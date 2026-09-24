@@ -16,13 +16,23 @@ commands below to match reality. The rules here are decided: flag problems, but 
 - **Backend:** Go, standard library first. `net/http` routing with method/path patterns
   (`GET /api/rooms/{id}`), no web framework. `database/sql` with hand-written SQL, no ORM. `log/slog`.
   WebSockets via `github.com/coder/websocket`. SQLite via `modernc.org/sqlite` (pure Go, so
-  `CGO_ENABLED=0` and simple Docker builds). `ffmpeg`/`ffprobe` run through `os/exec`.
+  `CGO_ENABLED=0` and simple Docker builds). File watching via `github.com/fsnotify/fsnotify`.
+  `ffmpeg`/`ffprobe` run through `os/exec`.
 - **Frontend:** SvelteKit with `adapter-static` in SPA mode (`fallback: 'index.html'`, `ssr = false` in
   the root layout), Svelte 5 runes, Tailwind v4 (config lives in CSS via `@theme`; there is no
-  `tailwind.config.js`). The build is embedded into the Go binary. Go serves real files and falls back
-  to `index.html` for app routes like `/rooms/{id}`.
+  `tailwind.config.js`). Go serves real files and falls back to `index.html` for app routes like
+  `/rooms/{id}`.
+- **Embedding:** the web build is embedded into the Go binary with `//go:embed all:build`. Plain
+  `build` would skip `build/_app`, where all the JS lives: `go:embed` leaves out names starting with `_`
+  or `.`. `web/build/.gitkeep` is committed so Go compiles before any web build exists. SvelteKit empties
+  `build/` on every build, so the web build task recreates `.gitkeep` afterwards.
 - **Database:** one SQLite file in the data dir.
 - **Docker** for both dev and prod. **Taskfile** wraps every command.
+- **Versions:** `go.mod` says `go 1.25`, the minimum (`http.CrossOriginProtection` needs 1.25, `os.Root`
+  needs 1.24). The Dockerfile builds with the current stable Go, `golang:1.27`: Go only patches the last
+  two releases. The web build uses Node LTS, `node:24-slim`. The runtime image is `debian:trixie-slim`
+  with its `ffmpeg` package (7.1), patched by Debian. Not `jrottenberg/ffmpeg`: one maintainer, and a
+  newer ffmpeg buys nothing, since video is never re-encoded.
 
 ## Commands (planned)
 
@@ -31,6 +41,7 @@ task dev                                                  # dev stack, hot reloa
 task test                                                 # all unit tests (Go + web), in Docker
 task test:go -- -run TestParseEpisode ./internal/library  # one Go test
 task test:web -- src/lib/sync                             # web tests under one path
+task testdata                                             # make tiny test clips with ffmpeg
 task lint                                                 # gofmt, go vet, svelte-check
 task build                                                # build the production image
 task up | task down | task logs                           # start, stop, follow the production stack
@@ -39,10 +50,15 @@ task up | task down | task logs                           # start, stop, follow 
 Ask before `task up` or `task down`: they restart the live server, maybe mid-movie. Dev and prod use
 different ports, compose project names and data dirs, so `task dev` is safe to run next to prod.
 
-Config lives in `.env` (template: `.env.example`):
+Prod config lives in `.env` (template: `.env.example`):
 - `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media`.
-- `DATA_DIR`: host folder for the database and cache, mounted at `/data`.
-- `PUBLIC_BIND`: host IP for the guest port, default `0.0.0.0`.
+- `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data`.
+- `PUBLIC_BIND`: host IP for the guest port, default `127.0.0.1`. Nothing is open to guests until you set
+  it to the host's Tailscale IP.
+
+`.env` is for prod only. `compose.dev.yml` hardcodes dev's ports and data dir (`./.dev-data`). Dev reads
+the same `MEDIA_ROOT` as prod; it's mounted read-only, so sharing it is safe. Go reloads with `air`
+inside the dev container.
 
 ## Layout (planned)
 
@@ -60,8 +76,14 @@ compose.dev.yml      development
 Taskfile.yml
 ```
 
-URL prefixes: `/api` JSON, `/api/admin` admin only, `/ws` WebSocket (one per open room page), `/media`
-prepared videos and subtitles.
+URL prefixes: `/api` JSON, `/api/admin` admin only, `/ws` WebSocket (one per open room page), `/stream`
+prepared videos and subtitles. The URL prefix is `/stream`, not `/media`, on purpose: `/media` is the
+container mount for source files, and one name for two things gets mixed up in code.
+
+- Unknown `/api/*` and `/stream/*` paths return 404. Only other paths fall back to `index.html`.
+- `index.html` is served with `Cache-Control: no-cache`, `_app/immutable/*` as immutable.
+- The server sends its build ID when a socket connects. If it doesn't match the page's, the page
+  reloads. So after a deploy, open tabs never run old JS against the new server.
 
 ## Access and networking
 
@@ -72,44 +94,93 @@ prepared videos and subtitles.
 - Why ports and not IP checks: inside Docker, the host's own requests arrive from the Docker network
   gateway, not `127.0.0.1`, so the app can't tell host from guest by IP. Never add IP-based admin checks.
 - Tailscale runs on the host OS, not in a container, and it is the only access control: anyone who
-  reaches the guest port is trusted. Docker bypasses `ufw`, so the guest port is open on every network
-  the host is on unless `PUBLIC_BIND` is set to the host's Tailscale IP.
+  reaches the guest port is trusted. Docker bypasses `ufw`, so a port bound to `0.0.0.0` is open on
+  every network the host joins (café Wi-Fi too). That's why `PUBLIC_BIND` defaults to `127.0.0.1`.
+- Set `net.ipv4.ip_nonlocal_bind=1` on the host. At boot, Docker can start before Tailscale has its IP.
+  Without this, binding the Tailscale IP fails with "cannot assign requested address".
 - Plain HTTP over the tailnet (WireGuard already encrypts). Guest pages are **not** a secure context:
   no `crypto.randomUUID()`, `navigator.clipboard`, Wake Lock or other HTTPS-only browser APIs.
 - Wrap state-changing routes in `http.CrossOriginProtection` (Go 1.25+, CSRF), above all on the admin
   port.
-- In dev, Vite proxies `/api`, `/ws` and `/media` to Go, sending `/api/admin` to the admin listener.
-- Bandwidth: every viewer streams the original file. The host's upload must cover bitrate × viewers,
-  and a guest on a relayed (DERP) Tailscale link may buffer, which pauses the room.
+- The admin listener rejects any Host header that isn't `localhost`, `127.0.0.1` or `[::1]`, compared
+  without the port (browsers send `localhost:8081`). This stops DNS rebinding: a web page pointing its
+  own domain at `127.0.0.1` looks "same origin", so `CrossOriginProtection` sees nothing wrong.
+- Keep coder/websocket's Origin check on. Never `InsecureSkipVerify`.
+- In dev, Vite proxies `/api`, `/ws` and `/stream` to Go, sending `/api/admin` to the admin listener.
+  Don't set Vite's `changeOrigin`: it rewrites Host to the Docker service name, and the Host check then
+  rejects every admin call.
+- Bandwidth: every viewer streams the original-quality file. The host's upload must cover
+  bitrate × viewers, and a guest on a relayed (DERP) Tailscale link may buffer, which pauses the room.
+- Host offline: open tabs show "Host is offline, reconnecting…" and keep retrying. A fresh visit just
+  fails; fixing that needs a second machine, which is out of scope.
 
 ## Users
 
 - No accounts: one host (anyone on the admin port) plus anonymous guests.
 - First visit: pick a display name. The server creates a user with a random token in an `HttpOnly`
   cookie (it rides along on the WebSocket upgrade too). The token keeps the name across visits.
-- Everyone can: see all rooms, create rooms, control playback, switch a room's video, chat, archive and
-  unarchive rooms.
-- Host only (admin API): manage libraries (folder + type), rescan, delete rooms.
+- The cookie gets the longest life browsers allow (Chrome caps it at 400 days) and is refreshed on
+  every visit.
+- Cookies are per host name: `localhost`, the Tailscale IP and the MagicDNS name each give a different
+  user. Give guests one address to use.
+- Names: 1–32 characters, trimmed, no control characters. Rename from a menu. Duplicates are allowed
+  (no accounts, so no way to reclaim a name).
+- `GET /api/me` returns `{name, isAdmin}`. The admin listener sets `isAdmin`. The page hides admin links
+  when it's false.
+- Everyone can: see all rooms, create and name rooms, control playback, switch a room's video, chat,
+  archive and unarchive rooms.
+- Host only (admin API): manage libraries (folder + type), rescan, delete rooms, set language defaults.
 - Render all user text (names, chat) as text. Never `{@html}`.
+- UI is English only, with all strings in one file so Turkish is easy to add later.
+
+### Admin page
+
+- Libraries: add, remove, rescan with progress.
+- Files we can't use (skipped or unplayable), each with its reason, plus "Apple devices only" warnings.
+- The job queue, with failed jobs and ffmpeg's error.
+- Cache size and free disk space.
+- Language defaults for new picks.
+- Room delete is not here. It lives on the homepage room cards, shown only when `isAdmin`. The call
+  still goes to `/api/admin`.
 
 ## Library
 
-- Local files only. A library is a folder under `/media` plus a type. The admin folder picker browses
-  `/media` only. Never write into media folders.
+- Local files only. A library is a folder under `/media` plus a type. Never write into media folders.
+- Libraries can't overlap: refuse a folder that equals, contains or sits inside another library's
+  folder. Otherwise one file gets two identities.
+- The admin folder picker browses `/media` through Go's `os.Root`, so a symlink can't lead outside it.
+  The scanner doesn't follow directory symlinks (they can loop).
 - Types: **Movies**, **TV Shows**, **Other Videos**.
+- Video files are an allowlist of extensions: `.mkv .mp4 .m4v .mov .avi .webm .ts .m2ts`. Skip hidden
+  files and macOS `._*` files.
 - Plex naming is required for Movies and TV Shows. Files that don't match are skipped and listed on the
   admin page with the reason:
   - Movies: `Title (Year)/Title (Year).ext`; a loose `Title (Year).ext` is fine too.
+    - `{edition-Director's Cut}` is kept as an edition label, so two editions in one folder stay
+      apart. Other `{...}` tags are ignored.
+    - Extras folders (`Featurettes`, `Behind The Scenes`, `Trailers`, `Extras`) and samples
+      (`sample.mkv`) are skipped quietly, not listed.
+    - Split files (`pt1`, `cd1`) are skipped with a reason.
   - TV: `Show (Year)/Season 01/Show (Year) - s01e02 - Episode Title.ext`; year and episode title optional.
-  - Other Videos: the file name is the title.
-  - `{...}` tags such as `{edition-Director's Cut}` are ignored.
+    - Also accepted: two episodes in one file (`s01e01-e02`), specials (`Specials` or `Season 00`),
+      season folders without a zero (`Season 1`), and episodes loose in the show folder.
+    - Date-based (`Show - 2024-05-01`) and absolute-numbered (anime) episodes are skipped with a reason.
+  - Other Videos: the file name is the title. Sub-folders become groups in the picker.
 - Metadata comes from names only: no online lookups, no artwork. `ffprobe` supplies only technical
   facts (duration, codecs, audio and subtitle tracks).
-- Sidecar subtitles sit next to the video with Plex names: `Title (Year).en.srt`,
-  `Title (Year).en.forced.srt`.
-- Watching: inotify watches one directory at a time, so add a watch per directory. Debounce events and
-  wait until a new file stops growing before probing it. Also rescan on a timer and on the admin
-  "Rescan" button, because events do get missed (network drives, inotify limits).
+- Sidecar subtitles sit next to the video with Plex names. Accepted: a 2- or 3-letter language code
+  (`Title (Year).en.srt`, `.eng.srt`), the `forced`, `sdh` and `hi` flags (`.en.forced.srt`,
+  `.en.sdh.srt`), and no language at all (`Title (Year).srt`). A `Subs/` folder is not read.
+- A video's identity is its library + its path relative to the library folder. A rename makes a new
+  video, and the old one turns missing.
+- Video rows are never deleted, not even when their library is removed. Rooms and chat messages point
+  at them. A gone file is marked missing, and its row keeps the title so old chat can still show it.
+- Watching uses `fsnotify`. inotify watches one directory at a time, so add a watch per directory.
+  Debounce events. A file moved into place counts as done (most tools rename when finished). A file
+  written in place is probed once it stops growing.
+- Rescan fully once at startup, then on a timer and on the admin "Rescan" button. Events get missed
+  (host off, network drives, inotify limits), and torrent clients may create full-size files up front.
+  A rescan re-probes only files whose size or mtime changed, and retries every failed probe.
 - Clients send IDs, never file paths. The admin folder picker is the one exception and must stay inside
   `/media`.
 
@@ -118,81 +189,183 @@ prepared videos and subtitles.
 Browsers play only some codecs, and a remux streamed on the fly can't seek (no fixed length, no index).
 So each room's video is **prepared once**, then served as a plain file.
 
-- Prepare = an ffmpeg remux to MP4 in `/data/cache`:
-  - video copied, never re-encoded (original quality). HEVC is tagged `hvc1` (`-tag:v hvc1`) or Apple
+- Codecs are checked at scan against an allowlist: H.264 (8-bit 4:2:0 only), HEVC, AV1, VP9.
+  Everything else is marked unplayable (VP8, 10-bit or 4:2:2/4:4:4 H.264, MPEG-2, VC-1, XviD, …).
+  Dolby Vision profile 5 gets an "Apple devices only" warning: other screens show it purple and green.
+- The scan also builds the full codec string from ffprobe data (e.g. `avc1.640028`) and sends it with
+  the video. The client checks that with `canPlayType()`: a bare `hvc1` answers "maybe" to almost
+  anything. The `<video>` error event is the backstop. Video is never transcoded, so when a device can't
+  decode it, show "This device can't play HEVC", not a black screen.
+- Prepare = one ffmpeg run into `/data/cache`:
+  - Video copied, never re-encoded (original quality). HEVC is tagged `hvc1` (`-tag:v hvc1`) or Apple
     devices refuse it.
-  - only the room's chosen audio track (browsers can't switch audio tracks). Copied if it's AAC with at
-    most two channels, otherwise converted to stereo AAC with a dialogue-friendly downmix (ffmpeg's
-    default 5.1 → stereo downmix makes voices quiet).
+  - Only the room's chosen audio track (browsers can't switch audio tracks). Copied if it's AAC with at
+    most two channels. Otherwise converted to stereo AAC at 192k:
+    - mono and stereo: just `-ac 2`.
+    - more channels: normalize the layout first (7.1 → 5.1, side → back), then one center-boosting
+      `pan` formula, then a light `acompressor` so explosions don't drown voices on phone speakers.
+      ffmpeg's default 5.1 → stereo downmix makes voices quiet.
+  - All embedded text subtitle tracks become WebVTT in the same run. Their packets are spread across the
+    whole file, so pulling them out costs a full read, just like the remux.
   - `-movflags +faststart`, so the index sits at the front and playback starts right away.
+  - Output goes to `*.tmp` and is renamed when done, so a half-written file never looks finished. Name
+    the format (`-f mp4`), since ffmpeg guesses it from the extension. On start, delete leftover
+    `*.tmp` files.
 - Every video goes through prepare, even ones a browser could play as-is. One code path, on purpose.
-- Jobs run one at a time, start as soon as a room gets a video, and report progress to the room.
+- The cache key is video + audio track + source size and mtime + a recipe version number. Rooms with the
+  same key share one copy. Bump the recipe version when the ffmpeg arguments change.
+- Prepare is lazy: a job is queued when someone opens a room, or picks a video in one, and its copy is
+  missing.
+- Jobs run one at a time and report progress to the room, or its place in line ("Queued, 2nd in
+  line"). A job is cancelled as soon as no room needs its result (switched away, archived, deleted).
+- Before each job, check free disk space. If it's too low, fail with a clear message.
+- A copy is deleted once nobody has opened any room using it for 7 days. Archived rooms don't count:
+  they can't play. Opening the room prepares it again.
+- A job reads and writes as fast as the disk allows, often on the disk viewers stream from. Measure
+  first. If viewers buffer during a job, cap it with ffmpeg's `-readrate`.
 - Serve with `http.ServeContent`: Range requests give native `<video>` seeking. No HLS.
-- Prepared copies are keyed by video + audio track, so rooms can share one. A copy is deleted once no
-  unarchived room uses it; unarchiving prepares it again. The cache needs free space about the size of
-  the videos in active rooms.
-- Codecs: H.264 plays everywhere. HEVC, AV1 and VP9 play only on some devices. Old codecs (MPEG-2, VC-1,
-  XviD) are marked unplayable at scan. Video is never transcoded, so when a device can't decode it
-  (`canPlayType()` or the `<video>` error event), show "This device can't play HEVC", not a black screen.
-- Subtitles: text tracks (embedded SRT/ASS/mov_text; sidecar `.srt`/`.vtt`/`.ass`) become WebVTT in
-  the cache, in UTF-8. Sidecars often aren't UTF-8 (e.g. Windows-1254 Turkish), so detect and convert.
-  ASS styling is lost. Image subtitles (PGS, VobSub) can't become text without OCR: list them as
-  unavailable.
-- Audio track, subtitle and subtitle offset are room state, shared by everyone. Subtitles render in our
-  own overlay, not native captions, so the offset is a simple time shift and we control where the text
-  sits (clear of chat toasts and controls).
+- Subtitles: text tracks (embedded SRT/ASS/mov_text; sidecar `.srt`/`.vtt`/`.ass`) become WebVTT in the
+  cache, in UTF-8. Embedded ones come out during prepare. Sidecars are converted at scan (they're
+  small). ASS styling is lost. Image subtitles (PGS, VobSub) can't become text without OCR: list them
+  as unavailable.
+- Sidecar text encoding: valid UTF-8 or a BOM → use it. Otherwise pick the code page from the language
+  in the file name (`tr` → Windows-1254, `ru` → Windows-1251, `el` → Windows-1253). Only then fall back
+  to a detector (they often guess wrong on short files).
+- The audio track is picked with the video and never changes after. A new track would mean a full
+  re-prepare. Subtitle and subtitle offset can change any time. All three are room state, shared by
+  everyone. Subtitles render in our own overlay, not native captions, so the offset is a simple time
+  shift and we control where the text sits (clear of chat toasts and controls).
 - If the video is gone (source moved or deleted, and no prepared copy), the room shows "Video missing"
   with the library picker. The new pick resumes at the same position.
 
-## Rooms and sync
+## Rooms
 
-- Anyone creates a room by picking a video, with audio track and subtitle defaults preselected.
-- The homepage lists every room with its current video and who's watching. Rooms live until deleted.
-  Archived rooms sit in their own section and can be unarchived.
+- Anyone creates a room by picking a video. The picker asks for the audio track and subtitle on every
+  pick, room creation and switch alike, with the defaults preselected.
+- Defaults come from an admin setting: preferred audio language (or "original") and subtitle languages
+  in order (e.g. `tr`, then `en`). Fall back to the file's default-track flag. Forced subtitles are
+  turned on when their language matches the audio.
+- Rooms have an optional name. Without one, show the current video.
+- The homepage lists every room with its current video and who's watching. It polls `GET /api/rooms`
+  every 5 s while the tab is visible, and right away when it becomes visible again.
+- Rooms live until the host deletes them. Then the server sends "room deleted" to everyone in it, and
+  their page goes home with a short note.
+- Archive is allowed only when nobody is watching. An archived room can't play, and its chat is
+  read-only. Archived rooms sit in their own homepage section and can be unarchived.
 - A room plays one video at a time. Anyone can switch it with the library picker, and TV episodes also
-  get a "Next episode" button. A switch starts at 0:00; only the "Video missing" swap keeps the position.
-- Progress is per room only: the position is saved on pause, seek and switch, and every few seconds
-  while playing. No per-user progress.
-- Presence: "watching now" (open socket) and "was here" (joined before, gone now), with a short
-  reconnect grace so flaky phones don't flicker between the two.
-- **The server is the source of truth.** Room state: video, playing, position + server timestamp,
-  audio track, subtitle, subtitle offset. Clients send intents (play, pause, seek, switch, subtitle,
-  offset) and status (ready, buffering, away). The server applies them and broadcasts the full state.
-- Clients estimate their clock offset to the server (ping/pong, keep the lowest-RTT sample) and compute
-  where playback should be. Small drift: nudge `playbackRate`. Big drift: seek.
+  get a "Next episode" button, which never lands on a special. A switch starts at 0:00; only the "Video
+  missing" swap keeps the position.
+- Before a switch, the switcher confirms: "You're at 1:40:00. Switch to …?" Nobody else is asked.
+- At the end of a video, the server (it knows the duration) pauses the room there. TV episodes show
+  "Next episode". No autoplay.
+- Progress is per room only: the position is saved on pause, seek and switch, and every 5 s while
+  playing. No per-user progress.
+- Presence: "watching now" (open socket) and "was here" (joined before, gone now), with a 15 s
+  reconnect grace so flaky phones don't flicker between the two. Each user shows once, even with two
+  tabs open.
+
+## Sync
+
+- **The server is the source of truth.** Room state: video, audio track, playing, position + server
+  timestamp, subtitle, subtitle offset. Clients send intents (play, pause, seek, switch, subtitle,
+  offset) and status (ready, buffering, away, can't play). The server applies them and broadcasts the
+  full state.
+- Status is tracked per socket, not per user. Clients send their position with each status message,
+  and every few seconds while playing. That's how the server knows when a skipped client has caught up,
+  and can show "Alice is 3 s behind".
+- In Go, one goroutine per room owns its state. Everything reaches it through a channel. The pure sync
+  logic runs inside that loop. No locks.
+- Server time is milliseconds since server start (monotonic), so it restarts at 0. Wall time is only
+  for what gets stored.
+- Clients estimate their clock offset to the server by ping/pong, keeping the lowest-RTT sample of the
+  last 10 pings (clocks drift, so old samples go stale). They throw the offset away on every reconnect
+  and the first pong gives a new one. After a restart every room is paused, so nothing needs the offset
+  until someone presses play. Clients time with `performance.now()`, never `Date.now()` (it can jump).
+- The clock ping, sent every few seconds, doubles as the heartbeat. No ping for 10 s → the socket
+  counts as disconnected. The client reconnects with backoff and gets the full state.
+- Drift: ignore it under 200 ms. Up to 1 s, nudge `playbackRate` by 5–10%. Beyond that, seek.
+- Play, pause and seek apply locally at once, then snap to the server's state when it arrives. The seek
+  bar sends a seek only when the user lets go.
 - Only our own controls send intents. `<video>` events (a `pause` from a locked phone, `waiting`) are
-  status, never commands. No native `controls` attribute.
-- Buffering: a client stalled longer than a short grace period pauses the room ("Waiting for Alice"),
-  and it resumes when everyone is ready. Anyone can press "Play anyway"; the stuck client is then
-  skipped until it catches up. Hidden or backgrounded tabs count as away and never block.
+  status, never commands.
+- The room waits for everyone. A client buffering or away (tab hidden or backgrounded) for longer than
+  3 s pauses the room ("Waiting for Alice"). It resumes when everyone is ready. Anyone can press "Play
+  anyway": the blocking client is then skipped until it catches up or comes back.
+- Some clients never block, and none of them count as away:
+  - a device marked "can't play" (it can't decode the video),
+  - someone who hasn't pressed "Tap to join" yet,
+  - a new joiner, until it has been ready once.
+- When someone pauses, the player shows a small note for 2 s ("Alice paused"). Not in chat, not stored.
 - The room pauses when the last person leaves. On server start, every room loads paused.
+- Timing numbers in this spec are named constants, kept in one place per side.
+- Keep sync logic pure (no IO, clock injected) on both sides, `internal/room` and `web/src/lib/sync`,
+  so it can be unit-tested.
+
+## Player
+
+- `<video playsinline>`, or iPhone opens its own fullscreen player on play: no chat, no subtitles, none
+  of our controls. Keep one `<video>` element for the life of the room page and only change its `src`;
+  a new element may need a fresh tap on iOS.
+- No native `controls` attribute. Set `disableRemotePlayback` and `disablePictureInPicture`: AirPlay,
+  Chromecast and Picture-in-Picture take the video out of the page, away from our subtitles, controls
+  and sync. Not in v1.
 - Browsers block autoplay with sound, so entering a room shows a "Tap to join" button first.
 - Fullscreen the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   `document.fullscreenEnabled` is false (iPhone Safari), fill the window with CSS instead.
-- Keep sync logic pure (no IO, clock injected) on both sides, `internal/room` and `web/src/lib/sync`,
-  so it can be unit-tested.
+- No playback speed control. `playbackRate` belongs to the drift fix.
+- Per device, in `localStorage`: volume, mute, subtitle size. Everything in room state is shared.
+- Subtitle cues: `<i>` and `<b>` become real elements. Everything else (`{\an8}`, ASS tags, other
+  markup) is dropped.
+- Library picker: a search box, show → season → episode grouping, and a "recently added" sort. Videos
+  this device can't play are greyed out.
 
 ## Chat
 
 - One chat per room, kept forever, deleted with the room (foreign-key cascade).
-- Plain text. Emoji are ordinary Unicode typed on the device keyboard; each device draws its own.
+- Plain text, at most 1000 characters. Emoji are ordinary Unicode typed on the device keyboard; each
+  device draws its own.
+- Live messages go both ways on the room socket. Opening the room loads the last 100; older ones load
+  on scroll up (`GET` with a cursor).
 - A message can reply to one earlier message and shows a short quote of it.
+- People can delete their own messages, not edit them. A reply to a deleted message quotes "deleted
+  message".
 - Each message stores the video and the room position when it was sent (from the server's room clock)
-  and shows that as a timestamp, plus the video's name if it isn't the one playing now.
+  and shows that as a timestamp, plus the video's name if it isn't the one playing now. The send time
+  (wall clock) shows on tap or hover.
 - No typing indicator, no sounds, no system messages: play, pause, seek, switch, join and leave never
   appear in chat.
 - UI: a side panel on wide screens, a bottom sheet on portrait phones. While it's closed, new messages
   pop up as small toasts over the video and fade out; tapping one opens a reply to it. Must work in
   fullscreen.
 
+## Operations
+
+- Start at boot: `restart: unless-stopped` in `compose.yml`, and the Docker service enabled in systemd.
+  The host PC is restarted often.
+- Clean shutdown on SIGTERM (`task down`, or the PC shutting down): save room positions, close sockets,
+  stop ffmpeg and delete its temp file. Set `stop_grace_period` in compose so the save has time to
+  finish; Docker kills the process after 10 s by default.
+- Backups: `VACUUM INTO` a file in `/data/backups` on start, then every 24 h while up. Skip it if the
+  newest backup is under 24 h old. Keep the last 7. Never copy the live database file: with WAL, a
+  plain copy can be broken.
+
 ## Conventions
 
 - Write unit tests for new logic: Go table-driven tests next to the code, Vitest for `web/src/lib`. The
   Plex name parser gets plenty of real-world file names. No end-to-end tests for now.
+- The ffmpeg arguments are where the bugs will be. So a few Go tests may run real ffmpeg inside Docker,
+  on the tiny clips `task testdata` makes: Plex names, 5.1 and 7.1 audio, a Windows-1254 `.srt`, an
+  HEVC file.
 - SQLite: every connection sets `foreign_keys=ON` (off by default, and cascades silently don't run
-  without it), WAL and `busy_timeout`, via `_pragma` in the DSN.
+  without it), WAL and `busy_timeout`, via `_pragma` in the DSN. Also `_txlock=immediate`: a
+  transaction that reads, then writes, can otherwise fail with `SQLITE_BUSY` at once, without waiting.
 - Migrations: numbered `.sql` files in `internal/store/migrations`, tracked with `PRAGMA user_version`.
   Never edit an applied migration; add a new one.
+- Migrations run on a dedicated connection with `foreign_keys=OFF`, set outside the transaction (inside
+  one it does nothing). Rebuilding a table (make new, copy, drop old) would otherwise run
+  `ON DELETE CASCADE` on the drop, and rebuilding `rooms` would wipe every chat message. Run
+  `PRAGMA foreign_key_check` before commit. Turn `foreign_keys` back `ON` before the connection returns
+  to the pool.
 - WebSocket messages are JSON `{"type": ..., ...}`, defined once per side (`internal/room/protocol.go`,
   `web/src/lib/protocol.ts`). Change both together.
 - The frontend uses relative URLs only, so one build works on both ports and behind the dev proxy.
