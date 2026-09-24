@@ -12,8 +12,8 @@ before the next one starts.
 4. Build until `task test` and `task lint` pass.
 5. Do the slice's "by hand" check.
 6. Update `CLAUDE.md` where it no longer matches the code (layout, commands, "planned"/"design only").
-7. `git add -A`, so new files show up in the diff. Then `/code-review high`. Add `/security-review` when
-   the slice touches ports, cookies, the admin API, file paths or the WebSocket.
+7. `git add -A`, so new files show up in the diff. Then `/code-review high`. Run `/security-review` on the
+   uncommitted working tree when the slice touches ports, cookies, the admin API, file paths or the WebSocket.
 8. Human reads the diff (`git diff --cached`).
 9. Tick the box below. Commit with the `git-commit` skill, then merge the branch into `main`.
 
@@ -24,7 +24,7 @@ Rules:
 
 ## Slices
 
-### [ ] 1. Skeleton
+### [x] 1. Skeleton
 
 **Goal:** a Go binary with both listeners serves an empty SvelteKit page, in Docker, with every `task`
 command working.
@@ -48,7 +48,7 @@ command working.
 - Admin listener: Host `localhost:8081`, `127.0.0.1`, `[::1]` pass. `evil.com`, `localhost.evil.com` → rejected.
 
 **By hand:** `task dev` shows the page at `http://localhost:5173`. `task build`, then run the image and
-open `:8080` and `:8081`. `docker compose ps`: `8081` on `127.0.0.1` only, `8080` on `PUBLIC_BIND`.
+open `:8420` and `:8421`. `docker compose ps`: `8421` on `127.0.0.1` only, `8420` on `PUBLIC_BIND`.
 `git status` is clean after both (`web/build/.gitkeep` still there).
 
 **Not here:** database, users, any real page.

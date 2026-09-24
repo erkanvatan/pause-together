@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 serves its local video library. Guests reach it over Tailscale and watch in sync from PCs, tablets and
 phones. Same show. Same second. Different places.
 
-**Status: design only, no code yet.** This file is the spec. As code lands, update the layout and
-commands below to match reality. The rules here are decided: flag problems, but don't quietly change them.
+**Status: being built in slices (`docs/plan.md`); the skeleton is done.** This file is the spec. As code
+lands, update the layout and commands below to match reality. The rules here are decided: flag problems, but don't quietly change them.
 
 ## Stack
 
@@ -34,15 +34,15 @@ commands below to match reality. The rules here are decided: flag problems, but 
   with its `ffmpeg` package (7.1), patched by Debian. Not `jrottenberg/ffmpeg`: one maintainer, and a
   newer ffmpeg buys nothing, since video is never re-encoded.
 
-## Commands (planned)
+## Commands
 
 ```sh
 task dev                                                  # dev stack, hot reload: http://localhost:5173
 task test                                                 # all unit tests (Go + web), in Docker
 task test:go -- -run TestParseEpisode ./internal/library  # one Go test
 task test:web -- src/lib/sync                             # web tests under one path
-task testdata                                             # make tiny test clips with ffmpeg
-task lint                                                 # gofmt, go vet, svelte-check
+task testdata                                             # make tiny test clips with ffmpeg (slice 5)
+task lint                                                 # golangci-lint (.golangci.yml), svelte-check
 task build                                                # build the production image
 task up | task down | task logs                           # start, stop, follow the production stack
 ```
@@ -50,27 +50,38 @@ task up | task down | task logs                           # start, stop, follow 
 Ask before `task up` or `task down`: they restart the live server, maybe mid-movie. Dev and prod use
 different ports, compose project names and data dirs, so `task dev` is safe to run next to prod.
 
-Prod config lives in `.env` (template: `.env.example`):
-- `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media`.
-- `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data`.
+Prod config lives in `.env` (template: `.env.example`). Each variable arrives with the slice that first
+uses it:
+- `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media` (slice 5).
+- `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data` (slice 2).
 - `PUBLIC_BIND`: host IP for the guest port, default `127.0.0.1`. Nothing is open to guests until you set
   it to the host's Tailscale IP.
+- `GUEST_PORT`, `ADMIN_PORT`: host ports, default `8420` and `8421`. Inside the container Go always
+  listens on `8080` and `8081`. Only the host side changes, so a clash on the host (8080 is a popular
+  port) never touches code or tests.
 
 `.env` is for prod only. `compose.dev.yml` hardcodes dev's ports and data dir (`./.dev-data`). Dev reads
 the same `MEDIA_ROOT` as prod; it's mounted read-only, so sharing it is safe. Go reloads with `air`
-inside the dev container.
+inside the dev container (`.air.toml`). Dev publishes only `127.0.0.1:5173`; Go's ports stay inside the
+Docker network. Tests and lint run in the dev containers (`compose run --rm --no-deps`).
 
-## Layout (planned)
+- Containers run as you (`HOST_UID`/`HOST_GID`, set by the Taskfile), so nothing root-owned lands in the
+  repo. Not `UID`: shells treat it as read-only.
+- Dev caches (Go build and modules, npm, air) live in `./.cache/`, ignored by git and Docker.
+- `npm ci` runs only when `web/package-lock.json` is newer than `web/node_modules/.package-lock.json`,
+  so it never wipes `node_modules` under a running dev server.
+
+## Layout
 
 ```
 cmd/pausetogether/   main: config, wiring, both HTTP listeners
 internal/api/        HTTP handlers, guest vs admin routes, SPA serving
-internal/room/       room state, sync engine, presence, chat, WebSocket hub
-internal/library/    folder scanning, Plex name parsing, file watching
-internal/media/      ffprobe, prepare jobs, subtitles to WebVTT, cache
-internal/store/      SQLite access; migrations/*.sql embedded and applied at startup
+internal/room/       (planned) room state, sync engine, presence, chat, WebSocket hub
+internal/library/    (planned) folder scanning, Plex name parsing, file watching
+internal/media/      (planned) ffprobe, prepare jobs, subtitles to WebVTT, cache
+internal/store/      (planned) SQLite access; migrations/*.sql embedded and applied at startup
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
-Dockerfile           web build → Go build → runtime image with ffmpeg
+Dockerfile           web build → Go build → runtime image (ffmpeg from slice 5); go-dev stage for dev
 compose.yml          production
 compose.dev.yml      development
 Taskfile.yml
@@ -88,9 +99,9 @@ container mount for source files, and one name for two things gets mixed up in c
 ## Access and networking
 
 - One process, two HTTP listeners:
-  - **Guest port `:8080`**: the whole app except the admin API. Guests reach it over Tailscale.
-  - **Admin port `:8081`**: the same app **plus** the admin API. Compose publishes it on `127.0.0.1`
-    only, so only the host machine can reach it. The host uses `http://localhost:8081` for everything.
+  - **Guest port** (host `8420`, container `8080`): the whole app except the admin API. Guests reach it over Tailscale.
+  - **Admin port** (host `8421`, container `8081`): the same app **plus** the admin API. Compose publishes it on `127.0.0.1`
+    only, so only the host machine can reach it. The host uses `http://localhost:8421` for everything.
 - Why ports and not IP checks: inside Docker, the host's own requests arrive from the Docker network
   gateway, not `127.0.0.1`, so the app can't tell host from guest by IP. Never add IP-based admin checks.
 - Tailscale runs on the host OS, not in a container, and it is the only access control: anyone who
@@ -103,13 +114,14 @@ container mount for source files, and one name for two things gets mixed up in c
 - Wrap state-changing routes in `http.CrossOriginProtection` (Go 1.25+, CSRF), above all on the admin
   port.
 - The admin listener rejects any Host header that isn't `localhost`, `127.0.0.1` or `[::1]`, compared
-  without the port (browsers send `localhost:8081`). This stops DNS rebinding: a web page pointing its
+  without the port (browsers send `localhost:8421`). This stops DNS rebinding: a web page pointing its
   own domain at `127.0.0.1` looks "same origin", so `CrossOriginProtection` sees nothing wrong.
 - Keep coder/websocket's Origin check on. Never `InsecureSkipVerify`.
 - In dev, Vite proxies `/api`, `/ws` and `/stream` to Go's admin listener, so `localhost:5173` is the
-  host's view (`isAdmin` true), like `localhost:8081` in prod. The guest view is covered by tests and
+  host's view (`isAdmin` true), like `localhost:8421` in prod. The guest view is covered by tests and
   seen on the prod image's guest port. Don't set Vite's `changeOrigin`: it rewrites Host to the Docker
-  service name, and the Host check then rejects every admin call.
+  service name, and the Host check then rejects every admin call. Vite's string shorthand
+  (`'/api': url`) turns `changeOrigin` on, so proxy entries are objects with `changeOrigin: false`.
 - Bandwidth: every viewer streams the original-quality file. The host's upload must cover
   bitrate × viewers, and a guest on a relayed (DERP) Tailscale link may buffer, which pauses the room.
 - Host offline: open tabs show "Host is offline, reconnecting…" and keep retrying. A fresh visit just

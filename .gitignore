@@ -1,0 +1,7 @@
+.env
+.dev-data/
+.cache/
+node_modules/
+web/.svelte-kit/
+web/build/*
+!web/build/.gitkeep

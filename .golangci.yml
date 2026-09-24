@@ -1,0 +1,14 @@
+version: "2"
+
+linters:
+  # standard: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  settings:
+    errcheck:
+      exclude-functions:
+        # Closing a file we only read from has no error worth handling.
+        - (io/fs.File).Close
+
+formatters:
+  enable:
+    - gofmt

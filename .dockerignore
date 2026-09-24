@@ -1,0 +1,8 @@
+# Dev's .dev-data holds whole prepared movies; never send it as build context.
+.git
+.env
+.dev-data
+.cache
+web/node_modules
+web/.svelte-kit
+web/build

@@ -1,0 +1,75 @@
+version: '3'
+
+env:
+  # Containers run as you, so files they write into the repo aren't owned by root.
+  # Not UID/GID: shells treat UID as read-only.
+  HOST_UID:
+    sh: id -u
+  HOST_GID:
+    sh: id -g
+
+vars:
+  DEV: docker compose -f compose.dev.yml
+  GO: '{{.DEV}} run --rm --no-deps api'
+  NODE: '{{.DEV}} run --rm --no-deps web'
+
+tasks:
+  dev:
+    desc: Dev stack with hot reload at http://localhost:5173
+    deps: [web:deps]
+    cmds:
+      - '{{.DEV}} up --build'
+
+  test:
+    desc: All unit tests (Go + web), in Docker
+    cmds:
+      - task: test:go
+      - task: test:web
+
+  test:go:
+    desc: 'Go tests. Pass go test args after --, e.g. task test:go -- -run TestRoutes ./internal/api'
+    cmds:
+      - '{{.GO}} go test {{.CLI_ARGS | default "./..."}}'
+
+  test:web:
+    desc: 'Web tests. Pass a path after --, e.g. task test:web -- src/lib/sync'
+    deps: [web:deps]
+    cmds:
+      - '{{.NODE}} npm test -- {{.CLI_ARGS}}'
+
+  lint:
+    desc: golangci-lint, svelte-check
+    deps: [web:deps]
+    cmds:
+      - '{{.GO}} golangci-lint run'
+      - '{{.NODE}} npm run check'
+
+  build:
+    desc: Build the production image
+    cmds:
+      - docker compose build
+
+  up:
+    desc: Start the production stack
+    cmds:
+      - docker compose up -d
+
+  down:
+    desc: Stop the production stack
+    cmds:
+      - docker compose down
+
+  logs:
+    desc: Follow the production logs
+    cmds:
+      - docker compose logs -f
+
+  web:deps:
+    internal: true
+    desc: npm ci, only when package-lock.json changed
+    status:
+      # npm writes this hidden lockfile on every install. Skipping when it's current means npm ci
+      # never wipes node_modules under a running dev server.
+      - test web/node_modules/.package-lock.json -nt web/package-lock.json
+    cmds:
+      - '{{.NODE}} npm ci'

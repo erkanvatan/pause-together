@@ -1,0 +1,13 @@
+# Production. Settings come from .env (template: .env.example).
+name: pausetogether
+
+services:
+  app:
+    build: .
+    image: pausetogether:latest
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    ports:
+      # Guest port: only as open as PUBLIC_BIND. Docker bypasses ufw.
+      - "${PUBLIC_BIND:-127.0.0.1}:${GUEST_PORT:-8420}:8080"
+      # Admin port: this machine only.
+      - "127.0.0.1:${ADMIN_PORT:-8421}:8081"

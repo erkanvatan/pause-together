@@ -1,0 +1,39 @@
+# Development: Go with air, Vite with hot reload. Open http://localhost:5173 (the host's view).
+name: pausetogether-dev
+
+x-dev: &dev
+  # Your own user, so files written into the repo (node_modules, caches) aren't owned by root.
+  user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+  volumes:
+    - .:/src
+
+services:
+  api:
+    <<: *dev
+    build:
+      context: .
+      target: go-dev
+    working_dir: /src
+    command: air
+    environment:
+      HOME: /tmp
+      GOCACHE: /src/.cache/go-build
+      GOMODCACHE: /src/.cache/go-mod
+      GOFLAGS: -modcacherw
+      GOLANGCI_LINT_CACHE: /src/.cache/golangci-lint
+
+  web:
+    <<: *dev
+    image: node:24-slim
+    # A real PID 1 that forwards Ctrl+C. Exit code 143 on stop just means "stopped by SIGTERM".
+    init: true
+    working_dir: /src/web
+    command: npm run dev -- --host 0.0.0.0
+    environment:
+      HOME: /tmp
+      npm_config_cache: /src/.cache/npm
+      npm_config_update_notifier: "false"
+      API_URL: http://api:8081
+    ports:
+      # Only on 127.0.0.1: Vite proxies to the admin API. Docker bypasses ufw.
+      - "127.0.0.1:5173:5173"

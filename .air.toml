@@ -1,0 +1,15 @@
+# Hot reload for Go in compose.dev.yml.
+root = "."
+tmp_dir = ".cache/air"
+
+[build]
+  cmd = "go build -o .cache/air/pausetogether ./cmd/pausetogether"
+  entrypoint = [".cache/air/pausetogether"]
+  include_ext = ["go"]
+  exclude_dir = [".cache", ".dev-data", "web/node_modules", "web/.svelte-kit", "web/build", "web/src"]
+  send_interrupt = true
+  # Longer than main.go's 5 s shutdown timeout, so graceful shutdown runs on every reload.
+  kill_delay = "6s"
+
+[misc]
+  clean_on_exit = true
