@@ -106,9 +106,10 @@ container mount for source files, and one name for two things gets mixed up in c
   without the port (browsers send `localhost:8081`). This stops DNS rebinding: a web page pointing its
   own domain at `127.0.0.1` looks "same origin", so `CrossOriginProtection` sees nothing wrong.
 - Keep coder/websocket's Origin check on. Never `InsecureSkipVerify`.
-- In dev, Vite proxies `/api`, `/ws` and `/stream` to Go, sending `/api/admin` to the admin listener.
-  Don't set Vite's `changeOrigin`: it rewrites Host to the Docker service name, and the Host check then
-  rejects every admin call.
+- In dev, Vite proxies `/api`, `/ws` and `/stream` to Go's admin listener, so `localhost:5173` is the
+  host's view (`isAdmin` true), like `localhost:8081` in prod. The guest view is covered by tests and
+  seen on the prod image's guest port. Don't set Vite's `changeOrigin`: it rewrites Host to the Docker
+  service name, and the Host check then rejects every admin call.
 - Bandwidth: every viewer streams the original-quality file. The host's upload must cover
   bitrate × viewers, and a guest on a relayed (DERP) Tailscale link may buffer, which pauses the room.
 - Host offline: open tabs show "Host is offline, reconnecting…" and keep retrying. A fresh visit just
