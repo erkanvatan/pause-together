@@ -1,4 +1,4 @@
-# Dev's .dev-data holds whole prepared movies; never send it as build context.
+# Dev's .dev-data will hold whole prepared movies; never send it as build context.
 .git
 .env
 .dev-data

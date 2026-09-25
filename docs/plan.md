@@ -12,8 +12,11 @@ before the next one starts.
 4. Build until `task test` and `task lint` pass.
 5. Do the slice's "by hand" check.
 6. Update `CLAUDE.md` where it no longer matches the code (layout, commands, "planned"/"design only").
-7. `git add -A`, so new files show up in the diff. Then `/code-review high`. Run `/security-review` on the
-   uncommitted working tree when the slice touches ports, cookies, the admin API, file paths or the WebSocket.
+7. `git add -A`, so new files show up in the diff. 
+    1. Run `/code-review high`.
+    2. Run `/security-review` on the uncommitted working tree when the slice touches ports, cookies, the admin API, 
+       file paths or the WebSocket.
+    3. Fix comments with the `fix-comments` skill.
 8. Human reads the diff (`git diff --cached`).
 9. Tick the box below. Commit with the `git-commit` skill, then merge the branch into `main`.
 

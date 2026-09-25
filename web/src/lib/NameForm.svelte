@@ -2,7 +2,6 @@
 	import { saveName } from '$lib/me.svelte';
 	import { strings } from '$lib/strings';
 
-	// No maxlength: it counts UTF-16 units, not runes. The server decides.
 	let {
 		initial = '',
 		ondone,
@@ -30,6 +29,7 @@
 
 <form onsubmit={submit} class="flex w-full max-w-xs flex-col gap-3">
 	<label for="name" class="text-lg font-medium">{strings.namePrompt}</label>
+	<!-- No maxlength: it counts UTF-16 units, not runes. The server decides. -->
 	<!-- svelte-ignore a11y_autofocus -->
 	<input
 		id="name"
