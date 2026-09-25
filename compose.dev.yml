@@ -15,6 +15,16 @@ services:
       target: go-dev
     working_dir: /src
     command: air
+    volumes:
+      - .:/src
+      # Prod's media folder, from .env. Read-only, so sharing it with prod is safe. Required: compose
+      # checks it for every command, tests and lint included.
+      - type: bind
+        source: ${MEDIA_ROOT:?set MEDIA_ROOT in .env}
+        target: /media
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       HOME: /tmp
       # The image's GOPATH (/go) is root-owned; go get writes its checksum cache under GOPATH/pkg/sumdb.

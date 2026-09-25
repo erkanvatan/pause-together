@@ -103,7 +103,7 @@ func (l *testLib) write(rel, content string) {
 
 func (l *testLib) scan() {
 	l.t.Helper()
-	if err := l.scanner.ScanLibrary(context.Background(), l.lib); err != nil {
+	if err := l.scanner.ScanLibrary(context.Background(), l.lib, nil); err != nil {
 		l.t.Fatalf("scan: %v", err)
 	}
 }
@@ -441,6 +441,30 @@ func TestScanSymlinkedLibraryFolder(t *testing.T) {
 	}
 }
 
+// A library folder that is a symlink, pointed outside the media folder after it was added, is not
+// walked, and its videos don't turn missing.
+func TestScanSymlinkLeadsOutside(t *testing.T) {
+	l := newTestLib(t, Movies)
+	l.write("Heat (1995).mkv", "heat")
+	l.scan()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "Ronin (1998).mkv"), []byte("ronin"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(l.dir, l.dir+".away"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, l.dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.scanner.ScanLibrary(context.Background(), l.lib, nil); !errors.Is(err, ErrBadPath) {
+		t.Errorf("err = %v, want ErrBadPath", err)
+	}
+	if got := l.videos(); len(got) != 1 || got["Heat (1995).mkv"].Missing {
+		t.Errorf("videos = %+v, want only Heat, not missing", got)
+	}
+}
+
 func TestScanLibraryIsAFile(t *testing.T) {
 	l := newTestLib(t, Movies)
 	if err := os.Remove(l.dir); err != nil {
@@ -449,7 +473,7 @@ func TestScanLibraryIsAFile(t *testing.T) {
 	if err := os.WriteFile(l.dir, []byte("not a folder"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := l.scanner.ScanLibrary(context.Background(), l.lib); err == nil {
+	if err := l.scanner.ScanLibrary(context.Background(), l.lib, nil); err == nil {
 		t.Error("want an error")
 	}
 }
@@ -462,7 +486,7 @@ func TestScanMissingRoot(t *testing.T) {
 	if err := os.Rename(l.dir, l.dir+".away"); err != nil {
 		t.Fatal(err)
 	}
-	if err := l.scanner.ScanLibrary(context.Background(), l.lib); err == nil {
+	if err := l.scanner.ScanLibrary(context.Background(), l.lib, nil); err == nil {
 		t.Error("scan of a missing library folder: want an error")
 	}
 	if v := l.videos()["Heat (1995).mkv"]; v.Missing {
@@ -505,26 +529,11 @@ func TestScanCancelled(t *testing.T) {
 		cancel()
 		return media.Info{}, errors.New("signal: killed")
 	})
-	if err := l.scanner.ScanLibrary(ctx, l.lib); !errors.Is(err, context.Canceled) {
+	if err := l.scanner.ScanLibrary(ctx, l.lib, nil); !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v, want context.Canceled", err)
 	}
 	if videos := l.videos(); len(videos) != 0 {
 		t.Errorf("videos = %v, want none written", videos)
-	}
-}
-
-func TestScanAll(t *testing.T) {
-	l := newTestLib(t, Movies)
-	l.write("Heat (1995).mkv", "heat")
-	// A second library whose folder is gone: logged, and the others still scan.
-	if _, err := l.db.Exec("INSERT INTO libraries (path, type) VALUES ('Gone', 'tv')"); err != nil {
-		t.Fatal(err)
-	}
-	if err := l.scanner.ScanAll(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := l.videos()["Heat (1995).mkv"]; !ok {
-		t.Error("Heat not scanned")
 	}
 }
 
@@ -543,11 +552,15 @@ func TestScanTestdata(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if _, err := db.Exec("INSERT INTO libraries (path, type) VALUES ('Movies', 'movies'), ('TV', 'tv')"); err != nil {
-		t.Fatal(err)
-	}
-	if err := (&Scanner{DB: db, Root: root, Prober: media.FFprobe{}}).ScanAll(ctx); err != nil {
-		t.Fatal(err)
+	scanner := &Scanner{DB: db, Root: root, Prober: media.FFprobe{}}
+	for i, lib := range []Library{{Path: "Movies", Type: Movies}, {Path: "TV", Type: TVShows}} {
+		lib.ID = int64(i + 1)
+		if _, err := db.Exec("INSERT INTO libraries (id, path, type) VALUES (?, ?, ?)", lib.ID, lib.Path, lib.Type); err != nil {
+			t.Fatal(err)
+		}
+		if err := scanner.ScanLibrary(ctx, lib, nil); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	want := map[string]string{ // title → codec string prefix, or unplayable reason

@@ -48,7 +48,8 @@
 			<NameForm initial={me.name} ondone={closeRename} oncancel={closeRename} />
 		</main>
 	{:else}
-		<header class="flex justify-end p-3">
+		<header class="flex items-center justify-between p-3">
+			<a href="/" class="px-1 font-semibold">{strings.appName}</a>
 			<div class="relative">
 				<button
 					onclick={() => (menuOpen = !menuOpen)}
@@ -73,6 +74,16 @@
 						>
 							{strings.rename}
 						</button>
+						{#if me.isAdmin}
+							<a
+								role="menuitem"
+								href="/admin"
+								onclick={() => (menuOpen = false)}
+								class="block w-full px-3 py-2 text-left hover:bg-neutral-800"
+							>
+								{strings.admin}
+							</a>
+						{/if}
 					</div>
 				{/if}
 			</div>

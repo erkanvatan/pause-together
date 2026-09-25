@@ -79,24 +79,30 @@ func run() error {
 		Keep: store.BackupKeep,
 		Now:  time.Now,
 	}
-	scanner := &library.Scanner{DB: db, Root: mediaDir, Prober: media.FFprobe{}}
+	scans := library.NewScans(&library.Scanner{DB: db, Root: mediaDir, Prober: media.FFprobe{}})
 
 	bgCtx, stopBackground := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	wg.Go(func() { backups.Run(bgCtx) })
-	wg.Go(func() {
-		if err := scanner.ScanAll(bgCtx); err != nil && bgCtx.Err() == nil {
-			slog.Error("startup scan", "err", err)
-		}
-	})
-	// Runs before db.Close: the backup loop and the scan must stop before the database closes.
+	wg.Go(func() { scans.Run(bgCtx) })
+	// Runs before db.Close: the backup loop and the scans must stop before the database closes.
 	defer func() {
 		stopBackground()
 		wg.Wait()
 	}()
+	// Every library is scanned once at startup. If that can't start, the server still serves; the
+	// admin page can rescan.
+	if err := scans.RequestAll(ctx); err != nil {
+		slog.Error("startup scan", "err", err)
+	}
 
 	build := web.Build()
-	deps := api.Deps{Users: &user.Store{DB: db}, TokenCookie: cfg.tokenCookie}
+	deps := api.Deps{
+		Users:       &user.Store{DB: db},
+		TokenCookie: cfg.tokenCookie,
+		Libraries:   &library.Libraries{DB: db, Root: mediaDir},
+		Scans:       scans,
+	}
 	servers := []*http.Server{
 		newServer(cfg.guestAddr, api.Guest(build, deps)),
 		newServer(cfg.adminAddr, api.Admin(build, deps)),

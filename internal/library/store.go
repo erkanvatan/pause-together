@@ -3,6 +3,7 @@ package library
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/erkanvatan/pause-together/internal/media"
 	"github.com/erkanvatan/pause-together/internal/store"
@@ -29,8 +30,9 @@ type skippedFile struct {
 	reason Reason
 }
 
-func (s *Scanner) libraries(ctx context.Context) ([]Library, error) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT id, path, type FROM libraries ORDER BY id")
+// activeLibraries returns every library that isn't removed.
+func activeLibraries(ctx context.Context, db *sql.DB) ([]Library, error) {
+	rows, err := db.QueryContext(ctx, "SELECT id, path, type FROM libraries WHERE NOT removed ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -44,6 +46,29 @@ func (s *Scanner) libraries(ctx context.Context) ([]Library, error) {
 		libs = append(libs, l)
 	}
 	return libs, rows.Err()
+}
+
+// getLibrary returns a library that isn't removed, or ErrNotFound.
+func getLibrary(ctx context.Context, db *sql.DB, id int64) (Library, error) {
+	var l Library
+	err := db.QueryRowContext(ctx, "SELECT id, path, type FROM libraries WHERE id = ? AND NOT removed", id).
+		Scan(&l.ID, &l.Path, &l.Type)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Library{}, ErrNotFound
+	}
+	return l, err
+}
+
+// checkActive returns ErrRemoved if the library was removed. Scans call it first in each of their
+// transactions: a removal can't run between the check and the writes, so a scan that was running
+// when its library was removed can never bring its videos back.
+func checkActive(ctx context.Context, tx *sql.Tx, libraryID int64) error {
+	var removed bool
+	err := tx.QueryRowContext(ctx, "SELECT removed FROM libraries WHERE id = ?", libraryID).Scan(&removed)
+	if errors.Is(err, sql.ErrNoRows) || err == nil && removed {
+		return ErrRemoved
+	}
+	return err
 }
 
 // knownVideos returns the library's video rows by path.
@@ -83,6 +108,9 @@ func (s *Scanner) saveProbed(ctx context.Context, libraryID int64, rel string, v
 	}
 
 	return store.InTx(ctx, s.DB, func(tx *sql.Tx) error {
+		if err := checkActive(ctx, tx, libraryID); err != nil {
+			return err
+		}
 		var id int64
 		err := tx.QueryRowContext(ctx, `
 			INSERT INTO videos (library_id, path, title, year, edition, version, season, episode, episode_end,
@@ -136,6 +164,9 @@ func (s *Scanner) saveProbed(ctx context.Context, libraryID int64, rel string, v
 func (s *Scanner) finishScan(ctx context.Context, libraryID int64, refresh []parsedVideo, gone []int64,
 	skipped []skippedFile) error {
 	return store.InTx(ctx, s.DB, func(tx *sql.Tx) error {
+		if err := checkActive(ctx, tx, libraryID); err != nil {
+			return err
+		}
 		for _, u := range refresh {
 			v := u.video
 			if _, err := tx.ExecContext(ctx, `

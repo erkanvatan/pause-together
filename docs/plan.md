@@ -144,7 +144,7 @@ quiet skip, or skip with a reason.
 
 **Not here:** admin page, file watching, subtitle conversion.
 
-### [ ] 6. Admin: libraries
+### [x] 6. Admin: libraries
 
 **Goal:** the host manages libraries from the admin page.
 

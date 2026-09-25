@@ -53,7 +53,8 @@ different ports, compose project names and data dirs, so `task dev` is safe to r
 
 Prod config lives in `.env` (template: `.env.example`). Each variable arrives with the slice that first
 uses it:
-- `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media` (slice 6).
+- `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media` (slice 6). Required, in
+  dev too. The folder must exist: compose won't make it (`create_host_path: false`).
 - `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data` (slice 2). Required.
   `task up` creates it, owned by you. Compose itself uses `create_host_path: false`, so a plain
   `docker compose up` with a missing folder fails instead of Docker making it as root, where the app
@@ -64,10 +65,11 @@ uses it:
   listens on `8080` and `8081`. Only the host side changes, so a clash on the host (8080 is a popular
   port) never touches code or tests.
 
-`.env` is for prod only. `compose.dev.yml` hardcodes dev's ports and data dir (`./.dev-data`, via Go's
+`.env` is for prod, except `MEDIA_ROOT`. `compose.dev.yml` hardcodes dev's ports and data dir (`./.dev-data`, via Go's
 `DATA_DIR` env inside the repo mount, so Go creates it as you; the database is
-`./.dev-data/pausetogether.db`). Dev reads the same `MEDIA_ROOT` as prod (from slice 6); it's mounted
-read-only, so sharing it is safe. Go reloads with `air` inside the dev container (`.air.toml`). Dev
+`./.dev-data/pausetogether.db`). Dev reads the same `MEDIA_ROOT` as prod (compose reads `.env`
+itself); it's mounted read-only, so sharing it is safe. Compose checks it for every command, so
+`task dev`, `task test` and `task lint` all fail until `.env` sets it. Go reloads with `air` inside the dev container (`.air.toml`). Dev
 publishes only `127.0.0.1:5173`; Go's ports stay inside the Docker network. Tests and lint run in the dev
 containers (`compose run --rm --no-deps`).
 
@@ -92,9 +94,10 @@ containers (`compose run --rm --no-deps`).
 
 ```
 cmd/pausetogether/   main: config, wiring, both HTTP listeners
-internal/api/        HTTP handlers, guest vs admin routes, SPA serving
+internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only), SPA serving
 internal/room/       (planned) room state, sync engine, presence, chat, WebSocket hub
-internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks; file watching planned
+internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks,
+                     scan queue with progress, add/remove libraries, folder picker; file watching planned
 internal/media/      ffprobe and the codec check; prepare jobs, subtitles to WebVTT and cache planned
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
 internal/user/       name rules, users table (token stored as a SHA-256 hash), lookup by cookie token

@@ -19,3 +19,10 @@ services:
         target: /data
         bind:
           create_host_path: false
+      # All media, read-only: the app never writes into media folders.
+      - type: bind
+        source: ${MEDIA_ROOT:?set MEDIA_ROOT in .env}
+        target: /media
+        read_only: true
+        bind:
+          create_host_path: false

@@ -66,6 +66,8 @@ tasks:
     preconditions:
       - sh: test -n "$DATA_DIR"
         msg: Set DATA_DIR in .env (template .env.example)
+      - sh: test -n "$MEDIA_ROOT"
+        msg: Set MEDIA_ROOT in .env (template .env.example)
     cmds:
       # Made here, so it's owned by you. Compose won't make it (create_host_path: false): Docker would
       # make it as root.

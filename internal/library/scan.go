@@ -3,6 +3,7 @@ package library
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -18,10 +19,13 @@ import (
 
 // Library is a folder of videos under the media folder, plus its type.
 type Library struct {
-	ID   int64
-	Path string // relative to the media folder, "/" separators
-	Type Type
+	ID   int64  `json:"id"`
+	Path string `json:"path"` // relative to the media folder, "/" separators
+	Type Type   `json:"type"`
 }
+
+// ErrRemoved stops a scan whose library was removed while it ran.
+var ErrRemoved = errors.New("library removed")
 
 // Prober reads a video file's technical facts. media.FFprobe is the real one.
 type Prober interface {
@@ -35,24 +39,6 @@ type Scanner struct {
 	Prober Prober
 }
 
-// ScanAll scans every library, one after another. A library that fails is logged and the rest still
-// scan; only a failure to list the libraries, or a cancel, is returned.
-func (s *Scanner) ScanAll(ctx context.Context) error {
-	libs, err := s.libraries(ctx)
-	if err != nil {
-		return err
-	}
-	for _, lib := range libs {
-		if err := s.ScanLibrary(ctx, lib); err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			slog.Error("scan library", "library", lib.Path, "err", err)
-		}
-	}
-	return nil
-}
-
 // fileStat is a file found in a library folder.
 type fileStat struct {
 	name  string
@@ -62,16 +48,19 @@ type fileStat struct {
 
 // ScanLibrary brings one library's rows up to date with its folder. New and changed videos are
 // probed, and so are videos whose last probe failed. Videos no longer there are marked missing.
+// progress, if not nil, hears how many of the library's videos are done so far.
 //
-// If the library folder itself is gone or can't be read, it returns an error and marks nothing
-// missing. A sub-folder that can't be read is logged, and nothing under it is marked missing.
-func (s *Scanner) ScanLibrary(ctx context.Context, lib Library) error {
+// If the library folder itself is gone, can't be read, or leads outside the media folder, it returns
+// an error and marks nothing missing. A sub-folder that can't be read is logged, and nothing under it
+// is marked missing. If the library is removed meanwhile, it stops with ErrRemoved.
+func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(done, total int)) error {
 	known, err := s.knownVideos(ctx, lib.ID)
 	if err != nil {
 		return err
 	}
-	// Resolved, so a library folder that is itself a symlink gets walked. Folder links inside it still aren't.
-	root, err := filepath.EvalSymlinks(filepath.Join(s.Root, filepath.FromSlash(lib.Path)))
+	// Resolved, so a library folder that is itself a symlink gets walked. Folder links inside it still
+	// aren't. Checked on every scan: the link may point outside the media folder by now.
+	root, _, err := realPath(s.Root, lib.Path)
 	if err != nil {
 		return err
 	}
@@ -80,10 +69,14 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library) error {
 		return err
 	}
 
-	seen := make(map[string]bool)
-	var refresh []parsedVideo
+	// Every folder is parsed first, so the progress total is known before the slow probes start.
+	type foundVideo struct {
+		rel   string
+		video Video
+		st    fileStat
+	}
+	var found []foundVideo
 	var skipped []skippedFile
-	probed := 0
 	for _, dir := range slices.Sorted(maps.Keys(folders)) {
 		stats := folders[dir]
 		names := make([]string, len(stats))
@@ -95,30 +88,37 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library) error {
 			switch f.Kind {
 			case KindSkipped:
 				skipped = append(skipped, skippedFile{path: rel, reason: f.Reason})
-				continue
 			case KindVideo:
-			default:
-				continue // ignored; subtitles wait for their own slice
+				found = append(found, foundVideo{rel: rel, video: f.Video, st: stats[i]})
 			}
-
-			seen[rel] = true
-			st := stats[i]
-			if k, ok := known[rel]; ok && k.size == st.size && k.mtime == st.mtime && !k.failed {
-				// Unchanged file. Its row is written only if it was missing or its name parses differently now.
-				if k.missing || k.video != f.Video {
-					refresh = append(refresh, parsedVideo{id: k.id, video: f.Video})
-				}
-				continue
-			}
-			info, perr := s.Prober.Probe(ctx, filepath.Join(root, filepath.FromSlash(rel)))
-			if perr != nil && ctx.Err() != nil {
-				return ctx.Err()
-			}
-			if err := s.saveProbed(ctx, lib.ID, rel, f.Video, st, info, perr); err != nil {
-				return err
-			}
-			probed++
+			// Anything else is ignored; subtitles wait for their own slice.
 		}
+	}
+	if progress == nil {
+		progress = func(int, int) {}
+	}
+
+	seen := make(map[string]bool)
+	var refresh []parsedVideo
+	probed := 0
+	for i, fv := range found {
+		progress(i, len(found))
+		seen[fv.rel] = true
+		if k, ok := known[fv.rel]; ok && k.size == fv.st.size && k.mtime == fv.st.mtime && !k.failed {
+			// Unchanged file. Its row is written only if it was missing or its name parses differently now.
+			if k.missing || k.video != fv.video {
+				refresh = append(refresh, parsedVideo{id: k.id, video: fv.video})
+			}
+			continue
+		}
+		info, perr := s.Prober.Probe(ctx, filepath.Join(root, filepath.FromSlash(fv.rel)))
+		if perr != nil && ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if err := s.saveProbed(ctx, lib.ID, fv.rel, fv.video, fv.st, info, perr); err != nil {
+			return err
+		}
+		probed++
 	}
 
 	var gone []int64
@@ -130,6 +130,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library) error {
 	if err := s.finishScan(ctx, lib.ID, refresh, gone, skipped); err != nil {
 		return err
 	}
+	progress(len(found), len(found))
 	slog.Info("scanned library", "library", lib.Path, "videos", len(seen), "probed", probed,
 		"skipped", len(skipped), "missing", len(gone))
 	return nil

@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"net/http"
 
+	"github.com/erkanvatan/pause-together/internal/library"
 	"github.com/erkanvatan/pause-together/internal/user"
 )
 
@@ -14,6 +15,8 @@ type Deps struct {
 	// TokenCookie names the user's cookie. Browsers ignore the port when storing cookies, so dev
 	// (localhost:5173) and prod (localhost:8421) need different names or they overwrite each other.
 	TokenCookie string
+	Libraries   *library.Libraries // admin API only
+	Scans       *library.Scans     // admin API only
 }
 
 // Guest returns the handler for the guest port: the whole app except the admin API.
@@ -34,13 +37,17 @@ type server struct {
 	admin bool
 }
 
-// mux registers the routes shared by both ports. "/", "/api/" and "/stream/" carry no method:
-// "GET /" next to "/api/" is a pattern conflict, and ServeMux panics on it.
+// mux registers the routes: the admin API on the admin port only, the rest on both. "/", "/api/"
+// and "/stream/" carry no method: "GET /" next to "/api/" is a pattern conflict, and ServeMux panics
+// on it.
 func (s *server) mux(web fs.FS) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", health)
 	mux.HandleFunc("GET /api/me", s.getMe)
 	mux.HandleFunc("POST /api/me", s.postMe)
+	if s.admin {
+		s.adminRoutes(mux)
+	}
 	mux.Handle("/api/", http.NotFoundHandler())
 	mux.Handle("/stream/", http.NotFoundHandler())
 	mux.Handle("/", spa(web))
