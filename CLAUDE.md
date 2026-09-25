@@ -8,8 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 serves its local video library. Guests reach it over Tailscale and watch in sync from PCs, tablets and
 phones. Same show. Same second. Different places.
 
-**Status: being built in slices (`docs/plan.md`); the skeleton is done.** This file is the spec. As code
-lands, update the layout and commands below to match reality. The rules here are decided: flag problems, but don't quietly change them.
+**Status: being built in slices; `docs/plan.md` ticks off the done ones.** This file is the spec. As code
+lands, update the layout and commands below to match reality. The rules here are decided: flag problems,
+but don't quietly change them.
 
 ## Stack
 
@@ -25,10 +26,10 @@ lands, update the layout and commands below to match reality. The rules here are
 - **Embedding:** the web build is embedded into the Go binary with `//go:embed all:build`. Plain
   `build` would skip `build/_app`, where all the JS lives: `go:embed` leaves out names starting with `_`
   or `.`. `web/build/.gitkeep` is committed so Go compiles before any web build exists. SvelteKit empties
-  `build/` on every build, so the web build task recreates `.gitkeep` afterwards.
+  `build/` on every build, so the `build` script in `web/package.json` recreates `.gitkeep` afterwards.
 - **Database:** one SQLite file in the data dir.
 - **Docker** for both dev and prod. **Taskfile** wraps every command.
-- **Versions:** `go.mod` says `go 1.25`, the minimum (`http.CrossOriginProtection` needs 1.25, `os.Root`
+- **Versions:** `go.mod` says `go 1.25.0`, the minimum (`http.CrossOriginProtection` needs 1.25, `os.Root`
   needs 1.24). The Dockerfile builds with the current stable Go, `golang:1.27`: Go only patches the last
   two releases. The web build uses Node LTS, `node:24-slim`. The runtime image is `debian:trixie-slim`
   with its `ffmpeg` package (7.1), patched by Debian. Not `jrottenberg/ffmpeg`: one maintainer, and a
@@ -37,14 +38,14 @@ lands, update the layout and commands below to match reality. The rules here are
 ## Commands
 
 ```sh
-task dev                                                  # dev stack, hot reload: http://localhost:5173
-task test                                                 # all unit tests (Go + web), in Docker
-task test:go -- -run TestParseEpisode ./internal/library  # one Go test
-task test:web -- src/lib/sync                             # web tests under one path
-task testdata                                             # make tiny test clips with ffmpeg (slice 5)
-task lint                                                 # golangci-lint (.golangci.yml), svelte-check
-task build                                                # build the production image
-task up | task down | task logs                           # start, stop, follow the production stack
+task dev                                                      # dev stack, hot reload: http://localhost:5173
+task test                                                     # all unit tests (Go + web), in Docker
+task test:go -- -run TestMigrateInOrderOnce ./internal/store  # one Go test
+task test:web -- src/lib/sync                                 # web tests under one path
+task testdata                                                 # make tiny test clips with ffmpeg (slice 5)
+task lint                                                     # golangci-lint (.golangci.yml), svelte-check
+task build                                                    # build the production image
+task up | task down | task logs                               # build + start, stop, follow the production stack
 ```
 
 Ask before `task up` or `task down`: they restart the live server, maybe mid-movie. Dev and prod use
@@ -53,23 +54,35 @@ different ports, compose project names and data dirs, so `task dev` is safe to r
 Prod config lives in `.env` (template: `.env.example`). Each variable arrives with the slice that first
 uses it:
 - `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media` (slice 5).
-- `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data` (slice 2).
+- `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data` (slice 2). Required.
+  `task up` creates it, owned by you. Compose itself uses `create_host_path: false`, so a plain
+  `docker compose up` with a missing folder fails instead of Docker making it as root, where the app
+  can't write.
 - `PUBLIC_BIND`: host IP for the guest port, default `127.0.0.1`. Nothing is open to guests until you set
   it to the host's Tailscale IP.
 - `GUEST_PORT`, `ADMIN_PORT`: host ports, default `8420` and `8421`. Inside the container Go always
   listens on `8080` and `8081`. Only the host side changes, so a clash on the host (8080 is a popular
   port) never touches code or tests.
 
-`.env` is for prod only. `compose.dev.yml` hardcodes dev's ports and data dir (`./.dev-data`). Dev reads
-the same `MEDIA_ROOT` as prod; it's mounted read-only, so sharing it is safe. Go reloads with `air`
-inside the dev container (`.air.toml`). Dev publishes only `127.0.0.1:5173`; Go's ports stay inside the
-Docker network. Tests and lint run in the dev containers (`compose run --rm --no-deps`).
+`.env` is for prod only. `compose.dev.yml` hardcodes dev's ports and data dir (`./.dev-data`, via Go's
+`DATA_DIR` env inside the repo mount, so Go creates it as you; the database is
+`./.dev-data/pausetogether.db`). Dev reads the same `MEDIA_ROOT` as prod (from slice 5); it's mounted
+read-only, so sharing it is safe. Go reloads with `air` inside the dev container (`.air.toml`). Dev
+publishes only `127.0.0.1:5173`; Go's ports stay inside the Docker network. Tests and lint run in the dev
+containers (`compose run --rm --no-deps`).
 
 - Containers run as you (`HOST_UID`/`HOST_GID`, set by the Taskfile), so nothing root-owned lands in the
   repo. Not `UID`: shells treat it as read-only.
-- Dev caches (Go build and modules, npm, air) live in `./.cache/`, ignored by git and Docker.
+- Dev caches (Go build, modules and `GOPATH`, npm, air) live in `./.cache/`, ignored by git and Docker.
 - `npm ci` runs only when `web/package-lock.json` is newer than `web/node_modules/.package-lock.json`,
   so it never wipes `node_modules` under a running dev server.
+- Go reads `GUEST_ADDR`, `ADMIN_ADDR` and `DATA_DIR` (defaults `:8080`, `:8081`, `/data`).
+- `kill_delay` in `.air.toml` (6 s) must stay longer than `main.go`'s 5 s shutdown timeout, or reloads
+  skip the clean shutdown.
+- Vite proxies only `^/api/`, `^/stream/` and `^/ws`. A new Go URL prefix needs its own entry in
+  `web/vite.config.ts`.
+- The Dockerfile's Go stage copies only `cmd/`, `internal/` and `web/embed.go`. A new top-level Go folder
+  must be added there, or the prod build fails while dev still works.
 
 ## Layout
 
@@ -79,7 +92,7 @@ internal/api/        HTTP handlers, guest vs admin routes, SPA serving
 internal/room/       (planned) room state, sync engine, presence, chat, WebSocket hub
 internal/library/    (planned) folder scanning, Plex name parsing, file watching
 internal/media/      (planned) ffprobe, prepare jobs, subtitles to WebVTT, cache
-internal/store/      (planned) SQLite access; migrations/*.sql embedded and applied at startup
+internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
 Dockerfile           web build → Go build → runtime image (ffmpeg from slice 5); go-dev stage for dev
 compose.yml          production
@@ -359,7 +372,8 @@ So each room's video is **prepared once**, then served as a plain file.
   stop ffmpeg and delete its temp file. Set `stop_grace_period` in compose so the save has time to
   finish; Docker kills the process after 10 s by default.
 - Backups: `VACUUM INTO` a file in `/data/backups` on start, then every 24 h while up. Skip it if the
-  newest backup is under 24 h old. Keep the last 7. Never copy the live database file: with WAL, a
+  newest backup is under 24 h old (checked hourly, so a restart never stretches the gap to 48 h). The
+  time is in the file name. Keep the last 7. Never copy the live database file: with WAL, a
   plain copy can be broken.
 
 ## Conventions
@@ -372,8 +386,9 @@ So each room's video is **prepared once**, then served as a plain file.
 - SQLite: every connection sets `foreign_keys=ON` (off by default, and cascades silently don't run
   without it), WAL and `busy_timeout`, via `_pragma` in the DSN. Also `_txlock=immediate`: a
   transaction that reads, then writes, can otherwise fail with `SQLITE_BUSY` at once, without waiting.
-- Migrations: numbered `.sql` files in `internal/store/migrations`, tracked with `PRAGMA user_version`.
-  Never edit an applied migration; add a new one.
+- Migrations: `NNNN_name.sql` files in `internal/store/migrations`, numbered 1, 2, 3… with no gaps,
+  tracked with `PRAGMA user_version`. One transaction each. Never edit an applied migration; add a new
+  one. The folder keeps a `.gitkeep` (embedded with `all:`) so it compiles while empty.
 - Migrations run on a dedicated connection with `foreign_keys=OFF`, set outside the transaction (inside
   one it does nothing). Rebuilding a table (make new, copy, drop old) would otherwise run
   `ON DELETE CASCADE` on the drop, and rebuilding `rooms` would wipe every chat message. Run

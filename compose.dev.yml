@@ -17,10 +17,15 @@ services:
     command: air
     environment:
       HOME: /tmp
+      # The image's GOPATH (/go) is root-owned; go get writes its checksum cache under GOPATH/pkg/sumdb.
+      GOPATH: /src/.cache/go
       GOCACHE: /src/.cache/go-build
       GOMODCACHE: /src/.cache/go-mod
       GOFLAGS: -modcacherw
       GOLANGCI_LINT_CACHE: /src/.cache/golangci-lint
+      # Inside the repo mount, not a mount of its own: Docker would create a missing mount folder as
+      # root. Go makes this one itself, as you.
+      DATA_DIR: /src/.dev-data
 
   web:
     <<: *dev

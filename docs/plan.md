@@ -53,7 +53,7 @@ open `:8420` and `:8421`. `docker compose ps`: `8421` on `127.0.0.1` only, `8420
 
 **Not here:** database, users, any real page.
 
-### [ ] 2. Database
+### [x] 2. Database
 
 **Goal:** SQLite opens with the right settings, runs migrations safely, and makes backups.
 

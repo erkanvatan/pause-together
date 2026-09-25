@@ -50,9 +50,20 @@ tasks:
       - docker compose build
 
   up:
-    desc: Start the production stack
+    desc: Build and start the production stack
+    dotenv: ['.env']
+    preconditions:
+      - sh: test -n "$DATA_DIR"
+        msg: Set DATA_DIR in .env (template .env.example)
     cmds:
-      - docker compose up -d
+      # Made here, so it's owned by you. Compose won't make it (create_host_path: false): Docker would
+      # make it as root.
+      - |
+        dir=$DATA_DIR
+        case $dir in "~/"*) dir=$HOME/${dir#"~/"} ;; esac
+        mkdir -p "$dir"
+      # --build, so up never starts a stale image. Docker's cache makes it quick when nothing changed.
+      - docker compose up -d --build
 
   down:
     desc: Stop the production stack

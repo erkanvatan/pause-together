@@ -11,3 +11,11 @@ services:
       - "${PUBLIC_BIND:-127.0.0.1}:${GUEST_PORT:-8420}:8080"
       # Admin port: this machine only.
       - "127.0.0.1:${ADMIN_PORT:-8421}:8081"
+    volumes:
+      # Long syntax, so a missing folder fails here instead of Docker creating it as root, which the
+      # app (running as you) couldn't write to.
+      - type: bind
+        source: ${DATA_DIR:?set DATA_DIR in .env}
+        target: /data
+        bind:
+          create_host_path: false

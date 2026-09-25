@@ -1,0 +1,62 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"io/fs"
+	"path/filepath"
+	"testing"
+	"testing/fstest"
+)
+
+// openTest opens a fresh database in a temp dir with the given migrations.
+func openTest(t *testing.T, migrations fs.FS) (*sql.DB, string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "sub", "test.db")
+	db, err := Open(context.Background(), path, migrations)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	return db, path
+}
+
+func TestPoolPragmas(t *testing.T) {
+	ctx := context.Background()
+	db, _ := openTest(t, fstest.MapFS{
+		"0001_a.sql": {Data: []byte("CREATE TABLE a (id INTEGER PRIMARY KEY);")},
+	})
+
+	// The migration's connection went back to the pool; it must be the only one so far,
+	// so the first connection taken below is that one.
+	if n := db.Stats().OpenConnections; n != 1 {
+		t.Fatalf("open connections after Open = %d, want 1", n)
+	}
+
+	// Hold several at once, so each is a different connection.
+	for i := range 3 {
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = conn.Close() }()
+
+		checks := []struct {
+			pragma string
+			want   string
+		}{
+			{"foreign_keys", "1"},
+			{"journal_mode", "wal"},
+			{"busy_timeout", "5000"},
+		}
+		for _, c := range checks {
+			var got string
+			if err := conn.QueryRowContext(ctx, "PRAGMA "+c.pragma).Scan(&got); err != nil {
+				t.Fatal(err)
+			}
+			if got != c.want {
+				t.Errorf("conn %d: %s = %q, want %q", i, c.pragma, got, c.want)
+			}
+		}
+	}
+}
