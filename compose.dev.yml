@@ -26,6 +26,9 @@ services:
       # Inside the repo mount, not a mount of its own: Docker would create a missing mount folder as
       # root. Go makes this one itself, as you.
       DATA_DIR: /src/.dev-data
+      # Cookies ignore the port: with prod's name, dev (localhost:5173) and prod (localhost:8421)
+      # would overwrite each other's user cookie.
+      TOKEN_COOKIE: pt_token_dev
 
   web:
     <<: *dev

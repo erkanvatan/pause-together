@@ -4,23 +4,43 @@ package api
 import (
 	"io/fs"
 	"net/http"
+
+	"github.com/erkanvatan/pause-together/internal/user"
 )
 
+// Deps is what the handlers need, the same on both listeners.
+type Deps struct {
+	Users *user.Store
+	// TokenCookie names the user's cookie. Browsers ignore the port when storing cookies, so dev
+	// (localhost:5173) and prod (localhost:8421) need different names or they overwrite each other.
+	TokenCookie string
+}
+
 // Guest returns the handler for the guest port: the whole app except the admin API.
-func Guest(web fs.FS) http.Handler {
-	return http.NewCrossOriginProtection().Handler(newMux(web))
+func Guest(web fs.FS, d Deps) http.Handler {
+	s := &server{Deps: d}
+	return http.NewCrossOriginProtection().Handler(s.mux(web))
 }
 
 // Admin returns the handler for the admin port: the app plus the admin API, for local Host headers only.
-func Admin(web fs.FS) http.Handler {
-	return localHostOnly(http.NewCrossOriginProtection().Handler(newMux(web)))
+func Admin(web fs.FS, d Deps) http.Handler {
+	s := &server{Deps: d, admin: true}
+	return localHostOnly(http.NewCrossOriginProtection().Handler(s.mux(web)))
 }
 
-// newMux registers the routes shared by both ports. "/", "/api/" and "/stream/" carry no method:
+// server holds what the handlers need. admin is true only on the admin listener.
+type server struct {
+	Deps
+	admin bool
+}
+
+// mux registers the routes shared by both ports. "/", "/api/" and "/stream/" carry no method:
 // "GET /" next to "/api/" is a pattern conflict, and ServeMux panics on it.
-func newMux(web fs.FS) *http.ServeMux {
+func (s *server) mux(web fs.FS) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", health)
+	mux.HandleFunc("GET /api/me", s.getMe)
+	mux.HandleFunc("POST /api/me", s.postMe)
 	mux.Handle("/api/", http.NotFoundHandler())
 	mux.Handle("/stream/", http.NotFoundHandler())
 	mux.Handle("/", spa(web))
@@ -28,6 +48,5 @@ func newMux(web fs.FS) *http.ServeMux {
 }
 
 func health(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"status":"ok"}`))
+	writeJSON(w, map[string]string{"status": "ok"})
 }

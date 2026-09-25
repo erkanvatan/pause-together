@@ -16,6 +16,7 @@ import (
 
 	"github.com/erkanvatan/pause-together/internal/api"
 	"github.com/erkanvatan/pause-together/internal/store"
+	"github.com/erkanvatan/pause-together/internal/user"
 	"github.com/erkanvatan/pause-together/web"
 )
 
@@ -23,13 +24,17 @@ type config struct {
 	guestAddr string
 	adminAddr string
 	dataDir   string // database and backups; later the cache
+	// tokenCookie names the user cookie. Dev sets its own: cookies ignore the port, so dev and prod
+	// on localhost would otherwise overwrite each other's.
+	tokenCookie string
 }
 
 func loadConfig() config {
 	return config{
-		guestAddr: envOr("GUEST_ADDR", ":8080"),
-		adminAddr: envOr("ADMIN_ADDR", ":8081"),
-		dataDir:   envOr("DATA_DIR", "/data"),
+		guestAddr:   envOr("GUEST_ADDR", ":8080"),
+		adminAddr:   envOr("ADMIN_ADDR", ":8081"),
+		dataDir:     envOr("DATA_DIR", "/data"),
+		tokenCookie: envOr("TOKEN_COOKIE", "pt_token"),
 	}
 }
 
@@ -79,9 +84,10 @@ func run() error {
 	}()
 
 	build := web.Build()
+	deps := api.Deps{Users: &user.Store{DB: db}, TokenCookie: cfg.tokenCookie}
 	servers := []*http.Server{
-		newServer(cfg.guestAddr, api.Guest(build)),
-		newServer(cfg.adminAddr, api.Admin(build)),
+		newServer(cfg.guestAddr, api.Guest(build, deps)),
+		newServer(cfg.adminAddr, api.Admin(build, deps)),
 	}
 
 	// Bind both ports before serving, so a bind error (port taken, Tailscale IP not up) fails at once.

@@ -27,12 +27,13 @@ func fakeBuild() fstest.MapFS {
 	}
 }
 
-// handlers returns both listeners' handlers, keyed by name, over the same fake build.
-func handlers() map[string]http.Handler {
+// handlers returns both listeners' handlers, keyed by name, over the same fake build and database.
+func handlers(t *testing.T) map[string]http.Handler {
 	build := fakeBuild()
+	users := testUsers(t)
 	return map[string]http.Handler{
-		"guest": Guest(build),
-		"admin": Admin(build),
+		"guest": Guest(build, deps(users)),
+		"admin": Admin(build, deps(users)),
 	}
 }
 
@@ -72,7 +73,7 @@ func TestRoutes(t *testing.T) {
 		{name: "plain static file", path: "/favicon.png", wantStatus: 200, wantBody: "png", wantCache: noCache},
 	}
 
-	for hName, h := range handlers() {
+	for hName, h := range handlers(t) {
 		for _, tt := range tests {
 			t.Run(hName+"/"+tt.name, func(t *testing.T) {
 				rec := do(h, http.MethodGet, tt.path, nil)
@@ -95,7 +96,7 @@ func TestRoutes(t *testing.T) {
 }
 
 func TestSPARejectsWrites(t *testing.T) {
-	for hName, h := range handlers() {
+	for hName, h := range handlers(t) {
 		t.Run(hName, func(t *testing.T) {
 			// Same-origin, so CrossOriginProtection lets it through and the SPA handler decides.
 			header := http.Header{"Sec-Fetch-Site": {"same-origin"}}
@@ -126,7 +127,7 @@ func TestAdminHostCheck(t *testing.T) {
 		{"", 403},
 	}
 
-	h := Admin(fakeBuild())
+	h := Admin(fakeBuild(), deps(testUsers(t)))
 	for _, tt := range tests {
 		t.Run(tt.host, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
@@ -144,14 +145,14 @@ func TestGuestIgnoresHost(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	req.Host = "evil.com"
 	rec := httptest.NewRecorder()
-	Guest(fakeBuild()).ServeHTTP(rec, req)
+	Guest(fakeBuild(), deps(testUsers(t))).ServeHTTP(rec, req)
 	if rec.Code != 200 {
 		t.Errorf("status = %d, want 200", rec.Code)
 	}
 }
 
 func TestCrossOriginPostRefused(t *testing.T) {
-	for hName, h := range handlers() {
+	for hName, h := range handlers(t) {
 		t.Run(hName, func(t *testing.T) {
 			header := http.Header{"Sec-Fetch-Site": {"cross-site"}}
 			if rec := do(h, http.MethodPost, "/api/health", header); rec.Code != http.StatusForbidden {

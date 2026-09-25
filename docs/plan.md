@@ -74,7 +74,7 @@ open `:8420` and `:8421`. `docker compose ps`: `8421` on `127.0.0.1` only, `8420
 
 **Not here:** real app tables.
 
-### [ ] 3. Users
+### [x] 3. Users
 
 **Goal:** a visitor picks a name once and keeps it.
 
@@ -82,12 +82,14 @@ open `:8420` and `:8421`. `docker compose ps`: `8421` on `127.0.0.1` only, `8420
 - Cookie is `SameSite=Lax` and **not** `Secure`: guests use plain HTTP, so their browser would drop it.
   `localhost` counts as secure, so dev would hide that bug.
 - Create user, rename, `GET /api/me` → `{name, isAdmin}`. `isAdmin` true only on the admin listener.
-- Name rules: trimmed, 1–32 runes (not bytes), no control characters. The input's `maxlength` counts
+- Name rules: trimmed, 1–32 runes (not bytes), at least one letter or number, no control, format
+  (zero-width, text direction) or line-break characters, no emoji. The input's `maxlength` counts
   UTF-16 units, not runes, so the server decides.
 - Page: first-visit name picker, rename menu.
 
 **Done when (tests):**
-- Name rules, table-driven (emoji, Turkish letters, tabs, 33 characters, spaces only).
+- Name rules, table-driven (emoji refused, Turkish letters, tabs, zero-width and direction marks,
+  33 characters, spaces only).
 - Cookie flags and max-age. Unknown token → treated as a new visitor.
 - Same request on guest vs admin listener → `isAdmin` false vs true.
 - Cross-origin POST is refused.

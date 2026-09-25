@@ -76,7 +76,9 @@ containers (`compose run --rm --no-deps`).
 - Dev caches (Go build, modules and `GOPATH`, npm, air) live in `./.cache/`, ignored by git and Docker.
 - `npm ci` runs only when `web/package-lock.json` is newer than `web/node_modules/.package-lock.json`,
   so it never wipes `node_modules` under a running dev server.
-- Go reads `GUEST_ADDR`, `ADMIN_ADDR` and `DATA_DIR` (defaults `:8080`, `:8081`, `/data`).
+- Go reads `GUEST_ADDR`, `ADMIN_ADDR`, `DATA_DIR` and `TOKEN_COOKIE` (defaults `:8080`, `:8081`,
+  `/data`, `pt_token`). Dev sets `TOKEN_COOKIE=pt_token_dev`: cookies ignore the port, so dev
+  (`localhost:5173`) and prod (`localhost:8421`) would otherwise overwrite each other's user.
 - `kill_delay` in `.air.toml` (6 s) must stay longer than `main.go`'s 5 s shutdown timeout, or reloads
   skip the clean shutdown.
 - Vite proxies only `^/api/`, `^/stream/` and `^/ws`. A new Go URL prefix needs its own entry in
@@ -93,6 +95,7 @@ internal/room/       (planned) room state, sync engine, presence, chat, WebSocke
 internal/library/    (planned) folder scanning, Plex name parsing, file watching
 internal/media/      (planned) ffprobe, prepare jobs, subtitles to WebVTT, cache
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
+internal/user/       name rules, users table (token stored as a SHA-256 hash), lookup by cookie token
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
 Dockerfile           web build → Go build → runtime image (ffmpeg from slice 5); go-dev stage for dev
 compose.yml          production
@@ -149,10 +152,16 @@ container mount for source files, and one name for two things gets mixed up in c
   every visit.
 - Cookies are per host name: `localhost`, the Tailscale IP and the MagicDNS name each give a different
   user. Give guests one address to use.
-- Names: 1–32 characters, trimmed, no control characters. Rename from a menu. Duplicates are allowed
-  (no accounts, so no way to reclaim a name).
-- `GET /api/me` returns `{name, isAdmin}`. The admin listener sets `isAdmin`. The page hides admin links
-  when it's false.
+- Names: 1–32 runes, trimmed, at least one letter or number. No control characters, no invisible
+  format characters (zero-width, text direction), no Unicode line breaks, no emoji. Emoji live in
+  Unicode's "other symbol" class with `♥ ★ ©`, so those go too. Rename from a menu. Duplicates are
+  allowed (no accounts, so no way to reclaim a name).
+- `GET /api/me` returns `{name, isAdmin}` (`name` is null for a new visitor) and refreshes the cookie.
+  The admin listener sets `isAdmin`. The page hides admin links when it's false.
+- `POST /api/me {name}` renames a known user, or creates one (and sets the cookie) when the token is
+  missing or unknown.
+- The cookie (`pt_token`, dev `pt_token_dev`) is `SameSite=Lax` and never `Secure`: guests use plain HTTP, and their
+  browser would drop a `Secure` cookie. `localhost` counts as secure, so dev would hide that bug.
 - Everyone can: see all rooms, create and name rooms, control playback, switch a room's video, chat,
   archive and unarchive rooms.
 - Host only (admin API): manage libraries (folder + type), rescan, delete rooms, set language defaults.
