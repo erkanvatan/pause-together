@@ -11,10 +11,11 @@ export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
 		strictPort: true,
-		// Regex keys match only what Go routes: /api (without a slash) or /streams stay SPA pages, as in prod.
+		// Regex keys match only what Go routes, as in prod: /api and /stream go to Go (it redirects them to
+		// /api/ and /stream/), /streams stays an SPA page.
 		proxy: {
-			'^/api/': api,
-			'^/stream/': api,
+			'^/api(/|$)': api,
+			'^/stream(/|$)': api,
 			'^/ws(\\?|$)': { ...api, ws: true }
 		}
 	},

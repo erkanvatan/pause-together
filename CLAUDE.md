@@ -81,8 +81,8 @@ containers (`compose run --rm --no-deps`).
   (`localhost:5173`) and prod (`localhost:8421`) would otherwise overwrite each other's user.
 - `kill_delay` in `.air.toml` (6 s) must stay longer than `main.go`'s 5 s shutdown timeout, or reloads
   skip the clean shutdown.
-- Vite proxies only `^/api/`, `^/stream/` and `^/ws`. A new Go URL prefix needs its own entry in
-  `web/vite.config.ts`.
+- Vite proxies only `/api`, `/stream` and `/ws` (and paths under them). A new Go URL prefix needs
+  its own entry in `web/vite.config.ts`.
 - The Dockerfile's Go stage copies only `cmd/`, `internal/` and `web/embed.go`. A new top-level Go folder
   must be added there, or the prod build fails while dev still works.
 
