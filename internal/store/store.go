@@ -75,3 +75,23 @@ func dsn(path string) string {
 	}
 	return path + "?" + q.Encode()
 }
+
+// InTx runs fn in a transaction. It commits when fn returns nil and rolls back otherwise.
+func InTx(ctx context.Context, db *sql.DB, fn func(*sql.Tx) error) (err error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			// ErrTxDone: a cancelled ctx has rolled it back already.
+			if rbErr := tx.Rollback(); !errors.Is(rbErr, sql.ErrTxDone) {
+				err = errors.Join(err, rbErr)
+			}
+		}
+	}()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

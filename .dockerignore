@@ -6,3 +6,5 @@
 web/node_modules
 web/.svelte-kit
 web/build
+# Clips made by task testdata.
+testdata/media

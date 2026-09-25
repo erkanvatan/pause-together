@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"io/fs"
 	"path/filepath"
 	"testing"
@@ -58,5 +59,38 @@ func TestPoolPragmas(t *testing.T) {
 				t.Errorf("conn %d: %s = %q, want %q", i, c.pragma, got, c.want)
 			}
 		}
+	}
+}
+
+func TestInTx(t *testing.T) {
+	ctx := context.Background()
+	db, _ := openTest(t, fstest.MapFS{
+		"0001_a.sql": {Data: []byte("CREATE TABLE a (id INTEGER PRIMARY KEY);")},
+	})
+	insert := func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, "INSERT INTO a DEFAULT VALUES")
+		return err
+	}
+
+	if err := InTx(ctx, db, insert); err != nil {
+		t.Fatal(err)
+	}
+	boom := errors.New("boom")
+	err := InTx(ctx, db, func(tx *sql.Tx) error {
+		if err := insert(tx); err != nil {
+			return err
+		}
+		return boom
+	})
+	if !errors.Is(err, boom) {
+		t.Errorf("err = %v, want boom", err)
+	}
+
+	var n int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM a").Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("rows = %d, want 1: the first committed, the second rolled back", n)
 	}
 }

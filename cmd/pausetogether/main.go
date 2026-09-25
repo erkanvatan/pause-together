@@ -15,10 +15,15 @@ import (
 	"time"
 
 	"github.com/erkanvatan/pause-together/internal/api"
+	"github.com/erkanvatan/pause-together/internal/library"
+	"github.com/erkanvatan/pause-together/internal/media"
 	"github.com/erkanvatan/pause-together/internal/store"
 	"github.com/erkanvatan/pause-together/internal/user"
 	"github.com/erkanvatan/pause-together/web"
 )
+
+// mediaDir is where the media folder is mounted in the container. Library paths are relative to it.
+const mediaDir = "/media"
 
 type config struct {
 	guestAddr string
@@ -74,12 +79,19 @@ func run() error {
 		Keep: store.BackupKeep,
 		Now:  time.Now,
 	}
-	backupCtx, stopBackups := context.WithCancel(ctx)
+	scanner := &library.Scanner{DB: db, Root: mediaDir, Prober: media.FFprobe{}}
+
+	bgCtx, stopBackground := context.WithCancel(ctx)
 	var wg sync.WaitGroup
-	wg.Go(func() { backups.Run(backupCtx) })
-	// Runs before db.Close: the backup loop must stop before the database closes.
+	wg.Go(func() { backups.Run(bgCtx) })
+	wg.Go(func() {
+		if err := scanner.ScanAll(bgCtx); err != nil && bgCtx.Err() == nil {
+			slog.Error("startup scan", "err", err)
+		}
+	})
+	// Runs before db.Close: the backup loop and the scan must stop before the database closes.
 	defer func() {
-		stopBackups()
+		stopBackground()
 		wg.Wait()
 	}()
 

@@ -10,6 +10,7 @@ env:
 
 vars:
   DEV: docker compose -f compose.dev.yml
+  # Tasks that use it depend on go:image, so a Dockerfile change reaches them without a manual rebuild.
   GO: '{{.DEV}} run --rm --no-deps api'
   NODE: '{{.DEV}} run --rm --no-deps web'
 
@@ -28,6 +29,8 @@ tasks:
 
   test:go:
     desc: 'Go tests. Pass go test args after --, e.g. task test:go -- -run TestRoutes ./internal/api'
+    # Real-ffmpeg tests need the clips; they fail, not skip, when the clips are missing.
+    deps: [go:image, testdata]
     cmds:
       - '{{.GO}} go test {{.CLI_ARGS | default "./..."}}'
 
@@ -37,9 +40,17 @@ tasks:
     cmds:
       - '{{.NODE}} npm test -- {{.CLI_ARGS}}'
 
+  testdata:
+    desc: Make tiny test clips with ffmpeg, in Docker (skipped when they're newer than the script)
+    deps: [go:image]
+    status:
+      - test testdata/media/.done -nt testdata/make.sh
+    cmds:
+      - '{{.GO}} sh testdata/make.sh'
+
   lint:
     desc: golangci-lint, svelte-check
-    deps: [web:deps]
+    deps: [go:image, web:deps]
     cmds:
       - '{{.GO}} golangci-lint run'
       - '{{.NODE}} npm run check'
@@ -84,3 +95,11 @@ tasks:
       - test web/node_modules/.package-lock.json -nt web/package-lock.json
     cmds:
       - '{{.NODE}} npm ci'
+
+  go:image:
+    internal: true
+    desc: Build the Go dev image (cached, so quick when nothing changed)
+    # Once per task run, though test:go and testdata both need it.
+    run: once
+    cmds:
+      - '{{.DEV}} build api'

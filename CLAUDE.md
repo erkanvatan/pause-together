@@ -42,7 +42,7 @@ task dev                                                      # dev stack, hot r
 task test                                                     # all unit tests (Go + web), in Docker
 task test:go -- -run TestMigrateInOrderOnce ./internal/store  # one Go test
 task test:web -- src/lib/sync                                 # web tests under one path
-task testdata                                                 # make tiny test clips with ffmpeg (slice 5)
+task testdata                                                 # tiny test clips (testdata/media); task test:go runs it first
 task lint                                                     # golangci-lint (.golangci.yml), svelte-check
 task build                                                    # build the production image
 task up | task down | task logs                               # build + start, stop, follow the production stack
@@ -53,7 +53,7 @@ different ports, compose project names and data dirs, so `task dev` is safe to r
 
 Prod config lives in `.env` (template: `.env.example`). Each variable arrives with the slice that first
 uses it:
-- `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media` (slice 5).
+- `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media` (slice 6).
 - `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data` (slice 2). Required.
   `task up` creates it, owned by you. Compose itself uses `create_host_path: false`, so a plain
   `docker compose up` with a missing folder fails instead of Docker making it as root, where the app
@@ -66,11 +66,13 @@ uses it:
 
 `.env` is for prod only. `compose.dev.yml` hardcodes dev's ports and data dir (`./.dev-data`, via Go's
 `DATA_DIR` env inside the repo mount, so Go creates it as you; the database is
-`./.dev-data/pausetogether.db`). Dev reads the same `MEDIA_ROOT` as prod (from slice 5); it's mounted
+`./.dev-data/pausetogether.db`). Dev reads the same `MEDIA_ROOT` as prod (from slice 6); it's mounted
 read-only, so sharing it is safe. Go reloads with `air` inside the dev container (`.air.toml`). Dev
 publishes only `127.0.0.1:5173`; Go's ports stay inside the Docker network. Tests and lint run in the dev
 containers (`compose run --rm --no-deps`).
 
+- Run Go, npm and tests through `task`, never the host's `go` or `npm`: versions and ffmpeg match
+  the images only in Docker.
 - Containers run as you (`HOST_UID`/`HOST_GID`, set by the Taskfile), so nothing root-owned lands in the
   repo. Not `UID`: shells treat it as read-only.
 - Dev caches (Go build, modules and `GOPATH`, npm, air) live in `./.cache/`, ignored by git and Docker.
@@ -92,12 +94,13 @@ containers (`compose run --rm --no-deps`).
 cmd/pausetogether/   main: config, wiring, both HTTP listeners
 internal/api/        HTTP handlers, guest vs admin routes, SPA serving
 internal/room/       (planned) room state, sync engine, presence, chat, WebSocket hub
-internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out); scanning and file watching planned
-internal/media/      (planned) ffprobe, prepare jobs, subtitles to WebVTT, cache
+internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks; file watching planned
+internal/media/      ffprobe and the codec check; prepare jobs, subtitles to WebVTT and cache planned
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
 internal/user/       name rules, users table (token stored as a SHA-256 hash), lookup by cookie token
+testdata/make.sh     makes the test clips in testdata/media (git-ignored)
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
-Dockerfile           web build → Go build → runtime image (ffmpeg from slice 5); go-dev stage for dev
+Dockerfile           web build → Go build → runtime image with Debian's ffmpeg; go-dev stage (also ffmpeg) for dev and tests
 compose.yml          production
 compose.dev.yml      development
 Taskfile.yml
@@ -166,7 +169,7 @@ container mount for source files, and one name for two things gets mixed up in c
   archive and unarchive rooms.
 - Host only (admin API): manage libraries (folder + type), rescan, delete rooms, set language defaults.
 - Render all user text (names, chat) as text. Never `{@html}`.
-- UI is English only, with all strings in one file so Turkish is easy to add later.
+- UI is English only, with all strings in `web/src/lib/strings.ts` so Turkish is easy to add later.
 
 ### Admin page
 
@@ -403,7 +406,8 @@ So each room's video is **prepared once**, then served as a plain file.
   Plex name parser gets plenty of real-world file names. No end-to-end tests for now.
 - The ffmpeg arguments are where the bugs will be. So a few Go tests may run real ffmpeg inside Docker,
   on the tiny clips `task testdata` makes: Plex names, 5.1 and 7.1 audio, a Windows-1254 `.srt`, an
-  HEVC file.
+  HEVC file. Missing clips fail these tests instead of skipping them, so they never pass by not
+  running.
 - SQLite: every connection sets `foreign_keys=ON` (off by default, and cascades silently don't run
   without it), WAL and `busy_timeout`, via `_pragma` in the DSN. Also `_txlock=immediate`: a
   transaction that reads, then writes, can otherwise fail with `SQLITE_BUSY` at once, without waiting.

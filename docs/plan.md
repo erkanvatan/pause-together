@@ -117,7 +117,7 @@ quiet skip, or skip with a reason.
 
 **Not here:** touching the disk, ffprobe.
 
-### [ ] 5. Scan and probe
+### [x] 5. Scan and probe
 
 **Goal:** scanning a library folder fills the database with videos, their tracks and whether they play.
 
@@ -149,6 +149,9 @@ quiet skip, or skip with a reason.
 **Goal:** the host manages libraries from the admin page.
 
 - `/api/admin/libraries`: add (folder + type), remove, rescan with progress.
+- Remove marks the library row removed (new column) instead of deleting it: `videos.library_id` points
+  at it with no `ON DELETE`. Re-adding the same folder brings the row back, so video ids stay.
+- `MEDIA_ROOT` in `.env.example`, mounted read-only at `/media` in `compose.yml` and `compose.dev.yml`.
 - Folder picker browses `/media` through `os.Root`. Overlapping libraries refused.
 - Admin page: libraries, skipped and unplayable files with reasons, "Apple devices only" warnings.
 - Admin links shown only when `isAdmin`.
@@ -214,7 +217,8 @@ quiet skip, or skip with a reason.
 - Embedded text tracks extracted in the prepare run (bump recipe version).
 - Image subtitles (PGS, VobSub) listed as unavailable.
 - Served under `/stream`.
-- `task testdata` adds: a Windows-1254 `.srt`, a BOM `.srt`, an `.ass`, a clip with an embedded SRT track.
+- `task testdata` adds: a Windows-1254 `.srt`, a BOM `.srt`, an `.ass`, a clip with an embedded SRT track (the
+  stereo clip from slice 5 already has one).
 
 **Done when (tests):**
 - Windows-1254 `.srt` → correct `ş ğ ı İ`, named both `.tr.srt` and `.tur.srt`. BOM file. ASS → VTT
