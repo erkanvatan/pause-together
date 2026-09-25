@@ -92,7 +92,7 @@ containers (`compose run --rm --no-deps`).
 cmd/pausetogether/   main: config, wiring, both HTTP listeners
 internal/api/        HTTP handlers, guest vs admin routes, SPA serving
 internal/room/       (planned) room state, sync engine, presence, chat, WebSocket hub
-internal/library/    (planned) folder scanning, Plex name parsing, file watching
+internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out); scanning and file watching planned
 internal/media/      (planned) ffprobe, prepare jobs, subtitles to WebVTT, cache
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
 internal/user/       name rules, users table (token stored as a SHA-256 hash), lookup by cookie token
@@ -189,23 +189,35 @@ container mount for source files, and one name for two things gets mixed up in c
 - Video files are an allowlist of extensions: `.mkv .mp4 .m4v .mov .avi .webm .ts .m2ts`. Skip hidden
   files and macOS `._*` files.
 - Plex naming is required for Movies and TV Shows. Files that don't match are skipped and listed on the
-  admin page with the reason:
+  admin page with the reason. Reasons are codes (`movie-no-year`), turned into text by the web strings
+  file.
   - Movies: `Title (Year)/Title (Year).ext`; a loose `Title (Year).ext` is fine too.
     - `{edition-Director's Cut}` is kept as an edition label, so two editions in one folder stay
       apart. Other `{...}` tags are ignored.
-    - Extras folders (`Featurettes`, `Behind The Scenes`, `Trailers`, `Extras`) and samples
-      (`sample.mkv`) are skipped quietly, not listed.
-    - Split files (`pt1`, `cd1`) are skipped with a reason.
+    - Text after the year is kept as a version label (`Dune (2021) - 4K.mkv`), so two versions in one
+      folder stay apart too.
+    - Only the file name counts, so movies can also sit in collection folders.
+    - Extras are skipped quietly, not listed, and so are their subtitles (Movies and TV only; in Other
+      Videos a `Trailers` folder is a real group). Plex's full list: folders `Behind The Scenes`,
+      `Deleted Scenes`, `Featurettes`, `Interviews`, `Scenes`, `Shorts`, `Trailers`, `Other`, `Extras`,
+      `Sample(s)`; names ending `-trailer`, `-behindthescenes`, `-deleted`, `-featurette`, `-interview`,
+      `-scene`, `-short`, `-other`, `-sample`; and `sample.mkv`. An extras folder counts only inside a
+      movie folder (`Title (Year)`) or a show, so a collection or show named `Shorts` still works. A
+      file with `s01e02` in its name is never an extra.
+    - Split files (`pt1`, `part1`, `cd1`, `disc1`, `disk1`) are skipped with a reason. Not `dvd1`:
+      `DVD9` is a source label.
   - TV: `Show (Year)/Season 01/Show (Year) - s01e02 - Episode Title.ext`; year and episode title optional.
-    - Also accepted: two episodes in one file (`s01e01-e02`), specials (`Specials` or `Season 00`),
-      season folders without a zero (`Season 1`), and episodes loose in the show folder.
+    - Also accepted: two episodes in one file (`s01e01-e02`, `s01e01e02`, `s01e01-02`), specials (`Specials` or `Season 00`),
+      season folders without a zero (`Season 1`), and episodes loose in the show folder. The show comes
+      from its folder, the season and episode from the file name.
     - Date-based (`Show - 2024-05-01`) and absolute-numbered (anime) episodes are skipped with a reason.
   - Other Videos: the file name is the title. Sub-folders become groups in the picker.
 - Metadata comes from names only: no online lookups, no artwork. `ffprobe` supplies only technical
   facts (duration, codecs, audio and subtitle tracks).
 - Sidecar subtitles sit next to the video with Plex names. Accepted: a 2- or 3-letter language code
   (`Title (Year).en.srt`, `.eng.srt`), the `forced`, `sdh` and `hi` flags (`.en.forced.srt`,
-  `.en.sdh.srt`), and no language at all (`Title (Year).srt`). A `Subs/` folder is not read.
+  `.en.sdh.srt`), and no language at all (`Title (Year).srt`). A `Subs/` folder is not read. `hi` is
+  also Hindi's code: first, it's the language (`.hi.srt`); after a language, the flag (`.en.hi.srt`).
 - A video's identity is its library + its path relative to the library folder. A rename makes a new
   video, and the old one turns missing.
 - Video rows are never deleted, not even when their library is removed. Rooms and chat messages point

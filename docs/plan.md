@@ -101,7 +101,7 @@ open `:8420` and `:8421`. `docker compose ps`: `8421` on `127.0.0.1` only, `8420
 
 **Not here:** rooms, admin links.
 
-### [ ] 4. Plex name parser
+### [x] 4. Plex name parser
 
 **Goal:** pure functions that turn a relative path into a movie, episode, other video, sidecar subtitle,
 quiet skip, or skip with a reason.
