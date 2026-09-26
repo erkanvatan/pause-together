@@ -47,6 +47,18 @@ export const strings = {
 	appleOnly: 'Apple devices only',
 	appleOnlyNote: 'Dolby Vision profile 5. Other screens show it purple and green.',
 
+	jobs: 'Prepare jobs',
+	noJobs: 'Nothing to prepare.',
+	diskUsage: (cache: string, free: string) => `Cache ${cache} · ${free} free on its disk`,
+	jobRunning: (percent: number) => `Preparing… ${percent}%`,
+	jobQueued: (place: number) =>
+		place === 1 ? 'Queued, next in line' : `Queued, ${ordinal(place)} in line`,
+	// Why a prepare job failed (media.FailNoSpace, media.FailPrepare).
+	jobErrors: {
+		'no-space': 'Not enough free disk space.',
+		failed: 'Prepare failed.'
+	} as Record<string, string>,
+
 	// Why a file can't be used: skipped by the scan (library.Reason) or unplayable (media.Unplayable).
 	reasons: {
 		'movie-no-year': 'Movie name has no year. Use "Title (Year)".',
@@ -63,3 +75,10 @@ export const strings = {
 		'probe-failed': "ffprobe couldn't read the file."
 	}
 };
+
+// ordinal writes 1st, 2nd, 3rd, 4th, 11th, 21st…
+function ordinal(n: number): string {
+	const tens = n % 100;
+	const suffix = tens >= 11 && tens <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th');
+	return `${n}${suffix}`;
+}

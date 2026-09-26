@@ -27,6 +27,9 @@ clip 'Movies/Surround Test (2021).mkv' -f lavfi -i anullsrc=channel_layout=5.1:s
 	-c:v libx264 -pix_fmt yuv420p -c:a ac3
 clip 'Movies/Seven One Test (2022).mkv' -f lavfi -i anullsrc=channel_layout=7.1:sample_rate=48000 \
 	-c:v libx264 -pix_fmt yuv420p -c:a aac
+clip 'Movies/Two Audio Test (2025).mkv' $stereo -f lavfi -i anullsrc=channel_layout=5.1:sample_rate=48000 \
+	-map 0 -map 1 -map 2 -c:v libx264 -pix_fmt yuv420p -c:a:0 aac -c:a:1 ac3 \
+	-metadata:s:a:0 language=eng -metadata:s:a:1 language=tur
 clip 'Movies/Ten Bit Test (2023).mkv' $stereo -c:v libx264 -pix_fmt yuv420p10le -c:a aac
 clip 'TV/Test Show (2024)/Season 01/Test Show (2024) - s01e01 - Pilot.mkv' $stereo \
 	-c:v libx265 -pix_fmt yuv420p -x265-params log-level=error -c:a aac

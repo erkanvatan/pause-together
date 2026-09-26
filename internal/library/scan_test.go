@@ -567,6 +567,7 @@ func TestScanTestdata(t *testing.T) {
 		"Stereo Test":    "avc1.6400",
 		"Surround Test":  "avc1.6400",
 		"Seven One Test": "avc1.6400",
+		"Two Audio Test": "avc1.6400",
 		"Ten Bit Test":   string(media.UnplayableH264Profile),
 		"Test Show":      "hvc1.1.6.L",
 	}

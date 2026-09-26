@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -65,6 +66,20 @@ func TestFFprobeSubtitleTrack(t *testing.T) {
 	want := []SubtitleTrack{{Stream: 2, Codec: "subrip", Lang: "eng"}}
 	if len(info.Subtitles) != 1 || info.Subtitles[0] != want[0] {
 		t.Errorf("subtitles = %+v, want %+v", info.Subtitles, want)
+	}
+}
+
+func TestFFprobeTwoAudioTracks(t *testing.T) {
+	info, err := FFprobe{}.Probe(context.Background(), clip(t, "Movies/Two Audio Test (2025).mkv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []AudioTrack{
+		{Stream: 1, Codec: "aac", Channels: 2, Layout: "stereo", Lang: "eng", Default: true},
+		{Stream: 2, Codec: "ac3", Channels: 6, Layout: "5.1(side)", Lang: "tur"}, // ffmpeg's AC3 encoder writes side
+	}
+	if !slices.Equal(info.Audio, want) {
+		t.Errorf("audio = %+v, want %+v", info.Audio, want)
 	}
 }
 

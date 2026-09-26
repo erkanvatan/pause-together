@@ -182,7 +182,7 @@ quiet skip, or skip with a reason.
 
 **Not here:** anything about playback.
 
-### [ ] 8. Prepare jobs
+### [x] 8. Prepare jobs
 
 **Goal:** one ffmpeg run turns a video + audio track into a cached MP4 that `<video>` can seek.
 

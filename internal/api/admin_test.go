@@ -10,10 +10,11 @@ import (
 	"testing"
 
 	"github.com/erkanvatan/pause-together/internal/library"
+	"github.com/erkanvatan/pause-together/internal/media"
 )
 
-// adminDeps adds Libraries and Scans over a media folder holding two empty folders, Movies and TV.
-// No scan worker runs, so requested scans stay queued.
+// adminDeps adds Libraries, Scans and Jobs over a media folder holding two empty folders, Movies and TV.
+// No scan worker runs, so requested scans stay queued. The cache folder is empty.
 func adminDeps(t *testing.T) Deps {
 	t.Helper()
 	users := testUsers(t)
@@ -26,6 +27,7 @@ func adminDeps(t *testing.T) Deps {
 	d := deps(users)
 	d.Libraries = &library.Libraries{DB: users.DB, Root: root}
 	d.Scans = library.NewScans(&library.Scanner{DB: users.DB, Root: root})
+	d.Jobs = media.NewJobs(t.TempDir(), media.FFmpeg{})
 	return d
 }
 
@@ -54,6 +56,7 @@ func TestAdminRoutesOnlyOnAdminPort(t *testing.T) {
 		{http.MethodPost, "/api/admin/libraries/1/scan", ""},
 		{http.MethodGet, "/api/admin/folders", ""},
 		{http.MethodGet, "/api/admin/problems", ""},
+		{http.MethodGet, "/api/admin/jobs", ""},
 	}
 	build := fakeBuild()
 	for _, rt := range routes {
@@ -167,6 +170,18 @@ func TestAdminProblemsEmptyLists(t *testing.T) {
 	want := `{"skipped":[],"unplayable":[],"appleOnly":[]}`
 	if got := strings.TrimSpace(rec.Body.String()); got != want {
 		t.Errorf("body = %s, want %s", got, want)
+	}
+}
+
+func TestAdminJobsEmpty(t *testing.T) {
+	rec := adminRequest(Admin(fakeBuild(), adminDeps(t)), http.MethodGet, "/api/admin/jobs", "")
+	body := decode[struct {
+		Jobs       []media.JobStatus `json:"jobs"`
+		CacheBytes *int64            `json:"cacheBytes"`
+		FreeBytes  uint64            `json:"freeBytes"`
+	}](t, rec)
+	if body.Jobs == nil || len(body.Jobs) != 0 || body.CacheBytes == nil || *body.CacheBytes != 0 || body.FreeBytes == 0 {
+		t.Errorf("body = %s, want an empty jobs list, cache 0, some free space", rec.Body.String())
 	}
 }
 

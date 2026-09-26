@@ -107,7 +107,8 @@ internal/api/        HTTP handlers, guest vs admin routes (admin API registered 
 internal/room/       (planned) room state, sync engine, presence, chat, WebSocket hub
 internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks,
                      scan queue with progress, add/remove libraries, folder picker, file watching
-internal/media/      ffprobe and the codec check; prepare jobs, subtitles to WebVTT and cache planned
+internal/media/      ffprobe and the codec check; prepare jobs (ffmpeg arguments, job queue, cache in DATA_DIR/cache);
+                     subtitles to WebVTT planned
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
 internal/user/       name rules, users table (token stored as a SHA-256 hash), lookup by cookie token
 testdata/make.sh     makes the test clips in testdata/media (git-ignored)
@@ -120,7 +121,7 @@ Taskfile.yml
 ```
 
 URL prefixes: `/api` JSON, `/api/admin` admin only, `/ws` WebSocket (one per open room page), `/stream`
-prepared videos and subtitles. The URL prefix is `/stream`, not `/media`, on purpose: `/media` is the
+prepared videos and subtitles (`/stream/{key}/video.mp4`, the key being the cache key). The URL prefix is `/stream`, not `/media`, on purpose: `/media` is the
 container mount for source files, and one name for two things gets mixed up in code.
 
 - Unknown `/api/*` and `/stream/*` paths return 404. Only other paths fall back to `index.html`.
@@ -277,9 +278,9 @@ So each room's video is **prepared once**, then served as a plain file.
   - All embedded text subtitle tracks become WebVTT in the same run. Their packets are spread across the
     whole file, so pulling them out costs a full read, just like the remux.
   - `-movflags +faststart`, so the index sits at the front and playback starts right away.
-  - Output goes to `*.tmp` and is renamed when done, so a half-written file never looks finished. Name
-    the format (`-f mp4`), since ffmpeg guesses it from the extension. On start, delete leftover
-    `*.tmp` files.
+  - Output goes to a `{key}.tmp` folder, renamed to `{key}` when done, so a half-written copy never
+    looks finished, and every file of one run appears at once. Name the format (`-f mp4`), since ffmpeg
+    guesses it from the extension. On start, delete leftover `*.tmp` folders.
 - Every video goes through prepare, even ones a browser could play as-is. One code path, on purpose.
 - The cache key is video + audio track + source size and mtime + a recipe version number. Rooms with the
   same key share one copy. Bump the recipe version when the ffmpeg arguments change.

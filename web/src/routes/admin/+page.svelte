@@ -3,11 +3,15 @@
 	import FolderPicker from '$lib/FolderPicker.svelte';
 	import {
 		addLibrary,
+		formatBytes,
+		jobText,
+		listJobs,
 		listLibraries,
 		listProblems,
 		problemText,
 		removeLibrary,
 		rescanLibrary,
+		type Jobs,
 		type Library,
 		type LibraryType,
 		type Problem,
@@ -24,6 +28,7 @@
 
 	let libraries = $state<Library[]>([]);
 	let problems = $state<Problems>({ skipped: [], unplayable: [], appleOnly: [] });
+	let jobs = $state<Jobs | null>(null);
 	let loaded = $state(false); // the libraries loaded at least once
 	let loadFailed = $state(false);
 	let actionFailed = $state(false);
@@ -45,12 +50,14 @@
 	async function refresh() {
 		const libs = await listLibraries();
 		const probs = await listProblems();
-		loadFailed = !libs.ok || !probs.ok;
+		const js = await listJobs();
+		loadFailed = !libs.ok || !probs.ok || !js.ok;
 		if (libs.ok) {
 			libraries = libs.value;
 			loaded = true;
 		}
 		if (probs.ok) problems = probs.value;
+		if (js.ok) jobs = js.value;
 	}
 
 	onMount(() => {
@@ -233,6 +240,34 @@
 								<span class="text-sm text-neutral-400">{problemText(p)}</span>
 								{#if p.probeError}
 									<span class="font-mono text-xs break-all text-neutral-500">{p.probeError}</span>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</section>
+		{/if}
+
+		{#if jobs}
+			<section class="flex flex-col gap-3">
+				<h2 class="text-lg font-semibold">{strings.jobs}</h2>
+				<p class="text-sm text-neutral-400">
+					{strings.diskUsage(formatBytes(jobs.cacheBytes), formatBytes(jobs.freeBytes))}
+				</p>
+				{#if jobs.jobs.length === 0}
+					<p class="text-neutral-400">{strings.noJobs}</p>
+				{:else}
+					<ul class="flex flex-col gap-2">
+						{#each jobs.jobs as j (j.key)}
+							<li class="flex flex-col">
+								<span class="break-all">{j.name}</span>
+								<span class="text-sm {j.state === 'failed' ? 'text-red-400' : 'text-neutral-400'}">
+									{jobText(j)}
+								</span>
+								{#if j.detail}
+									<span class="font-mono text-xs break-all whitespace-pre-wrap text-neutral-500">
+										{j.detail}
+									</span>
 								{/if}
 							</li>
 						{/each}

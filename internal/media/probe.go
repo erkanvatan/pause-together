@@ -1,4 +1,5 @@
-// Package media runs ffprobe and decides whether browsers can play a video.
+// Package media runs ffprobe, decides whether browsers can play a video, and prepares videos into
+// cached MP4s with ffmpeg.
 package media
 
 import (

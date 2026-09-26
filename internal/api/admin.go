@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/erkanvatan/pause-together/internal/library"
+	"github.com/erkanvatan/pause-together/internal/media"
 )
 
 // adminRoutes registers the admin API. Only the admin listener calls it, so on the guest port these
@@ -18,6 +19,7 @@ func (s *server) adminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/admin/libraries/{id}/scan", s.scanLibrary)
 	mux.HandleFunc("GET /api/admin/folders", s.listFolders)
 	mux.HandleFunc("GET /api/admin/problems", s.listProblems)
+	mux.HandleFunc("GET /api/admin/jobs", s.listJobs)
 }
 
 // Error codes the admin page turns into text.
@@ -133,6 +135,21 @@ func (s *server) listProblems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, p)
+}
+
+type jobsResponse struct {
+	Jobs       []media.JobStatus `json:"jobs"`
+	CacheBytes int64             `json:"cacheBytes"`
+	FreeBytes  uint64            `json:"freeBytes"`
+}
+
+func (s *server) listJobs(w http.ResponseWriter, _ *http.Request) {
+	cache, free, err := s.Jobs.Disk()
+	if err != nil {
+		internalError(w, "cache size", err)
+		return
+	}
+	writeJSON(w, jobsResponse{Jobs: s.Jobs.List(), CacheBytes: cache, FreeBytes: free})
 }
 
 // pathID reads the {id} path value.

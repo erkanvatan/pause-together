@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addLibrary, listFolders, problemText, removeLibrary } from './admin';
+import { addLibrary, formatBytes, jobText, listFolders, problemText, removeLibrary } from './admin';
 
 function respond(status: number, body: string | null, type = 'application/json') {
 	vi.stubGlobal(
@@ -75,5 +75,58 @@ describe('problemText', () => {
 
 	it('shows an unknown code as it is', () => {
 		expect(problemText({ libraryId: 1, path: 'x', reason: 'new-reason' })).toBe('new-reason');
+	});
+});
+
+describe('formatBytes', () => {
+	it.each([
+		[0, '0 B'],
+		[999, '999 B'],
+		[999_999, '1.0 MB'],
+		[9.96e9, '10 GB'],
+		[1500, '1.5 kB'],
+		[1_234_567_890, '1.2 GB'],
+		[12_345_678_901, '12 GB'],
+		[300e9, '300 GB'],
+		[3.25e12, '3.3 TB'],
+		[5e15, '5000 TB']
+	])('%d → %s', (n, want) => {
+		expect(formatBytes(n)).toBe(want);
+	});
+});
+
+describe('jobText', () => {
+	const job = {
+		key: 'k',
+		name: 'x',
+		place: 0,
+		progress: 0,
+		error: '',
+		detail: ''
+	};
+
+	it('shows progress as a whole percent', () => {
+		expect(jobText({ ...job, state: 'running', progress: 0.426 })).toBe('Preparing… 42%');
+	});
+
+	it.each([
+		[1, 'Queued, next in line'],
+		[2, 'Queued, 2nd in line'],
+		[3, 'Queued, 3rd in line'],
+		[4, 'Queued, 4th in line'],
+		[11, 'Queued, 11th in line'],
+		[12, 'Queued, 12th in line'],
+		[21, 'Queued, 21st in line'],
+		[102, 'Queued, 102nd in line']
+	])('place %i → %s', (place, want) => {
+		expect(jobText({ ...job, state: 'queued', place })).toBe(want);
+	});
+
+	it('turns a failure code into text', () => {
+		expect(jobText({ ...job, state: 'failed', error: 'no-space' })).toContain('disk space');
+	});
+
+	it('shows an unknown failure code as it is', () => {
+		expect(jobText({ ...job, state: 'failed', error: 'new-code' })).toBe('new-code');
 	});
 });

@@ -29,6 +29,19 @@ export type Problem = {
 
 export type Problems = { skipped: Problem[]; unplayable: Problem[]; appleOnly: Problem[] };
 
+// A prepare job: one video + audio track turned into a cached MP4.
+export type Job = {
+	key: string;
+	name: string;
+	state: 'running' | 'queued' | 'failed';
+	place: number; // queued: 1 = next in line
+	progress: number; // running: 0 to 1
+	error: string; // failed: a code; jobText turns it into text
+	detail: string; // failed: sizes, or ffmpeg's message
+};
+
+export type Jobs = { jobs: Job[]; cacheBytes: number; freeBytes: number };
+
 // The server's error code, or 'failed' for no connection, a server error, or an unexpected body.
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -66,6 +79,8 @@ export const rescanLibrary = (id: number) => call<void>('POST', `/api/admin/libr
 
 export const listProblems = () => call<Problems>('GET', '/api/admin/problems');
 
+export const listJobs = () => call<Jobs>('GET', '/api/admin/jobs');
+
 // listFolders lists the folders inside path, relative to the media folder ('' is the media folder).
 export async function listFolders(path: string): Promise<Result<string[]>> {
 	const r = await call<{ folders: string[] }>(
@@ -80,4 +95,31 @@ export function problemText(p: Problem): string {
 	const reasons: Record<string, string> = strings.reasons;
 	const text = (p.reason && reasons[p.reason]) || p.reason || '';
 	return p.reason === 'codec' && p.codec ? `${text} (${p.codec})` : text;
+}
+
+// jobText says where a job stands. Unknown failure codes show as they are.
+export function jobText(j: Job): string {
+	switch (j.state) {
+		case 'running':
+			return strings.jobRunning(Math.floor(j.progress * 100));
+		case 'queued':
+			return strings.jobQueued(j.place);
+		case 'failed':
+			return strings.jobErrors[j.error] ?? j.error;
+	}
+}
+
+const byteUnits = ['B', 'kB', 'MB', 'GB', 'TB'];
+
+// formatBytes writes a size in SI units (1 GB = 10⁹ bytes, like the server's messages): whole bytes,
+// then one decimal below 10 and none above.
+export function formatBytes(n: number): string {
+	let i = 0;
+	// The limits are checked after rounding, so 999,999 B is "1.0 MB", not "1000 kB".
+	while (n >= 999.5 && i < byteUnits.length - 1) {
+		n /= 1000;
+		i++;
+	}
+	const digits = i > 0 && n < 9.95 ? 1 : 0;
+	return `${n.toFixed(digits)} ${byteUnits[i]}`;
 }

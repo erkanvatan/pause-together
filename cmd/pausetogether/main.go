@@ -28,7 +28,7 @@ const mediaDir = "/media"
 type config struct {
 	guestAddr string
 	adminAddr string
-	dataDir   string // database and backups; later the cache
+	dataDir   string // database, backups and the cache of prepared videos
 	// tokenCookie names the user cookie. Dev sets its own: cookies ignore the port, so dev and prod
 	// on localhost would otherwise overwrite each other's.
 	tokenCookie string
@@ -89,16 +89,23 @@ func run() error {
 		scanner.Watcher = watcher
 	}
 
+	cacheDir := filepath.Join(cfg.dataDir, "cache")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return err
+	}
+	jobs := media.NewJobs(cacheDir, media.FFmpeg{})
+
 	bgCtx, stopBackground := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	wg.Go(func() { backups.Run(bgCtx) })
 	wg.Go(func() { scans.Run(bgCtx) })
 	wg.Go(func() { scans.Every(bgCtx, library.RescanInterval) })
+	wg.Go(func() { jobs.Run(bgCtx) })
 	if watcher != nil {
 		wg.Go(func() { watcher.Run(bgCtx) })
 	}
 	// Runs before db.Close: the backup loop, the scans and the watcher must stop before the database
-	// closes.
+	// closes. It also waits for a running prepare job to stop and delete its half-written copy.
 	defer func() {
 		stopBackground()
 		wg.Wait()
@@ -115,6 +122,7 @@ func run() error {
 		TokenCookie: cfg.tokenCookie,
 		Libraries:   &library.Libraries{DB: db, Root: mediaDir},
 		Scans:       scans,
+		Jobs:        jobs,
 	}
 	servers := []*http.Server{
 		newServer(cfg.guestAddr, api.Guest(build, deps)),
