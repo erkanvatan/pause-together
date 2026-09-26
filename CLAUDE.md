@@ -10,7 +10,8 @@ phones. Same show. Same second. Different places.
 
 **Status: being built in slices; `docs/plan.md` ticks off the done ones.** This file is the spec. As code
 lands, update the layout and commands below to match reality. The rules here are decided: flag problems,
-but don't quietly change them.
+but don't quietly change them. Work each slice by the steps under "How to work a slice" in
+`docs/plan.md`.
 
 ## Stack
 
@@ -54,7 +55,11 @@ different ports, compose project names and data dirs, so `task dev` is safe to r
 Prod config lives in `.env` (template: `.env.example`). Each variable arrives with the slice that first
 uses it:
 - `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media` (slice 6). Required, in
-  dev too. The folder must exist: compose won't make it (`create_host_path: false`).
+  dev too unless `DEV_MEDIA_ROOT` is set. The folder must exist: compose won't make it
+  (`create_host_path: false`).
+- `DEV_MEDIA_ROOT`: optional, dev only. Dev mounts it at `/media` instead of `MEDIA_ROOT`, e.g. a
+  scratch folder to copy test files into. Also works from the shell:
+  `DEV_MEDIA_ROOT=/tmp/media task dev`.
 - `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data` (slice 2). Required.
   `task up` creates it, owned by you. Compose itself uses `create_host_path: false`, so a plain
   `docker compose up` with a missing folder fails instead of Docker making it as root, where the app
@@ -65,14 +70,18 @@ uses it:
   listens on `8080` and `8081`. Only the host side changes, so a clash on the host (8080 is a popular
   port) never touches code or tests.
 
-`.env` is for prod, except `MEDIA_ROOT`. `compose.dev.yml` hardcodes dev's ports and data dir (`./.dev-data`, via Go's
-`DATA_DIR` env inside the repo mount, so Go creates it as you; the database is
-`./.dev-data/pausetogether.db`). Dev reads the same `MEDIA_ROOT` as prod (compose reads `.env`
-itself); it's mounted read-only, so sharing it is safe. Compose checks it for every command, so
-`task dev`, `task test` and `task lint` all fail until `.env` sets it. Go reloads with `air` inside the dev container (`.air.toml`). Dev
-publishes only `127.0.0.1:5173`; Go's ports stay inside the Docker network. Tests and lint run in the dev
-containers (`compose run --rm --no-deps`).
+Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env` is prod only.
 
+- `compose.dev.yml` hardcodes dev's ports and data dir: `./.dev-data`, set through Go's `DATA_DIR`
+  env inside the repo mount, so Go creates it as you. The database is `./.dev-data/pausetogether.db`.
+- Dev mounts `DEV_MEDIA_ROOT` if set, else prod's `MEDIA_ROOT`, read-only at `/media`, so sharing it
+  with prod is safe. Compose checks for one of the two on every command, so `task dev`, `task test`
+  and `task lint` all fail until one is set.
+- By-hand checks that add, rename or delete media use `DEV_MEDIA_ROOT` pointed at a scratch folder,
+  never the real library.
+- Go reloads with `air` inside the dev container (`.air.toml`).
+- Dev publishes only `127.0.0.1:5173`. Go's ports stay inside the Docker network.
+- Tests and lint run in the dev containers (`compose run --rm --no-deps`).
 - Run Go, npm and tests through `task`, never the host's `go` or `npm`: versions and ffmpeg match
   the images only in Docker.
 - Containers run as you (`HOST_UID`/`HOST_GID`, set by the Taskfile), so nothing root-owned lands in the
@@ -97,11 +106,12 @@ cmd/pausetogether/   main: config, wiring, both HTTP listeners
 internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only), SPA serving
 internal/room/       (planned) room state, sync engine, presence, chat, WebSocket hub
 internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks,
-                     scan queue with progress, add/remove libraries, folder picker; file watching planned
+                     scan queue with progress, add/remove libraries, folder picker, file watching
 internal/media/      ffprobe and the codec check; prepare jobs, subtitles to WebVTT and cache planned
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
 internal/user/       name rules, users table (token stored as a SHA-256 hash), lookup by cookie token
 testdata/make.sh     makes the test clips in testdata/media (git-ignored)
+docs/plan.md         build order in slices, and how to work one
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
 Dockerfile           web build → Go build → runtime image with Debian's ffmpeg; go-dev stage (also ffmpeg) for dev and tests
 compose.yml          production
@@ -181,6 +191,8 @@ container mount for source files, and one name for two things gets mixed up in c
 - The job queue, with failed jobs and ffmpeg's error.
 - Cache size and free disk space.
 - Language defaults for new picks.
+- The page polls every 5 s while the tab is visible (every 1 s during a scan), and right away when it
+  becomes visible again: the file watcher and the timed rescan change things behind its back.
 - Room delete is not here. It lives on the homepage room cards, shown only when `isAdmin`. The call
   still goes to `/api/admin`.
 
@@ -231,7 +243,11 @@ container mount for source files, and one name for two things gets mixed up in c
 - Watching uses `fsnotify`. inotify watches one directory at a time, so add a watch per directory.
   Debounce events. A file moved into place counts as done (most tools rename when finished). A file
   written in place is probed once it stops growing.
-- Rescan fully once at startup, then on a timer and on the admin "Rescan" button. Events get missed
+  - An event doesn't touch rows itself: it queues a normal scan of its library, 2 s after the last
+    event (at most 30 s after the first). An unchanged library costs a folder walk; ffprobe runs only
+    for files whose last probe failed.
+  - A file with no write for 10 s has stopped growing. Until then, every scan leaves it alone.
+- Rescan fully once at startup, then every hour and on the admin "Rescan" button. Events get missed
   (host off, network drives, inotify limits), and torrent clients may create full-size files up front.
   A rescan re-probes only files whose size or mtime changed, and retries every failed probe.
 - Clients send IDs, never file paths. The admin folder picker is the one exception and must stay inside

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"slices"
 	"sync"
+	"time"
 )
 
 // Scan states for ScanStatus.
@@ -71,15 +72,32 @@ func (q *Scans) RequestAll(ctx context.Context) error {
 	return nil
 }
 
-// Removed tells the queue a library was removed: its scan stops if it is running, and its last
-// error is dropped. Otherwise a scan started before the removal could go on after a re-add, with
-// the old type and an old list of the library's videos.
+// Removed tells the queue a library was removed: its folders are no longer watched, its scan stops
+// if it is running, and its last error is dropped. Otherwise a scan started before the removal could
+// go on after a re-add, with the old type and an old list of the library's videos.
 func (q *Scans) Removed(id int64) {
+	q.scanner.Watcher.unwatch(id)
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	delete(q.errs, id)
 	if q.current == id {
 		q.cancel()
+	}
+}
+
+// Every queues a scan of every library each interval d, until ctx is cancelled.
+func (q *Scans) Every(ctx context.Context, d time.Duration) {
+	t := time.NewTicker(d)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if err := q.RequestAll(ctx); err != nil && ctx.Err() == nil {
+				slog.Error("timed rescan", "err", err)
+			}
+		}
 	}
 }
 
@@ -138,6 +156,10 @@ func (q *Scans) scan(ctx context.Context, id int64) {
 	lib, err := getLibrary(ctx, q.scanner.DB, id)
 	if err == nil {
 		err = q.scanner.ScanLibrary(ctx, lib, q.progress)
+	}
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrRemoved) || ctx.Err() != nil {
+		// Removed, maybe while the scan was adding watches. Or shutdown, when watches don't matter.
+		q.scanner.Watcher.unwatch(id)
 	}
 
 	q.mu.Lock()

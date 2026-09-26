@@ -79,13 +79,26 @@ func run() error {
 		Keep: store.BackupKeep,
 		Now:  time.Now,
 	}
-	scans := library.NewScans(&library.Scanner{DB: db, Root: mediaDir, Prober: media.FFprobe{}})
+	scanner := &library.Scanner{DB: db, Root: mediaDir, Prober: media.FFprobe{}}
+	scans := library.NewScans(scanner)
+	// Without a watcher, libraries still follow the disk through the timed rescan.
+	watcher, err := library.NewWatcher(scans)
+	if err != nil {
+		slog.Error("file watching off", "err", err)
+	} else {
+		scanner.Watcher = watcher
+	}
 
 	bgCtx, stopBackground := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	wg.Go(func() { backups.Run(bgCtx) })
 	wg.Go(func() { scans.Run(bgCtx) })
-	// Runs before db.Close: the backup loop and the scans must stop before the database closes.
+	wg.Go(func() { scans.Every(bgCtx, library.RescanInterval) })
+	if watcher != nil {
+		wg.Go(func() { watcher.Run(bgCtx) })
+	}
+	// Runs before db.Close: the backup loop, the scans and the watcher must stop before the database
+	// closes.
 	defer func() {
 		stopBackground()
 		wg.Wait()

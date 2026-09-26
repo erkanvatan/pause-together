@@ -166,7 +166,7 @@ quiet skip, or skip with a reason.
 
 **Not here:** job queue, cache size, language defaults.
 
-### [ ] 7. File watching
+### [x] 7. File watching
 
 **Goal:** new, renamed and deleted files show up without a manual rescan.
 

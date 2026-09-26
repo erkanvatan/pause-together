@@ -17,10 +17,10 @@ services:
     command: air
     volumes:
       - .:/src
-      # Prod's media folder, from .env. Read-only, so sharing it with prod is safe. Required: compose
-      # checks it for every command, tests and lint included.
+      # DEV_MEDIA_ROOT from .env, or else prod's MEDIA_ROOT. Read-only, so sharing it with prod is safe.
+      # One of the two is required: compose checks it for every command, tests and lint included.
       - type: bind
-        source: ${MEDIA_ROOT:?set MEDIA_ROOT in .env}
+        source: ${DEV_MEDIA_ROOT:-${MEDIA_ROOT:?set MEDIA_ROOT or DEV_MEDIA_ROOT in .env}}
         target: /media
         read_only: true
         bind:

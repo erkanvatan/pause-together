@@ -37,6 +37,9 @@ type Scanner struct {
 	DB     *sql.DB
 	Root   string // the media folder; library paths are relative to it
 	Prober Prober
+	// Watcher, if not nil, gets a watch on every folder a scan walks. Files it sees growing are left
+	// alone until they stop.
+	Watcher *Watcher
 }
 
 // fileStat is a file found in a library folder.
@@ -49,6 +52,9 @@ type fileStat struct {
 // ScanLibrary brings one library's rows up to date with its folder. New and changed videos are
 // probed, and so are videos whose last probe failed. Videos no longer there are marked missing.
 // progress, if not nil, hears how many of the library's videos are done so far.
+//
+// A file still being written (see Watcher) is not probed and not marked missing; the watcher queues
+// another scan once it stops growing.
 //
 // If the library folder itself is gone, can't be read, or leads outside the media folder, it returns
 // an error and marks nothing missing. A sub-folder that can't be read is logged, and nothing under it
@@ -64,7 +70,10 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(do
 	if err != nil {
 		return err
 	}
-	folders, unreadable, err := walk(root)
+	// Watches of folders that are gone are dropped before the walk: a folder moved inside the library
+	// keeps its old watch, and adding it again under its new name would find that old one.
+	s.Watcher.prune(lib.ID)
+	folders, unreadable, err := walk(root, func(dir string) { s.Watcher.watchDir(lib.ID, dir) })
 	if err != nil {
 		return err
 	}
@@ -104,6 +113,10 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(do
 	for i, fv := range found {
 		progress(i, len(found))
 		seen[fv.rel] = true
+		abs := filepath.Join(root, filepath.FromSlash(fv.rel))
+		if s.Watcher.growing(abs) {
+			continue
+		}
 		if k, ok := known[fv.rel]; ok && k.size == fv.st.size && k.mtime == fv.st.mtime && !k.failed {
 			// Unchanged file. Its row is written only if it was missing or its name parses differently now.
 			if k.missing || k.video != fv.video {
@@ -111,7 +124,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(do
 			}
 			continue
 		}
-		info, perr := s.Prober.Probe(ctx, filepath.Join(root, filepath.FromSlash(fv.rel)))
+		info, perr := s.Prober.Probe(ctx, abs)
 		if perr != nil && ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -139,7 +152,10 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(do
 // walk lists the files under root, grouped by folder relative to root ("." for root itself). Hidden
 // folders are skipped. A directory symlink is never followed (it can loop); a file symlink counts as
 // the file it points to. Folders that can't be read come back in unreadable.
-func walk(root string) (folders map[string][]fileStat, unreadable []string, err error) {
+//
+// onDir gets each folder's absolute path before the folder is read, so a watch added there misses
+// nothing the listing doesn't show.
+func walk(root string, onDir func(dir string)) (folders map[string][]fileStat, unreadable []string, err error) {
 	folders = make(map[string][]fileStat)
 	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -158,6 +174,7 @@ func walk(root string) (folders map[string][]fileStat, unreadable []string, err 
 			if p != root && strings.HasPrefix(d.Name(), ".") {
 				return filepath.SkipDir
 			}
+			onDir(p)
 			return nil
 		}
 

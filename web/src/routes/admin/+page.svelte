@@ -17,13 +17,17 @@
 	import { strings } from '$lib/strings';
 
 	// How often the page asks again while a scan is queued or running, or the last load failed.
-	const pollMs = 1000;
+	const busyPollMs = 1000;
+	// How often it asks otherwise, while the tab is visible: the file watcher and the timed rescan
+	// change things without the page knowing.
+	const idlePollMs = 5000;
 
 	let libraries = $state<Library[]>([]);
 	let problems = $state<Problems>({ skipped: [], unplayable: [], appleOnly: [] });
 	let loaded = $state(false); // the libraries loaded at least once
 	let loadFailed = $state(false);
 	let actionFailed = $state(false);
+	let visible = $state(true);
 
 	let path = $state('');
 	let type = $state<LibraryType>('movies');
@@ -53,9 +57,15 @@
 		if (me.isAdmin) refresh();
 	});
 
+	function visibilityChanged() {
+		visible = document.visibilityState === 'visible';
+		if (visible && me.isAdmin) refresh();
+	}
+
 	// The next ask waits for the last answer, so answers can't pile up or land out of order.
 	$effect(() => {
-		if (!scanning && !loadFailed) return;
+		if (!me.isAdmin || !visible) return;
+		const pollMs = scanning || loadFailed ? busyPollMs : idlePollMs;
 		let stopped = false;
 		let timer: ReturnType<typeof setTimeout>;
 		const tick = async () => {
@@ -88,6 +98,8 @@
 		return `${libraryPath.get(p.libraryId) ?? '?'}/${p.path}`;
 	}
 </script>
+
+<svelte:document onvisibilitychange={visibilityChanged} />
 
 <svelte:head>
 	<title>{strings.admin} · {strings.appName}</title>
