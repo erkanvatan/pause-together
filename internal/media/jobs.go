@@ -40,7 +40,13 @@ const videoFile = "video.mp4"
 // half-written copy never looks finished.
 const tmpSuffix = ".tmp"
 
-var keyPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
+var (
+	keyPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
+	// cacheFilePattern matches the files a key's folder may hold: videoFile, sidecarFile and
+	// subtitleName's.
+	cacheFilePattern = regexp.MustCompile(`^(?:` + regexp.QuoteMeta(videoFile) + `|` +
+		regexp.QuoteMeta(sidecarFile) + `|[0-9]+` + regexp.QuoteMeta(subtitleExt) + `)$`)
+)
 
 func validKey(key string) bool { return keyPattern.MatchString(key) }
 
@@ -135,13 +141,14 @@ func (q *Jobs) List() []JobStatus {
 	return append(list, q.failed...)
 }
 
-// Open opens the prepared video for key. A malformed key, or one with no ready copy, gives an error
-// that matches fs.ErrNotExist.
-func (q *Jobs) Open(key string) (*os.File, error) {
-	if !validKey(key) {
+// Open opens a file of key's copy in the cache: a prepared video, one of its subtitle tracks, or a
+// converted sidecar. A malformed key or name, or one with no ready file, gives an error that matches
+// fs.ErrNotExist.
+func (q *Jobs) Open(key, name string) (*os.File, error) {
+	if !validKey(key) || !cacheFilePattern.MatchString(name) {
 		return nil, fs.ErrNotExist
 	}
-	return os.Open(filepath.Join(q.dir, key, videoFile))
+	return os.Open(filepath.Join(q.dir, key, name))
 }
 
 // Disk returns the bytes in the cache folder, half-written copies included, and the free bytes on
@@ -223,8 +230,9 @@ func (q *Jobs) next(ctx context.Context) (Job, context.Context, bool) {
 	return j, jobCtx, true
 }
 
-// prepare writes the job's copy into a .tmp folder and renames it when done. On any error, the .tmp
-// folder is deleted.
+// prepare writes the job's copy into a .tmp folder and renames it when done. When the run fails, it
+// runs once more without subtitles: one broken subtitle track mustn't cost a video that plays fine.
+// On any error, the .tmp folder is deleted.
 func (q *Jobs) prepare(ctx context.Context, j Job) error {
 	key := j.Key()
 	if q.ready(key) {
@@ -241,12 +249,14 @@ func (q *Jobs) prepare(ctx context.Context, j Job) error {
 	// Leftovers of a run that couldn't clean up, or a key folder without its video, would make Mkdir or
 	// Rename fail on every try.
 	tmp, final := filepath.Join(q.dir, key+tmpSuffix), filepath.Join(q.dir, key)
-	err = errors.Join(os.RemoveAll(tmp), os.RemoveAll(final))
+	err = os.RemoveAll(final)
 	if err == nil {
-		err = os.Mkdir(tmp, 0o755)
+		err = q.run(ctx, j, tmp)
 	}
-	if err == nil {
-		err = q.preparer.Prepare(ctx, j, filepath.Join(tmp, videoFile), q.progress)
+	if err != nil && ctx.Err() == nil && len(j.Subtitles) > 0 {
+		slog.Warn("prepare failed, trying again without subtitles", "video", j.Name, "err", err)
+		j.Subtitles = nil
+		err = q.run(ctx, j, tmp)
 	}
 	if err == nil {
 		err = os.Rename(tmp, final)
@@ -257,6 +267,17 @@ func (q *Jobs) prepare(ctx context.Context, j Job) error {
 		}
 	}
 	return err
+}
+
+// run prepares j into a fresh tmp folder.
+func (q *Jobs) run(ctx context.Context, j Job, tmp string) error {
+	if err := os.RemoveAll(tmp); err != nil {
+		return err
+	}
+	if err := os.Mkdir(tmp, 0o755); err != nil {
+		return err
+	}
+	return q.preparer.Prepare(ctx, j, tmp, q.progress)
 }
 
 func (q *Jobs) finish(ctx context.Context, j Job, err error) {

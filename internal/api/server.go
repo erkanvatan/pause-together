@@ -18,7 +18,7 @@ type Deps struct {
 	TokenCookie string
 	Libraries   *library.Libraries // admin API only
 	Scans       *library.Scans     // admin API only
-	Jobs        *media.Jobs        // prepared videos
+	Jobs        *media.Jobs        // prepared videos and subtitles, served under /stream
 }
 
 // Guest returns the handler for the guest port: the whole app except the admin API.
@@ -47,7 +47,7 @@ func (s *server) mux(web fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/health", health)
 	mux.HandleFunc("GET /api/me", s.getMe)
 	mux.HandleFunc("POST /api/me", s.postMe)
-	mux.HandleFunc("GET /stream/{key}/video.mp4", s.streamVideo)
+	mux.HandleFunc("GET /stream/{key}/{name}", s.streamFile)
 	if s.admin {
 		s.adminRoutes(mux)
 	}

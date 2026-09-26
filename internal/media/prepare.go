@@ -16,7 +16,7 @@ import (
 
 // RecipeVersion is part of every cache key. Bump it when the ffmpeg arguments change, so old copies
 // are made again with the new ones.
-const RecipeVersion = 1
+const RecipeVersion = 2
 
 // downmix turns 3 or more channels into stereo that keeps voices clear on phone speakers. aformat
 // first brings every layout to plain 5.1 (7.1 folds its extra pair in, side becomes back), so the pan
@@ -41,6 +41,9 @@ type Job struct {
 	Size       int64         // the source's size, for the key and the free-space check
 	Mtime      int64         // the source's mtime, Unix nanoseconds
 	Audio      *AudioTrack   // the room's audio track; nil when the video has none
+	// Subtitles are the embedded subtitle streams to turn into WebVTT: every track that isn't
+	// Unavailable. They're part of the video, so not part of the key.
+	Subtitles []int
 }
 
 // Key names the job's prepared copy: video + audio track + source size and mtime + recipe version.
@@ -54,9 +57,10 @@ func (j Job) Key() string {
 	return hex.EncodeToString(sum[:16])
 }
 
-// Preparer turns a job's source into an MP4 at out. FFmpeg is the real one.
+// Preparer turns a job's source into files in the folder dir: the MP4 and a WebVTT file per subtitle
+// track. FFmpeg is the real one.
 type Preparer interface {
-	Prepare(ctx context.Context, j Job, out string, progress func(done time.Duration)) error
+	Prepare(ctx context.Context, j Job, dir string, progress func(done time.Duration)) error
 }
 
 // FFmpeg prepares videos with the ffmpeg binary.
@@ -64,13 +68,13 @@ type FFmpeg struct{}
 
 // Prepare runs ffmpeg once. Both paths must be absolute: a relative "-x.mkv" or "concat:x.mkv" would
 // be read as an option or a protocol. progress, if not nil, hears how much of the video is done.
-func (FFmpeg) Prepare(ctx context.Context, j Job, out string, progress func(time.Duration)) error {
-	for _, p := range []string{j.Source, out} {
+func (FFmpeg) Prepare(ctx context.Context, j Job, dir string, progress func(time.Duration)) error {
+	for _, p := range []string{j.Source, dir} {
 		if !filepath.IsAbs(p) {
 			return fmt.Errorf("ffmpeg: path %q is not absolute", p)
 		}
 	}
-	cmd := exec.CommandContext(ctx, "ffmpeg", prepareArgs(j, out)...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", prepareArgs(j, dir)...)
 	stderr := &tail{max: stderrTail}
 	cmd.Stderr = stderr
 	stdout, err := cmd.StdoutPipe()
@@ -101,8 +105,10 @@ func (FFmpeg) Prepare(ctx context.Context, j Job, out string, progress func(time
 }
 
 // prepareArgs builds the ffmpeg arguments: the main video stream copied, only the chosen audio track,
-// and the index at the front so playback starts at once.
-func prepareArgs(j Job, out string) []string {
+// and the index at the front so playback starts at once. Each subtitle track is another output of the
+// same run: its packets are spread across the whole file, so reading it apart would cost another full
+// read.
+func prepareArgs(j Job, dir string) []string {
 	args := []string{"-nostdin", "-v", "error", "-progress", "pipe:1", "-nostats",
 		// AVI and some MPEG-TS packets carry no pts; MP4 needs one on every packet.
 		"-fflags", "+genpts", "-i", j.Source,
@@ -118,8 +124,21 @@ func prepareArgs(j Job, out string) []string {
 	if j.Audio != nil {
 		args = append(args, audioArgs(*j.Audio)...)
 	}
-	// ffmpeg guesses the format from the extension, and the output may not end in .mp4.
-	return append(args, "-movflags", "+faststart", "-f", "mp4", out)
+	// ffmpeg guesses the format from the extension; name it anyway, like the subtitles.
+	args = append(args, "-movflags", "+faststart", "-f", "mp4", filepath.Join(dir, videoFile))
+	for _, s := range j.Subtitles {
+		args = append(args, "-map", "0:"+strconv.Itoa(s), "-c:s", "webvtt", "-f", "webvtt",
+			filepath.Join(dir, subtitleName(s)))
+	}
+	return args
+}
+
+// subtitleExt ends every WebVTT file in the cache.
+const subtitleExt = ".vtt"
+
+// subtitleName is an embedded subtitle track's WebVTT file in its key's folder.
+func subtitleName(stream int) string {
+	return strconv.Itoa(stream) + subtitleExt
 }
 
 // audioArgs keeps AAC with at most two channels as it is. Everything else becomes stereo AAC.

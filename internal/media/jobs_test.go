@@ -21,7 +21,8 @@ type fakePreparer struct {
 	afterCancel chan struct{}
 }
 
-func (f *fakePreparer) Prepare(ctx context.Context, j Job, out string, progress func(time.Duration)) error {
+func (f *fakePreparer) Prepare(ctx context.Context, j Job, dir string, progress func(time.Duration)) error {
+	out := filepath.Join(dir, videoFile)
 	if err := os.WriteFile(out, []byte("partial"), 0o644); err != nil {
 		return err
 	}
@@ -121,7 +122,7 @@ func TestJobsPrepare(t *testing.T) {
 	q.prep.finish <- nil
 	waitFor(t, "the queue to empty", func() bool { return len(q.List()) == 0 })
 
-	f, err := q.Open(job.Key())
+	f, err := q.Open(job.Key(), videoFile)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -148,7 +149,7 @@ func TestJobsCancelMidJob(t *testing.T) {
 	q.Cancel(job.Key())
 	waitFor(t, "the queue to empty", func() bool { return len(q.List()) == 0 })
 	waitFor(t, "the tmp folder to go", func() bool { return len(q.tmpLeft(t)) == 0 })
-	if _, err := q.Open(job.Key()); !errors.Is(err, fs.ErrNotExist) {
+	if _, err := q.Open(job.Key(), videoFile); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("Open after cancel: err = %v, want not exist", err)
 	}
 }
@@ -248,6 +249,26 @@ func TestJobsFailedThenRetried(t *testing.T) {
 	q.prep.finish <- nil
 }
 
+func TestJobsFailedRetriedWithoutSubtitles(t *testing.T) {
+	q := newTestJobs(t)
+	q.start(t)
+	job := testJob(1)
+	job.Subtitles = []int{3, 4}
+	q.Add(job)
+	if j := q.started(t); len(j.Subtitles) != 2 {
+		t.Errorf("first run subtitles = %v, want both", j.Subtitles)
+	}
+	q.prep.finish <- errors.New("ffmpeg: exit status 1: bad subtitle")
+	if j := q.started(t); j.Subtitles != nil {
+		t.Errorf("second run subtitles = %v, want none", j.Subtitles)
+	}
+	q.prep.finish <- nil
+	waitFor(t, "the queue to empty", func() bool { return len(q.List()) == 0 })
+	if !q.ready(job.Key()) {
+		t.Errorf("no copy after the run without subtitles")
+	}
+}
+
 func TestJobsCancelDropsFailure(t *testing.T) {
 	q := newTestJobs(t)
 	q.start(t)
@@ -340,13 +361,27 @@ func TestJobsOpenBadKey(t *testing.T) {
 	upper := strings.ToUpper(job.Key())
 	for _, key := range []string{"", "..", "../x", job.Key()[:31], job.Key() + "0", upper, testJob(2).Key(),
 		job.Key() + ".tmp"} {
-		if f, err := q.Open(key); !errors.Is(err, fs.ErrNotExist) {
+		if f, err := q.Open(key, videoFile); !errors.Is(err, fs.ErrNotExist) {
 			if f != nil {
 				_ = f.Close()
 			}
 			t.Errorf("Open(%q): err = %v, want not exist", key, err)
 		}
 	}
+	for _, name := range []string{"", ".", "..", "../x", "video.mp4.part", "subtitle.vtt.part", "x.vtt", "2.vtt/x",
+		"/video.mp4", "-1.vtt"} {
+		if f, err := q.Open(job.Key(), name); !errors.Is(err, fs.ErrNotExist) {
+			if f != nil {
+				_ = f.Close()
+			}
+			t.Errorf("Open(key, %q): err = %v, want not exist", name, err)
+		}
+	}
+	f, err := q.Open(job.Key(), videoFile)
+	if err != nil {
+		t.Fatalf("Open(key, %q): %v", videoFile, err)
+	}
+	_ = f.Close()
 }
 
 func TestJobsDisk(t *testing.T) {

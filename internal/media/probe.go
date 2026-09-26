@@ -41,13 +41,14 @@ type AudioTrack struct {
 
 // SubtitleTrack is one embedded subtitle stream.
 type SubtitleTrack struct {
-	Stream  int
-	Codec   string // e.g. "subrip", "ass", "hdmv_pgs_subtitle"
-	Lang    string
-	Title   string
-	Default bool
-	Forced  bool
-	SDH     bool
+	Stream      int
+	Codec       string // e.g. "subrip", "ass", "hdmv_pgs_subtitle"
+	Lang        string
+	Title       string
+	Default     bool
+	Forced      bool
+	SDH         bool
+	Unavailable SubtitleUnavailable // "" = prepare turns it into WebVTT
 }
 
 // FFprobe probes files with the ffprobe binary.
@@ -139,7 +140,7 @@ func parseProbe(data []byte) (Info, error) {
 			info.Subtitles = append(info.Subtitles, SubtitleTrack{
 				Stream: s.Index, Codec: s.CodecName, Lang: s.lang(), Title: s.Tags["title"],
 				Default: s.Disposition["default"] == 1, Forced: s.Disposition["forced"] == 1,
-				SDH: s.Disposition["hearing_impaired"] == 1,
+				SDH: s.Disposition["hearing_impaired"] == 1, Unavailable: subtitleUnavailable(s.CodecName),
 			})
 		}
 	}

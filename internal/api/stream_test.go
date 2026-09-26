@@ -11,8 +11,8 @@ import (
 	"github.com/erkanvatan/pause-together/internal/media"
 )
 
-// streamHandlers returns both listeners' handlers over a cache holding one prepared video, its key
-// and its bytes.
+// streamHandlers returns both listeners' handlers over a cache holding one prepared video and its
+// subtitle track 2, the key and the video's bytes.
 func streamHandlers(t *testing.T) (map[string]http.Handler, string, []byte) {
 	t.Helper()
 	dir := t.TempDir()
@@ -25,6 +25,9 @@ func streamHandlers(t *testing.T) (map[string]http.Handler, string, []byte) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, key, "video.mp4"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, key, "2.vtt"), []byte(testVTT), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	d := deps(testUsers(t))
@@ -59,6 +62,21 @@ func TestStreamRange(t *testing.T) {
 	}
 }
 
+const testVTT = "WEBVTT\n\n00:00.000 --> 00:00.900\nşğıİ\n"
+
+func TestStreamSubtitle(t *testing.T) {
+	hs, key, _ := streamHandlers(t)
+	for name, h := range hs {
+		rec := do(h, http.MethodGet, "/stream/"+key+"/2.vtt", nil)
+		if rec.Code != http.StatusOK || rec.Body.String() != testVTT {
+			t.Errorf("%s: status = %d, body = %q", name, rec.Code, rec.Body.String())
+		}
+		if got := rec.Header().Get("Content-Type"); got != "text/vtt; charset=utf-8" {
+			t.Errorf("%s: Content-Type = %q", name, got)
+		}
+	}
+}
+
 func TestStreamNotFound(t *testing.T) {
 	hs, key, _ := streamHandlers(t)
 	other := media.Job{VideoID: 2}.Key()
@@ -69,6 +87,10 @@ func TestStreamNotFound(t *testing.T) {
 		"/stream/%2e%2e/video.mp4",                       // ..
 		"/stream/" + key + ".tmp/video.mp4",              // half-written
 		"/stream/" + key + "/other.mp4",                  // another name
+		"/stream/" + key + "/3.vtt",                      // no such track
+		"/stream/" + key + "/subtitle.vtt",               // not a sidecar's key
+		"/stream/" + key + "/2.vtt/x",                    // deeper
+		"/stream/" + key + "/%2e%2e",                     // ..
 		"/stream/" + key,                                 // the folder
 		"/stream/" + key + "/",                           // the folder
 	} {

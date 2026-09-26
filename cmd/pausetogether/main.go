@@ -28,7 +28,7 @@ const mediaDir = "/media"
 type config struct {
 	guestAddr string
 	adminAddr string
-	dataDir   string // database, backups and the cache of prepared videos
+	dataDir   string // database, backups and the cache of prepared videos and subtitles
 	// tokenCookie names the user cookie. Dev sets its own: cookies ignore the port, so dev and prod
 	// on localhost would otherwise overwrite each other's.
 	tokenCookie string
@@ -79,7 +79,15 @@ func run() error {
 		Keep: store.BackupKeep,
 		Now:  time.Now,
 	}
-	scanner := &library.Scanner{DB: db, Root: mediaDir, Prober: media.FFprobe{}}
+	// Prepared videos and converted subtitles.
+	cacheDir := filepath.Join(cfg.dataDir, "cache")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return err
+	}
+	jobs := media.NewJobs(cacheDir, media.FFmpeg{})
+
+	scanner := &library.Scanner{DB: db, Root: mediaDir, Prober: media.FFprobe{},
+		Subtitles: media.Subtitles{Dir: cacheDir}}
 	scans := library.NewScans(scanner)
 	// Without a watcher, libraries still follow the disk through the timed rescan.
 	watcher, err := library.NewWatcher(scans)
@@ -88,12 +96,6 @@ func run() error {
 	} else {
 		scanner.Watcher = watcher
 	}
-
-	cacheDir := filepath.Join(cfg.dataDir, "cache")
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-		return err
-	}
-	jobs := media.NewJobs(cacheDir, media.FFmpeg{})
 
 	bgCtx, stopBackground := context.WithCancel(ctx)
 	var wg sync.WaitGroup

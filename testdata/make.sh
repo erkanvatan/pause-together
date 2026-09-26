@@ -34,4 +34,24 @@ clip 'Movies/Ten Bit Test (2023).mkv' $stereo -c:v libx264 -pix_fmt yuv420p10le 
 clip 'TV/Test Show (2024)/Season 01/Test Show (2024) - s01e01 - Pilot.mkv' $stereo \
 	-c:v libx265 -pix_fmt yuv420p -x265-params log-level=error -c:a aac
 
+# Sidecar subtitles for the stereo clip. In Windows-1254, \376 \360 \375 \335 are ş ğ ı İ.
+movie="$out/Movies/Stereo Test (2020)/Stereo Test (2020)"
+for lang in tr tur; do
+	printf '1\n00:00:00,000 --> 00:00:00,900\n\376 \360 \375 \335\n' >"$movie.$lang.srt"
+done
+printf '\357\273\2771\n00:00:00,000 --> 00:00:00,900\nWith a BOM\n' >"$movie.en.srt"
+# Quoted EOF: no escapes, so {\an8} stays as written.
+cat >"$movie.en.sdh.ass" <<'EOF'
+[Script Info]
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, Bold, Italic
+Style: Default,Arial,20,&H00FFFFFF,0,0
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:00.90,Default,,0,0,0,,{\an8}{\i1}Up top{\i0} and plain
+EOF
+
 touch "$out/.done"

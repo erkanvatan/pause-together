@@ -15,10 +15,10 @@ import (
 )
 
 func TestPrepareArgs(t *testing.T) {
-	const src, out = "/media/Movies/A (2020).mkv", "/data/cache/k.tmp/video.mp4"
+	const src, dir = "/media/Movies/A (2020).mkv", "/data/cache/k.tmp"
 	head := []string{"-nostdin", "-v", "error", "-progress", "pipe:1", "-nostats", "-fflags", "+genpts", "-i", src,
 		"-map", "0:V:0"}
-	tail := []string{"-movflags", "+faststart", "-f", "mp4", out}
+	tail := []string{"-movflags", "+faststart", "-f", "mp4", dir + "/video.mp4"}
 	reencode := []string{"-c:a", "aac", "-b:a", "192k"}
 
 	tests := []struct {
@@ -26,29 +26,35 @@ func TestPrepareArgs(t *testing.T) {
 		codec string
 		audio *AudioTrack
 		want  []string // between head and tail
+		subs  []int
+		after []string // after tail
 	}{
 		{"stereo AAC copied", "h264", &AudioTrack{Stream: 1, Codec: "aac", Channels: 2},
-			[]string{"-map", "0:1", "-c:v", "copy", "-c:a", "copy"}},
+			[]string{"-map", "0:1", "-c:v", "copy", "-c:a", "copy"}, nil, nil},
 		{"mono AAC copied", "h264", &AudioTrack{Stream: 1, Codec: "aac", Channels: 1},
-			[]string{"-map", "0:1", "-c:v", "copy", "-c:a", "copy"}},
+			[]string{"-map", "0:1", "-c:v", "copy", "-c:a", "copy"}, nil, nil},
 		{"HEVC tagged hvc1", "hevc", &AudioTrack{Stream: 1, Codec: "aac", Channels: 2},
-			[]string{"-map", "0:1", "-c:v", "copy", "-tag:v", "hvc1", "-c:a", "copy"}},
+			[]string{"-map", "0:1", "-c:v", "copy", "-tag:v", "hvc1", "-c:a", "copy"}, nil, nil},
 		{"stereo AC3 to AAC", "h264", &AudioTrack{Stream: 1, Codec: "ac3", Channels: 2},
-			slices.Concat([]string{"-map", "0:1", "-c:v", "copy"}, reencode, []string{"-ac", "2"})},
+			slices.Concat([]string{"-map", "0:1", "-c:v", "copy"}, reencode, []string{"-ac", "2"}), nil, nil},
 		{"mono MP3 to stereo AAC", "vp9", &AudioTrack{Stream: 1, Codec: "mp3", Channels: 1},
-			slices.Concat([]string{"-map", "0:1", "-c:v", "copy"}, reencode, []string{"-ac", "2"})},
+			slices.Concat([]string{"-map", "0:1", "-c:v", "copy"}, reencode, []string{"-ac", "2"}), nil, nil},
 		{"5.1 AC3 downmixed", "h264", &AudioTrack{Stream: 1, Codec: "ac3", Channels: 6, Layout: "5.1(side)"},
-			slices.Concat([]string{"-map", "0:1", "-c:v", "copy", "-af", downmix}, reencode)},
+			slices.Concat([]string{"-map", "0:1", "-c:v", "copy", "-af", downmix}, reencode), nil, nil},
 		{"7.1 AAC downmixed, not copied", "av1", &AudioTrack{Stream: 1, Codec: "aac", Channels: 8, Layout: "7.1"},
-			slices.Concat([]string{"-map", "0:1", "-c:v", "copy", "-af", downmix}, reencode)},
+			slices.Concat([]string{"-map", "0:1", "-c:v", "copy", "-af", downmix}, reencode), nil, nil},
 		{"chosen stream index mapped", "h264", &AudioTrack{Stream: 3, Codec: "aac", Channels: 2},
-			[]string{"-map", "0:3", "-c:v", "copy", "-c:a", "copy"}},
-		{"no audio", "h264", nil, []string{"-c:v", "copy"}},
+			[]string{"-map", "0:3", "-c:v", "copy", "-c:a", "copy"}, nil, nil},
+		{"no audio", "h264", nil, []string{"-c:v", "copy"}, nil, nil},
+		{"subtitles as more outputs", "h264", &AudioTrack{Stream: 1, Codec: "aac", Channels: 2},
+			[]string{"-map", "0:1", "-c:v", "copy", "-c:a", "copy"}, []int{2, 5},
+			[]string{"-map", "0:2", "-c:s", "webvtt", "-f", "webvtt", dir + "/2.vtt",
+				"-map", "0:5", "-c:s", "webvtt", "-f", "webvtt", dir + "/5.vtt"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := prepareArgs(Job{Source: src, VideoCodec: tt.codec, Audio: tt.audio}, out)
-			want := slices.Concat(head, tt.want, tail)
+			got := prepareArgs(Job{Source: src, VideoCodec: tt.codec, Audio: tt.audio, Subtitles: tt.subs}, dir)
+			want := slices.Concat(head, tt.want, tail, tt.after)
 			if !slices.Equal(got, want) {
 				t.Errorf("args =\n  %q\nwant\n  %q", got, want)
 			}
@@ -66,6 +72,7 @@ func TestJobKey(t *testing.T) {
 	same := base
 	same.Name, same.Source, same.Duration = "b", "/b", time.Hour // not part of the key
 	same.Audio = &AudioTrack{Stream: 1, Codec: "ac3"}
+	same.Subtitles = []int{2}
 	if same.Key() != key {
 		t.Errorf("key changed with fields outside the key")
 	}
@@ -106,10 +113,10 @@ func TestParseProgress(t *testing.T) {
 }
 
 func TestFFmpegRefusesRelativePaths(t *testing.T) {
-	for _, j := range []struct{ src, out string }{{"-x.mkv", "/tmp/out.mp4"}, {"/x.mkv", "-out.mp4"}} {
-		err := FFmpeg{}.Prepare(context.Background(), Job{Source: j.src}, j.out, nil)
+	for _, j := range []struct{ src, dir string }{{"-x.mkv", "/tmp/k.tmp"}, {"/x.mkv", "-k.tmp"}} {
+		err := FFmpeg{}.Prepare(context.Background(), Job{Source: j.src}, j.dir, nil)
 		if err == nil || !strings.Contains(err.Error(), "not absolute") {
-			t.Errorf("%q → %q: err = %v, want a not-absolute error", j.src, j.out, err)
+			t.Errorf("%q → %q: err = %v, want a not-absolute error", j.src, j.dir, err)
 		}
 	}
 }
@@ -195,10 +202,11 @@ func TestFFmpegPrepareClips(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.clip, func(t *testing.T) {
-			out := filepath.Join(t.TempDir(), "video.mp4")
+			dir := t.TempDir()
+			out := filepath.Join(dir, videoFile)
 			job := Job{Source: clip(t, tt.clip), VideoCodec: tt.codec, Duration: time.Second, Audio: &tt.audio}
 			var last time.Duration
-			if err := (FFmpeg{}).Prepare(context.Background(), job, out, func(d time.Duration) { last = d }); err != nil {
+			if err := (FFmpeg{}).Prepare(context.Background(), job, dir, func(d time.Duration) { last = d }); err != nil {
 				t.Fatal(err)
 			}
 			if last <= 0 {
@@ -248,8 +256,30 @@ func TestFFmpegError(t *testing.T) {
 	if err := os.WriteFile(src, []byte("not a video"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err := FFmpeg{}.Prepare(context.Background(), Job{Source: src, VideoCodec: "h264"}, filepath.Join(dir, "out.mp4"), nil)
+	err := FFmpeg{}.Prepare(context.Background(), Job{Source: src, VideoCodec: "h264"}, dir, nil)
 	if err == nil || !strings.Contains(err.Error(), "Invalid data") {
 		t.Errorf("err = %v, want ffmpeg's message", err)
+	}
+}
+
+// The embedded SRT of the stereo clip comes out as WebVTT next to the MP4, in the same run.
+func TestFFmpegPrepareSubtitles(t *testing.T) {
+	dir := t.TempDir()
+	job := Job{Source: clip(t, "Movies/Stereo Test (2020)/Stereo Test (2020).mkv"), VideoCodec: "h264",
+		Audio: &AudioTrack{Stream: 1, Codec: "aac", Channels: 2}, Subtitles: []int{2}}
+	if err := (FFmpeg{}).Prepare(context.Background(), job, dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	vtt, err := os.ReadFile(filepath.Join(dir, "2.vtt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(vtt), "WEBVTT\n") || !strings.Contains(string(vtt), "\nHello\n") {
+		t.Errorf("2.vtt =\n%s\nwant WebVTT with Hello", vtt)
+	}
+	for _, s := range probeOut(t, filepath.Join(dir, videoFile)).Streams {
+		if s.CodecType == "subtitle" {
+			t.Errorf("subtitle stream in the MP4")
+		}
 	}
 }

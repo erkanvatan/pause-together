@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -33,7 +35,10 @@ var fakeInfo = media.Info{
 		{Stream: 1, Codec: "eac3", Channels: 6, Layout: "5.1(side)", Lang: "eng", Title: "Surround", Default: true},
 		{Stream: 2, Codec: "aac", Channels: 2, Layout: "stereo", Lang: "tur"},
 	},
-	Subtitles: []media.SubtitleTrack{{Stream: 3, Codec: "subrip", Lang: "eng", Forced: true}},
+	Subtitles: []media.SubtitleTrack{
+		{Stream: 3, Codec: "subrip", Lang: "eng", Forced: true},
+		{Stream: 4, Codec: "hdmv_pgs_subtitle", Lang: "tur", Unavailable: media.SubtitleImage},
+	},
 }
 
 func (f *fakeProber) Probe(_ context.Context, path string) (media.Info, error) {
@@ -48,6 +53,43 @@ func (f *fakeProber) Probe(_ context.Context, path string) (media.Info, error) {
 	return fakeInfo, nil
 }
 
+// fakeSubtitler keeps its copies as a set of keys. It counts conversions per file name and fails for
+// the names in fail. cacheErr, if set, fails every conversion as if the cache couldn't be written.
+type fakeSubtitler struct {
+	copies   map[string]bool
+	calls    map[string]int
+	fail     map[string]bool
+	cacheErr error
+}
+
+func newFakeSubtitler() *fakeSubtitler {
+	return &fakeSubtitler{copies: map[string]bool{}, calls: map[string]int{}, fail: map[string]bool{}}
+}
+
+func (f *fakeSubtitler) Sidecar(_ context.Context, src, _, key string) error {
+	if !filepath.IsAbs(src) {
+		return errors.New("path not absolute")
+	}
+	if f.copies[key] {
+		return nil
+	}
+	name := filepath.Base(src)
+	f.calls[name]++
+	switch {
+	case f.fail[name]:
+		return fmt.Errorf("%w: no cues found", media.ErrUnreadable)
+	case f.cacheErr != nil:
+		return f.cacheErr
+	}
+	f.copies[key] = true
+	return nil
+}
+
+func (f *fakeSubtitler) Remove(key string) error {
+	delete(f.copies, key)
+	return nil
+}
+
 type proberFunc func(context.Context, string) (media.Info, error)
 
 func (f proberFunc) Probe(ctx context.Context, path string) (media.Info, error) { return f(ctx, path) }
@@ -57,6 +99,7 @@ type testLib struct {
 	db      *sql.DB
 	scanner *Scanner
 	prober  *fakeProber
+	subs    *fakeSubtitler
 	lib     Library
 	dir     string // the library folder
 }
@@ -82,10 +125,10 @@ func newTestLib(t *testing.T, typ Type) *testLib {
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	prober := newFakeProber()
+	prober, subs := newFakeProber(), newFakeSubtitler()
 	return &testLib{
-		t: t, db: db, prober: prober, lib: lib, dir: dir,
-		scanner: &Scanner{DB: db, Root: root, Prober: prober},
+		t: t, db: db, prober: prober, subs: subs, lib: lib, dir: dir,
+		scanner: &Scanner{DB: db, Root: root, Prober: prober, Subtitles: subs},
 	}
 }
 
@@ -246,13 +289,191 @@ func TestScanStoresProbeResult(t *testing.T) {
 		t.Errorf("audio = %+v, want %+v", audio, fakeInfo.Audio)
 	}
 
-	var sub media.SubtitleTrack
-	if err := l.db.QueryRow("SELECT stream, codec, lang, title, is_default, forced, sdh FROM subtitle_tracks").
-		Scan(&sub.Stream, &sub.Codec, &sub.Lang, &sub.Title, &sub.Default, &sub.Forced, &sub.SDH); err != nil {
+	var subs []media.SubtitleTrack
+	rows, err = l.db.Query(`SELECT stream, codec, lang, title, is_default, forced, sdh, COALESCE(unavailable, '')
+		FROM subtitle_tracks ORDER BY stream`)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if sub != fakeInfo.Subtitles[0] {
-		t.Errorf("subtitle = %+v, want %+v", sub, fakeInfo.Subtitles[0])
+	for rows.Next() {
+		var sub media.SubtitleTrack
+		if err := rows.Scan(&sub.Stream, &sub.Codec, &sub.Lang, &sub.Title, &sub.Default, &sub.Forced, &sub.SDH,
+			&sub.Unavailable); err != nil {
+			t.Fatal(err)
+		}
+		subs = append(subs, sub)
+	}
+	_ = rows.Close()
+	if !reflect.DeepEqual(subs, fakeInfo.Subtitles) {
+		t.Errorf("subtitles = %+v, want %+v", subs, fakeInfo.Subtitles)
+	}
+}
+
+type savedSidecar struct {
+	ID    int64
+	Video string // its video's path
+	Lang  string
+	Flags string // "forced", "sdh", both or ""
+	Key   string
+}
+
+// sidecars returns the library's sidecar subtitle rows by their file's path.
+func (l *testLib) sidecars() map[string]savedSidecar {
+	l.t.Helper()
+	rows, err := l.db.Query(`SELECT s.id, v.path, s.name, s.lang, s.forced, s.sdh, s.cache_key
+		FROM sidecar_subtitles s JOIN videos v ON v.id = s.video_id WHERE v.library_id = ?`, l.lib.ID)
+	if err != nil {
+		l.t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	got := map[string]savedSidecar{}
+	for rows.Next() {
+		var r savedSidecar
+		var name string
+		var forced, sdh bool
+		if err := rows.Scan(&r.ID, &r.Video, &name, &r.Lang, &forced, &sdh, &r.Key); err != nil {
+			l.t.Fatal(err)
+		}
+		switch {
+		case forced && sdh:
+			r.Flags = "forced sdh"
+		case forced:
+			r.Flags = "forced"
+		case sdh:
+			r.Flags = "sdh"
+		}
+		got[path.Join(path.Dir(r.Video), name)] = r
+	}
+	if err := rows.Err(); err != nil {
+		l.t.Fatal(err)
+	}
+	return got
+}
+
+// key is the sidecar key of a file in the library as it is on disk now.
+func (l *testLib) key(rel string) string {
+	l.t.Helper()
+	st, err := os.Stat(filepath.Join(l.dir, rel))
+	if err != nil {
+		l.t.Fatal(err)
+	}
+	return media.SidecarKey(l.lib.ID, rel, st.Size(), st.ModTime().UnixNano())
+}
+
+func TestScanSidecars(t *testing.T) {
+	l := newTestLib(t, Movies)
+	const video, en, tr = "Heat (1995)/Heat (1995).mkv", "Heat (1995)/Heat (1995).en.srt", "Heat (1995)/Heat (1995).tur.forced.srt"
+	l.write(video, "heat")
+	l.write(en, "english")
+	l.write(tr, "türkçe")
+	l.write("Heat (1995)/Heat (1995).sdh.srt", "no language: skipped")
+	l.scan()
+
+	got := l.sidecars()
+	want := map[string]savedSidecar{
+		en: {Video: video, Lang: "en", Key: l.key(en)},
+		tr: {Video: video, Lang: "tur", Flags: "forced", Key: l.key(tr)},
+	}
+	for rel, w := range want {
+		g := got[rel]
+		w.ID = g.ID
+		if g != w || !l.subs.copies[w.Key] {
+			t.Errorf("%s: row %+v, want %+v; copy made: %v", rel, g, w, l.subs.copies[w.Key])
+		}
+	}
+	if len(got) != len(want) {
+		t.Errorf("got %d sidecars, want %d: %v", len(got), len(want), got)
+	}
+
+	t.Run("unchanged: not converted again", func(t *testing.T) {
+		l.scan()
+		if n := l.subs.calls["Heat (1995).en.srt"]; n != 1 {
+			t.Errorf("converted %d times, want 1", n)
+		}
+		if again := l.sidecars(); !reflect.DeepEqual(again, got) {
+			t.Errorf("rows changed:\n%v\nwant\n%v", again, got)
+		}
+	})
+
+	t.Run("changed: new copy, old one removed, same row", func(t *testing.T) {
+		oldKey := got[en].Key
+		l.write(en, "english, fixed")
+		l.scan()
+		row := l.sidecars()[en]
+		if row.ID != got[en].ID || row.Key != l.key(en) || row.Key == oldKey {
+			t.Errorf("row = %+v, want id %d with the new key", row, got[en].ID)
+		}
+		if l.subs.copies[oldKey] || !l.subs.copies[row.Key] {
+			t.Errorf("copies = %v, want only the new key", l.subs.copies)
+		}
+	})
+
+	t.Run("deleted: row and copy gone", func(t *testing.T) {
+		key := got[tr].Key
+		if err := os.Remove(filepath.Join(l.dir, tr)); err != nil {
+			t.Fatal(err)
+		}
+		l.scan()
+		if _, ok := l.sidecars()[tr]; ok || l.subs.copies[key] {
+			t.Errorf("row or copy still there")
+		}
+	})
+
+	t.Run("cache error: row kept, not listed", func(t *testing.T) {
+		before := l.sidecars()[en]
+		l.subs.cacheErr = errors.New("no space left on device")
+		l.write(en, "english, fixed again")
+		l.scan()
+		l.subs.cacheErr = nil
+		if after := l.sidecars()[en]; after != before {
+			t.Errorf("row = %+v, want it unchanged: %+v", after, before)
+		}
+		if _, ok := l.skipped()[en]; ok {
+			t.Errorf("listed as skipped")
+		}
+	})
+
+	t.Run("can't convert: listed, row and copy gone", func(t *testing.T) {
+		key := l.sidecars()[en].Key
+		l.subs.fail["Heat (1995).en.srt"] = true
+		l.write(en, "broken")
+		l.scan()
+		if _, ok := l.sidecars()[en]; ok || l.subs.copies[key] {
+			t.Errorf("row or copy still there")
+		}
+		if r := l.skipped()[en]; r != string(ReasonSubUnreadable) {
+			t.Errorf("skipped reason = %q, want %q", r, ReasonSubUnreadable)
+		}
+
+		delete(l.subs.fail, "Heat (1995).en.srt")
+		l.scan()
+		if _, ok := l.sidecars()[en]; !ok {
+			t.Errorf("not back after a good scan")
+		}
+		if _, ok := l.skipped()[en]; ok {
+			t.Errorf("still listed as skipped")
+		}
+	})
+}
+
+// A video renamed (mkv to mp4) is a new video. Its sidecar keeps its name, row and copy, and follows it.
+func TestScanSidecarFollowsRenamedVideo(t *testing.T) {
+	l := newTestLib(t, Movies)
+	l.write("Heat (1995).mkv", "heat")
+	l.write("Heat (1995).en.srt", "english")
+	l.scan()
+	before := l.sidecars()["Heat (1995).en.srt"]
+
+	if err := os.Rename(filepath.Join(l.dir, "Heat (1995).mkv"), filepath.Join(l.dir, "Heat (1995).mp4")); err != nil {
+		t.Fatal(err)
+	}
+	l.scan()
+	after := l.sidecars()["Heat (1995).en.srt"]
+	if after.ID != before.ID || after.Key != before.Key || after.Video != "Heat (1995).mp4" {
+		t.Errorf("after = %+v, want %+v on the mp4", after, before)
+	}
+	if n := l.subs.calls["Heat (1995).en.srt"]; n != 1 {
+		t.Errorf("converted %d times, want 1", n)
 	}
 }
 
@@ -497,6 +718,7 @@ func TestScanMissingRoot(t *testing.T) {
 func TestScanUnreadableFolder(t *testing.T) {
 	l := newTestLib(t, Movies)
 	l.write("Heat (1995)/Heat (1995).mkv", "heat")
+	l.write("Heat (1995)/Heat (1995).en.srt", "english")
 	l.write("Ronin (1998).mkv", "ronin")
 	l.scan()
 
@@ -516,6 +738,9 @@ func TestScanUnreadableFolder(t *testing.T) {
 	}
 	if v := videos["Ronin (1998).mkv"]; !v.Missing {
 		t.Errorf("Ronin, deleted = %+v, want missing", v)
+	}
+	if _, ok := l.sidecars()["Heat (1995)/Heat (1995).en.srt"]; !ok {
+		t.Errorf("Heat's subtitle, in the unreadable folder: row deleted")
 	}
 }
 
@@ -552,7 +777,8 @@ func TestScanTestdata(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	scanner := &Scanner{DB: db, Root: root, Prober: media.FFprobe{}}
+	cache := t.TempDir()
+	scanner := &Scanner{DB: db, Root: root, Prober: media.FFprobe{}, Subtitles: media.Subtitles{Dir: cache}}
 	for i, lib := range []Library{{Path: "Movies", Type: Movies}, {Path: "TV", Type: TVShows}} {
 		lib.ID = int64(i + 1)
 		if _, err := db.Exec("INSERT INTO libraries (id, path, type) VALUES (?, ?, ?)", lib.ID, lib.Path, lib.Type); err != nil {
@@ -598,5 +824,39 @@ func TestScanTestdata(t *testing.T) {
 	}
 	if got != len(want) {
 		t.Errorf("got %d videos, want %d", got, len(want))
+	}
+
+	// The stereo clip's sidecars, converted with real ffmpeg.
+	wantSubs := map[string]string{ // name → language + flags
+		"Stereo Test (2020).tr.srt":     "tr",
+		"Stereo Test (2020).tur.srt":    "tur",
+		"Stereo Test (2020).en.srt":     "en",
+		"Stereo Test (2020).en.sdh.ass": "en sdh",
+	}
+	subRows, err := db.Query("SELECT name, lang, sdh, cache_key FROM sidecar_subtitles")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = subRows.Close() }()
+	gotSubs := map[string]string{}
+	for subRows.Next() {
+		var name, lang, key string
+		var sdh bool
+		if err := subRows.Scan(&name, &lang, &sdh, &key); err != nil {
+			t.Fatal(err)
+		}
+		if sdh {
+			lang += " sdh"
+		}
+		gotSubs[name] = lang
+		if _, err := os.Stat(filepath.Join(cache, key, "subtitle.vtt")); err != nil {
+			t.Errorf("%s: no copy: %v", name, err)
+		}
+	}
+	if err := subRows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gotSubs, wantSubs) {
+		t.Errorf("sidecars = %v, want %v", gotSubs, wantSubs)
 	}
 }

@@ -7,6 +7,7 @@ ignore ./web/node_modules
 
 require (
 	github.com/fsnotify/fsnotify v1.10.1
+	golang.org/x/text v0.41.0
 	modernc.org/sqlite v1.59.0
 )
 

@@ -69,10 +69,18 @@ export const strings = {
 		'tv-date': 'Date-based episode names are not supported.',
 		'sub-no-video': 'Subtitle has no video with a matching name.',
 		'sub-bad-name': "Text after the video's name is not a language code.",
+		'sub-no-lang': 'Subtitle name has no language code. Use "Title (Year).en.srt".',
+		'sub-unreadable': "Subtitle couldn't be read, or holds no subtitles.",
 		'no-video': 'No video stream.',
 		codec: "Browsers can't play this codec.",
 		'h264-profile': "H.264 that browsers can't decode (10-bit, 4:2:2 or 4:4:4).",
 		'probe-failed': "ffprobe couldn't read the file."
+	},
+
+	// Why a subtitle track can't be shown (media.SubtitleUnavailable).
+	subtitleUnavailable: {
+		image: 'Picture subtitles (PGS, VobSub) are not supported.',
+		codec: 'This subtitle format is not supported.'
 	}
 };
 

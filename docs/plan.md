@@ -109,7 +109,7 @@ quiet skip, or skip with a reason.
 - Movies, TV Shows, Other Videos rules from the spec, including editions, extras folders, samples,
   split files, two-episode files, specials, `Season 1`, loose episodes, date-based and absolute episodes.
 - Extension allowlist, hidden and `._*` files.
-- Sidecar subtitle names: language code, `forced`/`sdh`/`hi`, no language.
+- Sidecar subtitle names: language code (required), `forced`/`sdh`/`hi`.
 
 **Done when (tests):** a big table of real-world file names, each with the expected result.
 
@@ -208,12 +208,12 @@ quiet skip, or skip with a reason.
 
 **Not here:** subtitles, rooms, cache clean-up after 7 days.
 
-### [ ] 9. Subtitles
+### [x] 9. Subtitles
 
 **Goal:** every text subtitle becomes UTF-8 WebVTT in the cache.
 
 - Sidecars recorded as subtitle tracks and converted at scan. Encoding: UTF-8 or BOM → use it; else
-  code page from language (`tr`, `ru`, `el`, and their 3-letter codes); else a detector.
+  code page from the language in the file name; no code page known for it → `sub-unreadable`.
 - Embedded text tracks extracted in the prepare run (bump recipe version).
 - Image subtitles (PGS, VobSub) listed as unavailable.
 - Served under `/stream`.

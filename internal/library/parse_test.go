@@ -257,7 +257,6 @@ func TestParseSubtitles(t *testing.T) {
 		sub    string
 		want   File
 	}{
-		{"no language", Movies, "Heat (1995)", []string{heat}, "Heat (1995).srt", subtitle(Subtitle{Video: heat})},
 		{"2-letter code", Movies, "Heat (1995)", []string{heat}, "Heat (1995).en.srt", subtitle(Subtitle{Video: heat, Lang: "en"})},
 		{"3-letter code", Movies, "Heat (1995)", []string{heat}, "Heat (1995).eng.srt", subtitle(Subtitle{Video: heat, Lang: "eng"})},
 		{"upper-case code", Movies, "Heat (1995)", []string{heat}, "Heat (1995).TR.srt", subtitle(Subtitle{Video: heat, Lang: "tr"})},
@@ -267,20 +266,23 @@ func TestParseSubtitles(t *testing.T) {
 		{"sdh and forced", Movies, "Heat (1995)", []string{heat}, "Heat (1995).en.sdh.forced.srt",
 			subtitle(Subtitle{Video: heat, Lang: "en", Forced: true, SDH: true})},
 		{"hi alone is Hindi", Movies, "Heat (1995)", []string{heat}, "Heat (1995).hi.srt", subtitle(Subtitle{Video: heat, Lang: "hi"})},
-		{"forced, no language", Movies, "Heat (1995)", []string{heat}, "Heat (1995).forced.srt", subtitle(Subtitle{Video: heat, Forced: true})},
-		{"sdh, no language", Movies, "Heat (1995)", []string{heat}, "Heat (1995).sdh.srt", subtitle(Subtitle{Video: heat, SDH: true})},
 		{".vtt", Movies, "Heat (1995)", []string{heat}, "Heat (1995).tr.vtt", subtitle(Subtitle{Video: heat, Lang: "tr"})},
 		{".ass", Movies, "Heat (1995)", []string{heat}, "Heat (1995).tr.ass", subtitle(Subtitle{Video: heat, Lang: "tr"})},
 		{"upper-case extension", Movies, "Heat (1995)", []string{heat}, "Heat (1995).en.SRT", subtitle(Subtitle{Video: heat, Lang: "en"})},
 		{"loose movie", Movies, "", []string{heat}, "Heat (1995).en.srt", subtitle(Subtitle{Video: heat, Lang: "en"})},
 
 		{"region code", Movies, "Heat (1995)", []string{heat}, "Heat (1995).pt-BR.srt", skipped(ReasonSubBadName)},
+		{"no language", Movies, "Heat (1995)", []string{heat}, "Heat (1995).srt", skipped(ReasonSubNoLang)},
+		{"forced, no language", Movies, "Heat (1995)", []string{heat}, "Heat (1995).forced.srt", skipped(ReasonSubNoLang)},
+		{"sdh, no language", Movies, "Heat (1995)", []string{heat}, "Heat (1995).sdh.srt", skipped(ReasonSubNoLang)},
 		{"language name", Movies, "Heat (1995)", []string{heat}, "Heat (1995).english.srt", skipped(ReasonSubBadName)},
 		{"two languages", Movies, "Heat (1995)", []string{heat}, "Heat (1995).en.fr.srt", skipped(ReasonSubBadName)},
 		{"flag before language", Movies, "Heat (1995)", []string{heat}, "Heat (1995).forced.en.srt", skipped(ReasonSubBadName)},
 		{"no video next to it", Movies, "Heat (1995)", []string{heat}, "Ronin (1998).en.srt", skipped(ReasonSubNoVideo)},
 		{"only a non-video next to it", Movies, "Heat (1995)", []string{"Heat (1995).nfo"}, "Heat (1995).en.srt", skipped(ReasonSubNoVideo)},
 		{"next to a skipped video", Movies, "", []string{"Heat (1995) - pt1.mkv"}, "Heat (1995) - pt1.en.srt", ignored},
+		{"no language, next to a skipped video", Movies, "", []string{"Heat.mkv"}, "Heat.srt", ignored},
+		{"bad name, next to a skipped video", Movies, "", []string{"Heat.mkv"}, "Heat.english.srt", ignored},
 		{"of a trailer", Movies, "Heat (1995)", []string{heat, "Heat (1995)-trailer.mkv"}, "Heat (1995)-trailer.en.srt", ignored},
 		{"of a sample", Movies, "Heat (1995)", []string{heat, "sample.mkv"}, "sample.srt", ignored},
 		{"not a subtitle format", Movies, "Heat (1995)", []string{heat}, "Heat (1995).en.sub", ignored},
@@ -294,10 +296,15 @@ func TestParseSubtitles(t *testing.T) {
 			[]string{"Breaking Bad - s01e01.mkv", "Breaking Bad - s01e02.mkv"}, "Breaking Bad - s01e02.tr.srt",
 			subtitle(Subtitle{Video: "Breaking Bad - s01e02.mkv", Lang: "tr"})},
 
-		{"dotted video name", OtherVideos, "", []string{"Holiday.Day.mkv"}, "Holiday.Day.srt", subtitle(Subtitle{Video: "Holiday.Day.mkv"})},
+		{"dotted video name, no language", OtherVideos, "", []string{"Holiday.Day.mkv"}, "Holiday.Day.srt", skipped(ReasonSubNoLang)},
 		{"dotted video name with language", OtherVideos, "", []string{"Holiday.Day.mkv"}, "Holiday.Day.en.srt",
 			subtitle(Subtitle{Video: "Holiday.Day.mkv", Lang: "en"})},
-		{"longest video name wins", OtherVideos, "", []string{"Talk.mkv", "Talk.en.mkv"}, "Talk.en.srt", subtitle(Subtitle{Video: "Talk.en.mkv"})},
+		{"longest video name wins", OtherVideos, "", []string{"Talk.mkv", "Talk.en.mkv"}, "Talk.en.tr.srt",
+			subtitle(Subtitle{Video: "Talk.en.mkv", Lang: "tr"})},
+		{"longest video name wins, even with no language", OtherVideos, "", []string{"Talk.mkv", "Talk.en.mkv"}, "Talk.en.srt",
+			skipped(ReasonSubNoLang)},
+		{"longest video name wins over a bad name", OtherVideos, "", []string{"Holiday.mkv", "Holiday.Day.mkv"}, "Holiday.Day.srt",
+			skipped(ReasonSubNoLang)},
 	}
 
 	for _, tt := range tests {

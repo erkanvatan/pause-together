@@ -19,6 +19,7 @@ but don't quietly change them. Work each slice by the steps under "How to work a
   (`GET /api/rooms/{id}`), no web framework. `database/sql` with hand-written SQL, no ORM. `log/slog`.
   WebSockets via `github.com/coder/websocket`. SQLite via `modernc.org/sqlite` (pure Go, so
   `CGO_ENABLED=0` and simple Docker builds). File watching via `github.com/fsnotify/fsnotify`.
+  Subtitle code pages via `golang.org/x/text`.
   `ffmpeg`/`ffprobe` run through `os/exec`.
 - **Frontend:** SvelteKit with `adapter-static` in SPA mode (`fallback: 'index.html'`, `ssr = false` in
   the root layout), Svelte 5 runes, Tailwind v4 (config lives in CSS via `@theme`; there is no
@@ -42,7 +43,7 @@ but don't quietly change them. Work each slice by the steps under "How to work a
 task dev                                                      # dev stack, hot reload: http://localhost:5173
 task test                                                     # all unit tests (Go + web), in Docker
 task test:go -- -run TestMigrateInOrderOnce ./internal/store  # one Go test
-task test:web -- src/lib/sync                                 # web tests under one path
+task test:web -- src/lib/me                                   # web tests under one path (a wrong path passes with 0 tests)
 task testdata                                                 # tiny test clips (testdata/media); task test:go runs it first
 task lint                                                     # golangci-lint (.golangci.yml), svelte-check
 task build                                                    # build the production image
@@ -54,12 +55,10 @@ different ports, compose project names and data dirs, so `task dev` is safe to r
 
 Prod config lives in `.env` (template: `.env.example`). Each variable arrives with the slice that first
 uses it:
-- `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media` (slice 6). Required, in
-  dev too unless `DEV_MEDIA_ROOT` is set. The folder must exist: compose won't make it
-  (`create_host_path: false`).
-- `DEV_MEDIA_ROOT`: optional, dev only. Dev mounts it at `/media` instead of `MEDIA_ROOT`, e.g. a
-  scratch folder to copy test files into. Also works from the shell:
-  `DEV_MEDIA_ROOT=/tmp/media task dev`.
+- `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media` (slice 6). Required. The
+  folder must exist: compose won't make it (`create_host_path: false`).
+- `DEV_MEDIA_ROOT`: optional, dev only, e.g. a scratch folder to copy test files into. Also works from
+  the shell: `DEV_MEDIA_ROOT=/tmp/media task dev`.
 - `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data` (slice 2). Required.
   `task up` creates it, owned by you. Compose itself uses `create_host_path: false`, so a plain
   `docker compose up` with a missing folder fails instead of Docker making it as root, where the app
@@ -95,7 +94,8 @@ Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env`
 - `kill_delay` in `.air.toml` (6 s) must stay longer than `main.go`'s 5 s shutdown timeout, or reloads
   skip the clean shutdown.
 - Vite proxies only `/api`, `/stream` and `/ws` (and paths under them). A new Go URL prefix needs
-  its own entry in `web/vite.config.ts`.
+  its own entry in `web/vite.config.ts`, shaped like the others: a regex key (`'^/api(/|$)'`, so
+  `/streams` stays an SPA page) and an object value.
 - The Dockerfile's Go stage copies only `cmd/`, `internal/` and `web/embed.go`. A new top-level Go folder
   must be added there, or the prod build fails while dev still works.
 
@@ -108,7 +108,7 @@ internal/room/       (planned) room state, sync engine, presence, chat, WebSocke
 internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks,
                      scan queue with progress, add/remove libraries, folder picker, file watching
 internal/media/      ffprobe and the codec check; prepare jobs (ffmpeg arguments, job queue, cache in DATA_DIR/cache);
-                     subtitles to WebVTT planned
+                     sidecar subtitles to WebVTT (encoding, ffmpeg over stdin)
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
 internal/user/       name rules, users table (token stored as a SHA-256 hash), lookup by cookie token
 testdata/make.sh     makes the test clips in testdata/media (git-ignored)
@@ -121,7 +121,9 @@ Taskfile.yml
 ```
 
 URL prefixes: `/api` JSON, `/api/admin` admin only, `/ws` WebSocket (one per open room page), `/stream`
-prepared videos and subtitles (`/stream/{key}/video.mp4`, the key being the cache key). The URL prefix is `/stream`, not `/media`, on purpose: `/media` is the
+prepared videos and subtitles, the key being the cache key: `/stream/{key}/video.mp4`, an embedded track
+`/stream/{key}/{stream}.vtt` (ffprobe's stream index), a sidecar `/stream/{sidecarKey}/subtitle.vtt`
+(its own key: file + size + mtime). The URL prefix is `/stream`, not `/media`, on purpose: `/media` is the
 container mount for source files, and one name for two things gets mixed up in code.
 
 - Unknown `/api/*` and `/stream/*` paths return 404. Only other paths fall back to `index.html`.
@@ -150,7 +152,7 @@ container mount for source files, and one name for two things gets mixed up in c
   without the port (browsers send `localhost:8421`). This stops DNS rebinding: a web page pointing its
   own domain at `127.0.0.1` looks "same origin", so `CrossOriginProtection` sees nothing wrong.
 - Keep coder/websocket's Origin check on. Never `InsecureSkipVerify`.
-- In dev, Vite proxies `/api`, `/ws` and `/stream` to Go's admin listener, so `localhost:5173` is the
+- In dev, Vite proxies to Go's admin listener, so `localhost:5173` is the
   host's view (`isAdmin` true), like `localhost:8421` in prod. The guest view is covered by tests and
   seen on the prod image's guest port. Don't set Vite's `changeOrigin`: it rewrites Host to the Docker
   service name, and the Host check then rejects every admin call. Vite's string shorthand
@@ -177,7 +179,7 @@ container mount for source files, and one name for two things gets mixed up in c
   The admin listener sets `isAdmin`. The page hides admin links when it's false.
 - `POST /api/me {name}` renames a known user, or creates one (and sets the cookie) when the token is
   missing or unknown.
-- The cookie (`pt_token`, dev `pt_token_dev`) is `SameSite=Lax` and never `Secure`: guests use plain HTTP, and their
+- The cookie (`pt_token`) is `SameSite=Lax` and never `Secure`: guests use plain HTTP, and their
   browser would drop a `Secure` cookie. `localhost` counts as secure, so dev would hide that bug.
 - Everyone can: see all rooms, create and name rooms, control playback, switch a room's video, chat,
   archive and unarchive rooms.
@@ -208,8 +210,8 @@ container mount for source files, and one name for two things gets mixed up in c
 - Video files are an allowlist of extensions: `.mkv .mp4 .m4v .mov .avi .webm .ts .m2ts`. Skip hidden
   files and macOS `._*` files.
 - Plex naming is required for Movies and TV Shows. Files that don't match are skipped and listed on the
-  admin page with the reason. Reasons are codes (`movie-no-year`), turned into text by the web strings
-  file.
+  admin page with the reason. Reasons are codes (`movie-no-year`): `Reason` constants in
+  `internal/library/parse.go`, turned into text in `web/src/lib/strings.ts`. Add a new one to both.
   - Movies: `Title (Year)/Title (Year).ext`; a loose `Title (Year).ext` is fine too.
     - `{edition-Director's Cut}` is kept as an edition label, so two editions in one folder stay
       apart. Other `{...}` tags are ignored.
@@ -233,10 +235,11 @@ container mount for source files, and one name for two things gets mixed up in c
   - Other Videos: the file name is the title. Sub-folders become groups in the picker.
 - Metadata comes from names only: no online lookups, no artwork. `ffprobe` supplies only technical
   facts (duration, codecs, audio and subtitle tracks).
-- Sidecar subtitles sit next to the video with Plex names. Accepted: a 2- or 3-letter language code
-  (`Title (Year).en.srt`, `.eng.srt`), the `forced`, `sdh` and `hi` flags (`.en.forced.srt`,
-  `.en.sdh.srt`), and no language at all (`Title (Year).srt`). A `Subs/` folder is not read. `hi` is
-  also Hindi's code: first, it's the language (`.hi.srt`); after a language, the flag (`.en.hi.srt`).
+- Sidecar subtitles sit next to the video with Plex names. A 2- or 3-letter language code is required
+  (`Title (Year).en.srt`, `.eng.srt`), then optional `forced`, `sdh` and `hi` flags (`.en.forced.srt`,
+  `.en.sdh.srt`). No language (`Title (Year).srt`) is skipped with a reason. A `Subs/` folder is not
+  read. `hi` is also Hindi's code: first, it's the language (`.hi.srt`); after a language, the flag
+  (`.en.hi.srt`).
 - A video's identity is its library + its path relative to the library folder. A rename makes a new
   video, and the old one turns missing.
 - Video rows are never deleted, not even when their library is removed. Rooms and chat messages point
@@ -266,6 +269,8 @@ So each room's video is **prepared once**, then served as a plain file.
   the video. The client checks that with `canPlayType()`: a bare `hvc1` answers "maybe" to almost
   anything. The `<video>` error event is the backstop. Video is never transcoded, so when a device can't
   decode it, show "This device can't play HEVC", not a black screen.
+- ffprobe and ffmpeg always get absolute paths. A relative `-x.mkv` or `concat:x.mkv` would be read as
+  an option or a protocol.
 - Prepare = one ffmpeg run into `/data/cache`:
   - Video copied, never re-encoded (original quality). HEVC is tagged `hvc1` (`-tag:v hvc1`) or Apple
     devices refuse it.
@@ -278,19 +283,24 @@ So each room's video is **prepared once**, then served as a plain file.
   - All embedded text subtitle tracks become WebVTT in the same run. Their packets are spread across the
     whole file, so pulling them out costs a full read, just like the remux.
   - `-movflags +faststart`, so the index sits at the front and playback starts right away.
+  - If the run fails, it runs once more without subtitles, so one broken subtitle track never costs a
+    video that plays fine. That copy has no embedded subtitle files: check the folder, not the track
+    list, before offering one.
   - Output goes to a `{key}.tmp` folder, renamed to `{key}` when done, so a half-written copy never
     looks finished, and every file of one run appears at once. Name the format (`-f mp4`), since ffmpeg
     guesses it from the extension. On start, delete leftover `*.tmp` folders.
 - Every video goes through prepare, even ones a browser could play as-is. One code path, on purpose.
 - The cache key is video + audio track + source size and mtime + a recipe version number. Rooms with the
-  same key share one copy. Bump the recipe version when the ffmpeg arguments change.
+  same key share one copy. Bump the recipe version (`RecipeVersion` in
+  `internal/media/prepare.go`) when the ffmpeg arguments change.
 - Prepare is lazy: a job is queued when someone opens a room, or picks a video in one, and its copy is
   missing.
 - Jobs run one at a time and report progress to the room, or its place in line ("Queued, 2nd in
   line"). A job is cancelled as soon as no room needs its result (switched away, archived, deleted).
 - Before each job, check free disk space. If it's too low, fail with a clear message.
 - A copy is deleted once nobody has opened any room using it for 7 days. Archived rooms don't count:
-  they can't play. Opening the room prepares it again.
+  they can't play. Opening the room prepares it again. Sidecar copies share the cache folder but belong
+  to their `sidecar_subtitles` row, not to rooms: the scan deletes them when the file goes.
 - A job reads and writes as fast as the disk allows, often on the disk viewers stream from. Measure
   first. If viewers buffer during a job, cap it with ffmpeg's `-readrate`.
 - Serve with `http.ServeContent`: Range requests give native `<video>` seeking. No HLS.
@@ -298,9 +308,12 @@ So each room's video is **prepared once**, then served as a plain file.
   cache, in UTF-8. Embedded ones come out during prepare. Sidecars are converted at scan (they're
   small). ASS styling is lost. Image subtitles (PGS, VobSub) can't become text without OCR: list them
   as unavailable.
-- Sidecar text encoding: valid UTF-8 or a BOM → use it. Otherwise pick the code page from the language
-  in the file name (`tr` → Windows-1254, `ru` → Windows-1251, `el` → Windows-1253). Only then fall back
-  to a detector (they often guess wrong on short files).
+- Sidecar text encoding: valid UTF-8 or a BOM → use it. Otherwise the language in the file name picks
+  the code page (`tr`/`tur` → Windows-1254, `en`/`eng` → Windows-1252, `ru`/`rus` → Windows-1251, …).
+  No detector: they guess wrong on short files, and can't tell Turkish from Western European. A
+  language with no single legacy code page (Chinese: GBK or Big5; Hindi) must be UTF-8.
+- A sidecar that can't be read or decoded, or that ffmpeg turns into no cues (it never fails on junk text), is
+  listed on the admin page as `sub-unreadable`.
 - The audio track is picked with the video and never changes after. A new track would mean a full
   re-prepare. Subtitle and subtitle offset can change any time. All three are room state, shared by
   everyone. Subtitles render in our own overlay, not native captions, so the offset is a simple time

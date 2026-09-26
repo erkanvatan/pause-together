@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"path"
 
 	"github.com/erkanvatan/pause-together/internal/media"
 	"github.com/erkanvatan/pause-together/internal/store"
@@ -28,6 +29,33 @@ type parsedVideo struct {
 type skippedFile struct {
 	path   string
 	reason Reason
+}
+
+// knownSidecar is a sidecar subtitle row a scan already has.
+type knownSidecar struct {
+	id      int64
+	videoID int64
+	key     string
+}
+
+// sidecarRow is a sidecar subtitle row to write. id 0 means a new row. oldKey is the key the row had
+// before, "" for a new row.
+type sidecarRow struct {
+	id      int64
+	videoID int64
+	name    string
+	sub     Subtitle
+	key     string
+	oldKey  string
+}
+
+// scanWrites is what a scan writes at its end, in one transaction.
+type scanWrites struct {
+	refresh      []parsedVideo // unchanged files whose name fields or missing flag need writing
+	gone         []int64       // videos to mark missing
+	skipped      []skippedFile // replaces the library's skipped list
+	sidecars     []sidecarRow
+	goneSidecars []knownSidecar // rows to delete
 }
 
 // activeLibraries returns every library that isn't removed.
@@ -95,9 +123,32 @@ func (s *Scanner) knownVideos(ctx context.Context, libraryID int64) (map[string]
 	return known, rows.Err()
 }
 
-// saveProbed writes a probed video and replaces its tracks. perr is the probe's error, if it failed.
+// knownSidecars returns the library's sidecar subtitle rows by path, relative to the library folder.
+func (s *Scanner) knownSidecars(ctx context.Context, libraryID int64) (map[string]knownSidecar, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT s.id, s.video_id, v.path, s.name, s.cache_key
+		FROM sidecar_subtitles s JOIN videos v ON v.id = s.video_id
+		WHERE v.library_id = ?`, libraryID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	known := make(map[string]knownSidecar)
+	for rows.Next() {
+		var k knownSidecar
+		var videoPath, name string
+		if err := rows.Scan(&k.id, &k.videoID, &videoPath, &name, &k.key); err != nil {
+			return nil, err
+		}
+		known[path.Join(path.Dir(videoPath), name)] = k
+	}
+	return known, rows.Err()
+}
+
+// saveProbed writes a probed video and replaces its tracks, and returns its id. perr is the probe's
+// error, if it failed.
 func (s *Scanner) saveProbed(ctx context.Context, libraryID int64, rel string, v Video, st fileStat,
-	info media.Info, perr error) error {
+	info media.Info, perr error) (int64, error) {
 	var probeErr, unplayable sql.NullString
 	if perr != nil {
 		probeErr = sql.NullString{String: perr.Error(), Valid: true}
@@ -107,11 +158,11 @@ func (s *Scanner) saveProbed(ctx context.Context, libraryID int64, rel string, v
 		unplayable = sql.NullString{String: string(info.Unplayable), Valid: true}
 	}
 
-	return store.InTx(ctx, s.DB, func(tx *sql.Tx) error {
+	var id int64
+	err := store.InTx(ctx, s.DB, func(tx *sql.Tx) error {
 		if err := checkActive(ctx, tx, libraryID); err != nil {
 			return err
 		}
-		var id int64
 		err := tx.QueryRowContext(ctx, `
 			INSERT INTO videos (library_id, path, title, year, edition, version, season, episode, episode_end,
 				episode_title, group_name, size, mtime, missing, probe_error, duration_ms, video_codec,
@@ -148,26 +199,29 @@ func (s *Scanner) saveProbed(ctx context.Context, libraryID int64, rel string, v
 			}
 		}
 		for _, sub := range info.Subtitles {
+			var unavailable sql.NullString
+			if sub.Unavailable != "" {
+				unavailable = sql.NullString{String: string(sub.Unavailable), Valid: true}
+			}
 			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO subtitle_tracks (video_id, stream, codec, lang, title, is_default, forced, sdh)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-				id, sub.Stream, sub.Codec, sub.Lang, sub.Title, sub.Default, sub.Forced, sub.SDH); err != nil {
+				INSERT INTO subtitle_tracks (video_id, stream, codec, lang, title, is_default, forced, sdh, unavailable)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				id, sub.Stream, sub.Codec, sub.Lang, sub.Title, sub.Default, sub.Forced, sub.SDH, unavailable); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
+	return id, err
 }
 
-// finishScan writes the rest of a scan in one transaction: unchanged files whose name fields or
-// missing flag need writing, gone videos marked missing, and the skipped list replaced.
-func (s *Scanner) finishScan(ctx context.Context, libraryID int64, refresh []parsedVideo, gone []int64,
-	skipped []skippedFile) error {
+// finishScan writes the rest of a scan in one transaction.
+func (s *Scanner) finishScan(ctx context.Context, libraryID int64, w scanWrites) error {
 	return store.InTx(ctx, s.DB, func(tx *sql.Tx) error {
 		if err := checkActive(ctx, tx, libraryID); err != nil {
 			return err
 		}
-		for _, u := range refresh {
+		for _, u := range w.refresh {
 			v := u.video
 			if _, err := tx.ExecContext(ctx, `
 				UPDATE videos SET title = ?, year = ?, edition = ?, version = ?, season = ?, episode = ?,
@@ -178,15 +232,36 @@ func (s *Scanner) finishScan(ctx context.Context, libraryID int64, refresh []par
 				return err
 			}
 		}
-		for _, id := range gone {
+		for _, id := range w.gone {
 			if _, err := tx.ExecContext(ctx, "UPDATE videos SET missing = 1 WHERE id = ?", id); err != nil {
+				return err
+			}
+		}
+		for _, k := range w.goneSidecars {
+			if _, err := tx.ExecContext(ctx, "DELETE FROM sidecar_subtitles WHERE id = ?", k.id); err != nil {
+				return err
+			}
+		}
+		for _, r := range w.sidecars {
+			var err error
+			if r.id == 0 {
+				_, err = tx.ExecContext(ctx, `
+					INSERT INTO sidecar_subtitles (video_id, name, lang, forced, sdh, cache_key) VALUES (?, ?, ?, ?, ?, ?)`,
+					r.videoID, r.name, r.sub.Lang, r.sub.Forced, r.sub.SDH, r.key)
+			} else {
+				_, err = tx.ExecContext(ctx, `
+					UPDATE sidecar_subtitles SET video_id = ?, name = ?, lang = ?, forced = ?, sdh = ?, cache_key = ?
+					WHERE id = ?`,
+					r.videoID, r.name, r.sub.Lang, r.sub.Forced, r.sub.SDH, r.key, r.id)
+			}
+			if err != nil {
 				return err
 			}
 		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM skipped_files WHERE library_id = ?", libraryID); err != nil {
 			return err
 		}
-		for _, sk := range skipped {
+		for _, sk := range w.skipped {
 			if _, err := tx.ExecContext(ctx, "INSERT INTO skipped_files (library_id, path, reason) VALUES (?, ?, ?)",
 				libraryID, sk.path, string(sk.reason)); err != nil {
 				return err

@@ -32,11 +32,20 @@ type Prober interface {
 	Probe(ctx context.Context, path string) (media.Info, error)
 }
 
+// Subtitler converts sidecar subtitles into WebVTT copies in the cache. media.Subtitles is the real one.
+type Subtitler interface {
+	// Sidecar makes key's copy from the file at src, unless it's there already. lang is the language
+	// code from the file name.
+	Sidecar(ctx context.Context, src, lang, key string) error
+	Remove(key string) error
+}
+
 // Scanner fills the database from library folders.
 type Scanner struct {
-	DB     *sql.DB
-	Root   string // the media folder; library paths are relative to it
-	Prober Prober
+	DB        *sql.DB
+	Root      string // the media folder; library paths are relative to it
+	Prober    Prober
+	Subtitles Subtitler
 	// Watcher, if not nil, gets a watch on every folder a scan walks. Files it sees growing are left
 	// alone until they stop.
 	Watcher *Watcher
@@ -51,10 +60,11 @@ type fileStat struct {
 
 // ScanLibrary brings one library's rows up to date with its folder. New and changed videos are
 // probed, and so are videos whose last probe failed. Videos no longer there are marked missing.
+// Sidecar subtitles are converted to WebVTT when new or changed; rows of the ones gone are deleted.
 // progress, if not nil, hears how many of the library's videos are done so far.
 //
-// A file still being written (see Watcher) is not probed and not marked missing; the watcher queues
-// another scan once it stops growing.
+// A file still being written (see Watcher) is not probed or converted, and not marked missing; the
+// watcher queues another scan once it stops growing.
 //
 // If the library folder itself is gone, can't be read, or leads outside the media folder, it returns
 // an error and marks nothing missing. A sub-folder that can't be read is logged, and nothing under it
@@ -85,6 +95,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(do
 		st    fileStat
 	}
 	var found []foundVideo
+	var subs []foundSidecar
 	var skipped []skippedFile
 	for _, dir := range slices.Sorted(maps.Keys(folders)) {
 		stats := folders[dir]
@@ -99,8 +110,10 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(do
 				skipped = append(skipped, skippedFile{path: rel, reason: f.Reason})
 			case KindVideo:
 				found = append(found, foundVideo{rel: rel, video: f.Video, st: stats[i]})
+			case KindSubtitle:
+				subs = append(subs, foundSidecar{rel: rel, video: path.Join(dir, f.Subtitle.Video), sub: f.Subtitle,
+					st: stats[i]})
 			}
-			// Anything else is ignored; subtitles wait for their own slice.
 		}
 	}
 	if progress == nil {
@@ -108,19 +121,24 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(do
 	}
 
 	seen := make(map[string]bool)
-	var refresh []parsedVideo
+	ids := make(map[string]int64) // video ids by path, for the sidecars
+	var w scanWrites
 	probed := 0
 	for i, fv := range found {
 		progress(i, len(found))
 		seen[fv.rel] = true
+		k, ok := known[fv.rel]
+		if ok {
+			ids[fv.rel] = k.id
+		}
 		abs := filepath.Join(root, filepath.FromSlash(fv.rel))
 		if s.Watcher.growing(abs) {
 			continue
 		}
-		if k, ok := known[fv.rel]; ok && k.size == fv.st.size && k.mtime == fv.st.mtime && !k.failed {
+		if ok && k.size == fv.st.size && k.mtime == fv.st.mtime && !k.failed {
 			// Unchanged file. Its row is written only if it was missing or its name parses differently now.
 			if k.missing || k.video != fv.video {
-				refresh = append(refresh, parsedVideo{id: k.id, video: fv.video})
+				w.refresh = append(w.refresh, parsedVideo{id: k.id, video: fv.video})
 			}
 			continue
 		}
@@ -128,25 +146,109 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(do
 		if perr != nil && ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if err := s.saveProbed(ctx, lib.ID, fv.rel, fv.video, fv.st, info, perr); err != nil {
+		id, err := s.saveProbed(ctx, lib.ID, fv.rel, fv.video, fv.st, info, perr)
+		if err != nil {
 			return err
 		}
+		ids[fv.rel] = id
 		probed++
 	}
 
-	var gone []int64
 	for rel, k := range known {
 		if !seen[rel] && !k.missing && !isUnder(rel, unreadable) {
-			gone = append(gone, k.id)
+			w.gone = append(w.gone, k.id)
 		}
 	}
-	if err := s.finishScan(ctx, lib.ID, refresh, gone, skipped); err != nil {
+	unusable, err := s.sidecars(ctx, lib.ID, root, subs, ids, unreadable, &w)
+	if err != nil {
 		return err
+	}
+	w.skipped = append(skipped, unusable...)
+	if err := s.finishScan(ctx, lib.ID, w); err != nil {
+		// The new copies' rows weren't written; nothing points at them.
+		for _, sc := range w.sidecars {
+			if sc.key != sc.oldKey {
+				s.removeSidecar(sc.key)
+			}
+		}
+		return err
+	}
+	// Only now that no row points at them.
+	for _, sc := range w.sidecars {
+		if sc.oldKey != "" && sc.oldKey != sc.key {
+			s.removeSidecar(sc.oldKey)
+		}
+	}
+	for _, k := range w.goneSidecars {
+		s.removeSidecar(k.key)
 	}
 	progress(len(found), len(found))
 	slog.Info("scanned library", "library", lib.Path, "videos", len(seen), "probed", probed,
-		"skipped", len(skipped), "missing", len(gone))
+		"skipped", len(w.skipped), "missing", len(w.gone))
 	return nil
+}
+
+// foundSidecar is a sidecar subtitle found in a library folder.
+type foundSidecar struct {
+	rel   string
+	video string // its video's path, relative to the library folder
+	sub   Subtitle
+	st    fileStat
+}
+
+// sidecars converts the library's new and changed sidecar subtitles and adds the rows to write to w:
+// sidecars to insert or update, and the rows of the ones gone. ids are the library's video ids by
+// path. Unreadable files (media.ErrUnreadable) come back as skipped; their rows go too. Other
+// conversion errors leave the row as it was.
+func (s *Scanner) sidecars(ctx context.Context, libraryID int64, root string, subs []foundSidecar,
+	ids map[string]int64, unreadable []string, w *scanWrites) ([]skippedFile, error) {
+	known, err := s.knownSidecars(ctx, libraryID)
+	if err != nil {
+		return nil, err
+	}
+	var skipped []skippedFile
+	seen := make(map[string]bool)
+	for _, f := range subs {
+		seen[f.rel] = true
+		abs := filepath.Join(root, filepath.FromSlash(f.rel))
+		videoID, ok := ids[f.video]
+		if !ok || s.Watcher.growing(abs) {
+			continue // its video has no row yet (still being written), or it is being written itself
+		}
+		key := media.SidecarKey(libraryID, f.rel, f.st.size, f.st.mtime)
+		switch err := s.Subtitles.Sidecar(ctx, abs, f.sub.Lang, key); {
+		case ctx.Err() != nil:
+			return nil, ctx.Err()
+		case errors.Is(err, media.ErrUnreadable):
+			slog.Warn("scan: can't convert subtitle", "path", abs, "err", err)
+			skipped = append(skipped, skippedFile{path: f.rel, reason: ReasonSubUnreadable})
+			delete(seen, f.rel) // its row goes
+			continue
+		case err != nil:
+			// Not the file's fault (a disk hiccup, ffmpeg killed, a full cache disk): its row stays as it
+			// was, and the next scan tries again.
+			slog.Error("scan: convert subtitle", "path", abs, "err", err)
+			continue
+		}
+		k := known[f.rel]
+		if k.key != key || k.videoID != videoID {
+			w.sidecars = append(w.sidecars, sidecarRow{id: k.id, videoID: videoID, name: path.Base(f.rel),
+				sub: f.sub, key: key, oldKey: k.key})
+		}
+	}
+	for rel, k := range known {
+		if !seen[rel] && !isUnder(rel, unreadable) {
+			w.goneSidecars = append(w.goneSidecars, k)
+		}
+	}
+	return skipped, nil
+}
+
+// removeSidecar deletes a sidecar's copy. A failure only leaves a small file behind, so it's logged.
+func (s *Scanner) removeSidecar(key string) {
+	if err := s.Subtitles.Remove(key); err != nil {
+		slog.Error("remove subtitle copy", "key", key, "err", err)
+	}
 }
 
 // walk lists the files under root, grouped by folder relative to root ("." for root itself). Hidden

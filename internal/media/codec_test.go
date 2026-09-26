@@ -133,7 +133,7 @@ func TestParseProbeTracks(t *testing.T) {
 		},
 		Subtitles: []SubtitleTrack{
 			{Stream: 3, Codec: "subrip", Lang: "eng", Title: "Forced", Forced: true},
-			{Stream: 4, Codec: "hdmv_pgs_subtitle", Lang: "eng", Default: true, SDH: true},
+			{Stream: 4, Codec: "hdmv_pgs_subtitle", Lang: "eng", Default: true, SDH: true, Unavailable: SubtitleImage},
 		},
 	}
 	if !reflect.DeepEqual(info, want) {

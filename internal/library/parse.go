@@ -41,6 +41,8 @@ const (
 	ReasonTVDate         Reason = "tv-date"           // date-based episode
 	ReasonSubNoVideo     Reason = "sub-no-video"      // no video with a matching name next to it
 	ReasonSubBadName     Reason = "sub-bad-name"      // text after the video's name isn't a language code and flags
+	ReasonSubNoLang      Reason = "sub-no-lang"       // no language code in the name
+	ReasonSubUnreadable  Reason = "sub-unreadable"    // couldn't be read, or holds no subtitles
 )
 
 // Video is what a video file's path says about it.
@@ -59,7 +61,7 @@ type Video struct {
 // Subtitle is a sidecar subtitle file matched to the video next to it.
 type Subtitle struct {
 	Video  string // file name of its video, in the same folder
-	Lang   string // 2- or 3-letter code, lower case, as written; "" = none
+	Lang   string // 2- or 3-letter code, lower case, as written
 	Forced bool
 	SDH    bool // "sdh" or "hi"
 }
@@ -126,13 +128,15 @@ func ParseDir(typ Type, dir string, names []string) []File {
 		if f.Kind != KindSubtitle {
 			continue
 		}
-		f.Subtitle, f.Reason = matchSubtitle(f.Name, videos)
+		sub, reason := matchSubtitle(f.Name, videos)
 		switch {
-		case f.Reason != "":
-			f.Kind = KindSkipped
-		case byName[f.Subtitle.Video].Kind != KindVideo:
+		case sub.Video != "" && byName[sub.Video].Kind != KindVideo:
 			// Its video is ignored or already listed as skipped.
 			f = File{Name: f.Name, Kind: KindIgnored}
+		case reason != "":
+			f = File{Name: f.Name, Kind: KindSkipped, Reason: reason}
+		default:
+			f.Subtitle = sub
 		}
 		files[i] = f
 	}
@@ -338,8 +342,10 @@ func splitTitleYear(s string) (title string, year int, rest string, ok bool) {
 }
 
 // matchSubtitle matches a sidecar subtitle to one of the videos next to it. Its name must be the
-// video's name, optionally followed by a language code and then flags: "Title (Year).en.forced.srt".
-// When several videos fit ("Talk.mkv" and "Talk.en.mkv"), the longest name wins.
+// video's name, then a language code, then optional flags: "Title (Year).en.forced.srt".
+// When several videos fit ("Talk.mkv" and "Talk.en.mkv"), the longest name wins. A name that fits a
+// video but breaks the rules comes back with a Reason and only Video set, so the caller can check
+// whether that video is used.
 func matchSubtitle(name string, videos []string) (Subtitle, Reason) {
 	stem := strings.TrimSuffix(name, path.Ext(name))
 	var sub Subtitle
@@ -360,9 +366,8 @@ func matchSubtitle(name string, videos []string) (Subtitle, Reason) {
 		return Subtitle{}, ReasonSubNoVideo
 	}
 	if tokens == "" {
-		return sub, ""
+		return Subtitle{Video: sub.Video}, ReasonSubNoLang
 	}
-
 	for i, t := range strings.Split(tokens, ".") {
 		t = strings.ToLower(t)
 		switch {
@@ -374,8 +379,11 @@ func matchSubtitle(name string, videos []string) (Subtitle, Reason) {
 		case i == 0 && langRe.MatchString(t):
 			sub.Lang = t
 		default:
-			return Subtitle{}, ReasonSubBadName
+			return Subtitle{Video: sub.Video}, ReasonSubBadName
 		}
+	}
+	if sub.Lang == "" {
+		return Subtitle{Video: sub.Video}, ReasonSubNoLang
 	}
 	return sub, ""
 }
