@@ -20,12 +20,14 @@ func (s *server) adminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/admin/folders", s.listFolders)
 	mux.HandleFunc("GET /api/admin/problems", s.listProblems)
 	mux.HandleFunc("GET /api/admin/jobs", s.listJobs)
+	mux.HandleFunc("PUT /api/admin/languages", s.putLanguages)
 }
 
 // Error codes the admin page turns into text.
 const (
 	errBadRequest = "bad-request"
 	errBadType    = "bad-type"
+	errBadLang    = "bad-lang"
 	errNotFolder  = "not-folder"
 	errOverlap    = "overlap"
 )
@@ -150,6 +152,23 @@ func (s *server) listJobs(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, jobsResponse{Jobs: s.Jobs.List(), CacheBytes: cache, FreeBytes: free})
+}
+
+func (s *server) putLanguages(w http.ResponseWriter, r *http.Request) {
+	var req library.Languages
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errBadRequest)
+		return
+	}
+	langs, err := s.Libraries.SetLanguages(r.Context(), req)
+	switch {
+	case errors.Is(err, library.ErrBadLang):
+		writeError(w, http.StatusBadRequest, errBadLang)
+	case err != nil:
+		internalError(w, "save languages", err)
+	default:
+		writeJSON(w, langs)
+	}
 }
 
 // pathID reads the {id} path value.

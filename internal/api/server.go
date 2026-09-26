@@ -16,9 +16,9 @@ type Deps struct {
 	// TokenCookie names the user's cookie. Browsers ignore the port when storing cookies, so dev
 	// (localhost:5173) and prod (localhost:8421) need different names or they overwrite each other.
 	TokenCookie string
-	Libraries   *library.Libraries // admin API only
-	Scans       *library.Scans     // admin API only
-	Jobs        *media.Jobs        // prepared videos and subtitles, served under /stream
+	Libraries   *library.Libraries
+	Scans       *library.Scans // admin API only
+	Jobs        *media.Jobs    // prepared videos and subtitles, served under /stream
 }
 
 // Guest returns the handler for the guest port: the whole app except the admin API.
@@ -47,6 +47,9 @@ func (s *server) mux(web fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/health", health)
 	mux.HandleFunc("GET /api/me", s.getMe)
 	mux.HandleFunc("POST /api/me", s.postMe)
+	mux.HandleFunc("GET /api/videos", s.listVideos)
+	mux.HandleFunc("GET /api/videos/{id}", s.getVideo)
+	mux.HandleFunc("GET /api/languages", s.getLanguages)
 	mux.HandleFunc("GET /stream/{key}/{name}", s.streamFile)
 	if s.admin {
 		s.adminRoutes(mux)

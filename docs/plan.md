@@ -229,7 +229,7 @@ quiet skip, or skip with a reason.
 
 **Not here:** showing subtitles in the player.
 
-### [ ] 10. Library picker and language defaults
+### [x] 10. Library picker and language defaults
 
 **Goal:** anyone can find a video and choose its audio and subtitle.
 

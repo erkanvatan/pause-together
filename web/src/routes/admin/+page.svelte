@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import FolderPicker from '$lib/FolderPicker.svelte';
+	import { getLanguages, type LibraryType } from '$lib/api';
 	import {
 		addLibrary,
 		formatBytes,
@@ -11,13 +12,14 @@
 		problemText,
 		removeLibrary,
 		rescanLibrary,
+		setLanguages,
 		type Jobs,
 		type Library,
-		type LibraryType,
 		type Problem,
 		type Problems
 	} from '$lib/admin';
 	import { me } from '$lib/me.svelte';
+	import { langName } from '$lib/picker';
 	import { strings } from '$lib/strings';
 
 	// How often the page asks again while a scan is queued or running, or the last load failed.
@@ -41,6 +43,15 @@
 
 	let confirming = $state<number | null>(null); // library whose Remove waits for a yes
 
+	// Language defaults, as typed. Loaded once, not polled, so a poll never overwrites typing.
+	let audioLang = $state('');
+	let subtitleLangs = $state('');
+	let langsLoaded = $state(false);
+	let savingLangs = $state(false);
+	let langsSaved = $state(false);
+	let langsError = $state('');
+	const subtitleCodes = $derived(subtitleLangs.split(/[\s,]+/).filter(Boolean));
+
 	const scanning = $derived(libraries.some((l) => l.scan.state !== ''));
 	const libraryPath = $derived(new Map(libraries.map((l) => [l.id, l.path])));
 	const problemCount = $derived(problems.skipped.length + problems.unplayable.length);
@@ -51,7 +62,12 @@
 		const libs = await listLibraries();
 		const probs = await listProblems();
 		const js = await listJobs();
-		loadFailed = !libs.ok || !probs.ok || !js.ok;
+		const langs = langsLoaded ? null : await getLanguages();
+		loadFailed = !libs.ok || !probs.ok || !js.ok || langs?.ok === false;
+		if (langs?.ok) {
+			showLanguages(langs.value.audio, langs.value.subtitles);
+			langsLoaded = true;
+		}
 		if (libs.ok) {
 			libraries = libs.value;
 			loaded = true;
@@ -99,6 +115,21 @@
 		addError = r.ok ? '' : (strings.addErrors[r.error] ?? strings.addErrors.failed);
 		if (r.ok) path = '';
 		await refresh();
+	}
+
+	function showLanguages(audio: string, subtitles: string[]) {
+		audioLang = audio;
+		subtitleLangs = subtitles.join(', ');
+	}
+
+	async function saveLanguages(e: SubmitEvent) {
+		e.preventDefault();
+		savingLangs = true;
+		const r = await setLanguages({ audio: audioLang.trim(), subtitles: subtitleCodes });
+		savingLangs = false;
+		langsSaved = r.ok;
+		langsError = r.ok ? '' : (strings.langErrors[r.error] ?? strings.langErrors.failed);
+		if (r.ok) showLanguages(r.value.audio, r.value.subtitles);
 	}
 
 	function fullPath(p: Problem) {
@@ -226,6 +257,58 @@
 				{/if}
 			</form>
 		</section>
+
+		{#if langsLoaded}
+			<section class="flex flex-col gap-3">
+				<h2 class="text-lg font-semibold">{strings.languageDefaults}</h2>
+				<p class="text-sm text-neutral-400">{strings.languageDefaultsNote}</p>
+				<form
+					onsubmit={saveLanguages}
+					oninput={() => (langsSaved = false)}
+					class="flex flex-col gap-3"
+				>
+					<label class="flex flex-col gap-1">
+						<span>{strings.audioLanguage}</span>
+						<input
+							bind:value={audioLang}
+							placeholder={strings.original}
+							class="max-w-xs rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5"
+						/>
+						<span class="text-sm text-neutral-400">
+							{strings.audioLanguageHint}
+							→ {audioLang.trim() ? langName(audioLang.trim()) : strings.original}
+						</span>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span>{strings.subtitleLanguages}</span>
+						<input
+							bind:value={subtitleLangs}
+							placeholder="tr, en"
+							class="max-w-xs rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5"
+						/>
+						<span class="text-sm text-neutral-400">
+							{strings.subtitleLanguagesHint}
+							→ {subtitleCodes.length > 0 ? subtitleCodes.map(langName).join(', ') : strings.none}
+						</span>
+					</label>
+					<div class="flex items-center gap-3">
+						<button
+							type="submit"
+							disabled={savingLangs}
+							class="rounded-md bg-neutral-100 px-3 py-1.5 font-medium text-neutral-950 disabled:opacity-40"
+						>
+							{strings.save}
+						</button>
+						{#if langsSaved}
+							<span class="text-sm text-neutral-400">{strings.saved}</span>
+						{/if}
+					</div>
+					{#if langsError}
+						<p class="text-sm text-red-400" role="alert">{langsError}</p>
+					{/if}
+				</form>
+			</section>
+		{/if}
 
 		{#if libraries.length > 0}
 			<section class="flex flex-col gap-3">

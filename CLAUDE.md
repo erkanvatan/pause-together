@@ -106,7 +106,8 @@ cmd/pausetogether/   main: config, wiring, both HTTP listeners
 internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only), SPA serving
 internal/room/       (planned) room state, sync engine, presence, chat, WebSocket hub
 internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks,
-                     scan queue with progress, add/remove libraries, folder picker, file watching
+                     scan queue with progress, add/remove libraries, folder picker, file watching; the picker's
+                     video list and details, language codes (normalized to 2 letters), language defaults
 internal/media/      ffprobe and the codec check; prepare jobs (ffmpeg arguments, job queue, cache in DATA_DIR/cache);
                      sidecar subtitles to WebVTT (encoding, ffmpeg over stdin)
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
@@ -114,6 +115,8 @@ internal/user/       name rules, users table (token stored as a SHA-256 hash), l
 testdata/make.sh     makes the test clips in testdata/media (git-ignored)
 docs/plan.md         build order in slices, and how to work one
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
+web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), picker.ts (pure picker logic:
+                     grouping, search, default audio and subtitle), Picker.svelte, strings.ts
 Dockerfile           web build → Go build → runtime image with Debian's ffmpeg; go-dev stage (also ffmpeg) for dev and tests
 compose.yml          production
 compose.dev.yml      development
@@ -328,6 +331,11 @@ So each room's video is **prepared once**, then served as a plain file.
 - Defaults come from an admin setting: preferred audio language (or "original") and subtitle languages
   in order (e.g. `tr`, then `en`). Fall back to the file's default-track flag. Forced subtitles are
   turned on when their language matches the audio.
+  - Subtitle: the first listed language with a full (not forced) track wins, even when it's the
+    audio's language; plain before SDH. Only when no listed language matches: a forced track in the
+    audio's language, then the file's default track, then off.
+  - Language codes are compared after normalizing to 2 letters where one exists (`eng`, `en` → `en`;
+    `ger`, `deu` → `de`), on the server.
 - Rooms have an optional name. Without one, show the current video.
 - The homepage lists every room with its current video and who's watching. It polls `GET /api/rooms`
   every 5 s while the tab is visible, and right away when it becomes visible again.

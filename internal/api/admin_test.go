@@ -57,6 +57,7 @@ func TestAdminRoutesOnlyOnAdminPort(t *testing.T) {
 		{http.MethodGet, "/api/admin/folders", ""},
 		{http.MethodGet, "/api/admin/problems", ""},
 		{http.MethodGet, "/api/admin/jobs", ""},
+		{http.MethodPut, "/api/admin/languages", `{"audio":"","subtitles":["tr"]}`},
 	}
 	build := fakeBuild()
 	for _, rt := range routes {

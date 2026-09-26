@@ -1,7 +1,6 @@
 // The admin API. Only the admin port serves it; elsewhere every call fails with 404.
-import { strings } from '$lib/strings';
-
-export type LibraryType = keyof typeof strings.libraryTypes;
+import { call, type Languages, type LibraryType, type Result } from '$lib/api';
+import { reasonText, strings } from '$lib/strings';
 
 export type ScanStatus = {
 	state: '' | 'queued' | 'scanning';
@@ -42,32 +41,6 @@ export type Job = {
 
 export type Jobs = { jobs: Job[]; cacheBytes: number; freeBytes: number };
 
-// The server's error code, or 'failed' for no connection, a server error, or an unexpected body.
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-
-async function call<T>(method: string, url: string, body?: unknown): Promise<Result<T>> {
-	try {
-		const res = await fetch(url, {
-			method,
-			headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-			body: body === undefined ? undefined : JSON.stringify(body)
-		});
-		if (res.ok) {
-			const value = res.headers.get('Content-Type')?.startsWith('application/json')
-				? await res.json()
-				: undefined;
-			return { ok: true, value };
-		}
-		const code = await res
-			.json()
-			.then((b) => b?.error)
-			.catch(() => undefined);
-		return { ok: false, error: typeof code === 'string' ? code : 'failed' };
-	} catch {
-		return { ok: false, error: 'failed' };
-	}
-}
-
 export const listLibraries = () => call<Library[]>('GET', '/api/admin/libraries');
 
 export const addLibrary = (path: string, type: LibraryType) =>
@@ -81,6 +54,10 @@ export const listProblems = () => call<Problems>('GET', '/api/admin/problems');
 
 export const listJobs = () => call<Jobs>('GET', '/api/admin/jobs');
 
+// setLanguages returns the defaults as saved: codes normalized, duplicates dropped.
+export const setLanguages = (langs: Languages) =>
+	call<Languages>('PUT', '/api/admin/languages', langs);
+
 // listFolders lists the folders inside path, relative to the media folder ('' is the media folder).
 export async function listFolders(path: string): Promise<Result<string[]>> {
 	const r = await call<{ folders: string[] }>(
@@ -92,8 +69,7 @@ export async function listFolders(path: string): Promise<Result<string[]>> {
 
 // problemText says why a file can't be used. Unknown codes show as they are.
 export function problemText(p: Problem): string {
-	const reasons: Record<string, string> = strings.reasons;
-	const text = (p.reason && reasons[p.reason]) || p.reason || '';
+	const text = p.reason ? reasonText(p.reason) : '';
 	return p.reason === 'codec' && p.codec ? `${text} (${p.codec})` : text;
 }
 
