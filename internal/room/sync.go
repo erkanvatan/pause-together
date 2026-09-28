@@ -72,6 +72,9 @@ type client struct {
 	posAt     int64  // when it was reported
 	readyOnce bool
 	skipped   bool // by "Play anyway", until it catches up
+	// gone: its socket closed. It stays, away, until its person is ready again on another socket, or
+	// "Play anyway" skips it. Leaving the room is being away from it.
+	gone bool
 }
 
 // Sync holds one room's sync rules: pure, no IO. Time is milliseconds of server time, passed in.
@@ -144,14 +147,31 @@ func (s *Sync) Join(id int64, w Who, now int64) Effect {
 	return s.settle(now, Effect{})
 }
 
-// Leave removes a socket. When the last one goes, the room pauses.
+// Leave closes a socket. Someone the room would wait for stays as away, unless they still have
+// another socket in the room. When the last socket goes, the room pauses and forgets who left.
 func (s *Sync) Leave(id, now int64) Effect {
-	s.clients = slices.DeleteFunc(s.clients, func(c *client) bool { return c.id == id })
+	c := s.client(id)
+	if c == nil {
+		return Effect{}
+	}
+	s.clients = slices.DeleteFunc(s.clients, func(o *client) bool { return o == c })
 	var e Effect
-	if len(s.clients) == 0 && s.playing {
-		s.rebase(now)
-		s.playing = false
-		e.Save = true
+	if !slices.ContainsFunc(s.clients, func(o *client) bool { return !o.gone }) {
+		s.clients = nil
+		if s.playing {
+			s.rebase(now)
+			s.playing = false
+			e.Save = true
+		}
+		return s.settle(now, e)
+	}
+	here := slices.ContainsFunc(s.clients, func(o *client) bool { return !o.gone && o.who.UserID == c.who.UserID })
+	if c.readyOnce && !c.skipped && c.status != CantPlay && !here {
+		if !stalled(c.status) {
+			c.since = now
+		}
+		c.status, c.gone = Away, true
+		s.clients = append(s.clients, c)
 	}
 	return s.settle(now, e)
 }
@@ -184,13 +204,15 @@ func (s *Sync) SeekTo(posMs, now int64) Effect {
 	return s.settle(now, Effect{Changed: true, Save: true})
 }
 
-// PlayAnyway skips everyone the room waits for, until each catches up or comes back.
+// PlayAnyway skips everyone the room waits for, until each catches up or comes back. Someone who left
+// can't catch up, so they are forgotten instead.
 func (s *Sync) PlayAnyway(now int64) Effect {
 	for _, c := range s.clients {
 		if s.blocks(c, now) {
 			c.skipped = true
 		}
 	}
+	s.clients = slices.DeleteFunc(s.clients, func(c *client) bool { return c.gone && c.skipped })
 	return s.settle(now, Effect{Changed: true})
 }
 
@@ -218,7 +240,8 @@ func (s *Sync) SetOffset(ms, now int64) Effect {
 
 // Status records what a socket reports, with its position. A skipped socket is no longer skipped once
 // it is ready within CaughtUpMs of the room, or can't play at all. Going from buffering to away, or
-// back, doesn't restart the stall.
+// back, doesn't restart the stall. Someone who left and came back stops being waited for as gone once
+// their new socket is ready, or can't play.
 func (s *Sync) Status(id int64, st Status, posMs, now int64) Effect {
 	c := s.client(id)
 	if c == nil {
@@ -236,6 +259,9 @@ func (s *Sync) Status(id int64, st Status, posMs, now int64) Effect {
 	}
 	if st == CantPlay {
 		c.skipped = false
+	}
+	if st == Ready || st == CantPlay {
+		s.clients = slices.DeleteFunc(s.clients, func(o *client) bool { return o.gone && o.who.UserID == c.who.UserID })
 	}
 	return s.settle(now, Effect{})
 }

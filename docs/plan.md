@@ -311,7 +311,7 @@ quiet skip, or skip with a reason.
 
 **Not here:** the player.
 
-### [ ] 14. Player
+### [x] 14. Player
 
 **Goal:** people watch together.
 

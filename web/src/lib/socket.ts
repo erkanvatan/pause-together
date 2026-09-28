@@ -9,6 +9,10 @@ import {
 	RECONNECT_MIN_MS
 } from '$lib/sync/timing';
 
+// CLOSE_LEFT is WebSocket's normal closure. The server takes it, like a closing tab's "going away", as
+// the page leaving on purpose.
+const CLOSE_LEFT = 1000;
+
 // reconnectDelay is how long to wait before reconnect attempt n (0 = the first after a drop).
 export function reconnectDelay(attempt: number): number {
 	return Math.min(RECONNECT_MIN_MS * 2 ** attempt, RECONNECT_MAX_MS);
@@ -26,7 +30,9 @@ export class RoomSocket {
 
 	constructor(
 		private roomId: number,
-		private onmessage: (m: ServerMessage) => void
+		private onmessage: (m: ServerMessage) => void,
+		// ondrop is called when the connection is lost; the next hello says it's back.
+		private ondrop: () => void = () => {}
 	) {
 		this.connect();
 	}
@@ -36,10 +42,11 @@ export class RoomSocket {
 		if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
 	}
 
+	// close leaves the room: the clean close tells the server so, and it shows "was here" at once.
 	close() {
 		this.closed = true;
 		clearTimeout(this.retryTimer);
-		this.drop();
+		this.drop(CLOSE_LEFT);
 	}
 
 	private connect() {
@@ -91,16 +98,19 @@ export class RoomSocket {
 	// lost drops the connection and tries again after the backoff.
 	private lost() {
 		this.drop();
-		if (!this.closed) this.retryTimer = setTimeout(() => this.connect(), reconnectDelay(this.attempt++));
+		if (this.closed) return;
+		this.ondrop();
+		this.retryTimer = setTimeout(() => this.connect(), reconnectDelay(this.attempt++));
 	}
 
 	// drop closes the socket without waiting for it: a dead connection may take long to report closing.
-	private drop() {
+	// Without a code the server counts it as a dropped connection, and gives the page time to come back.
+	private drop(code?: number) {
 		clearInterval(this.pingTimer);
 		const ws = this.ws;
 		this.ws = null;
 		if (!ws) return;
 		ws.onopen = ws.onmessage = ws.onclose = null;
-		ws.close();
+		ws.close(code);
 	}
 }

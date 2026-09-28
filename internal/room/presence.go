@@ -35,15 +35,19 @@ func (p *Presence) Join(w Who) {
 	v.sockets++
 }
 
-// Leave counts a socket of a user's as closed. With their last one gone, the grace starts.
-func (p *Presence) Leave(userID, now int64) {
+// Leave counts a socket of a user's as closed. With their last one gone, the grace starts, unless the
+// page left on purpose (closed the socket cleanly): then they aren't coming back soon.
+func (p *Presence) Leave(userID, now int64, left bool) {
 	v := p.find(userID)
 	if v == nil || v.sockets == 0 {
 		return
 	}
 	v.sockets--
 	if v.sockets == 0 {
-		v.until = now + PresenceGraceMs
+		v.until = now
+		if !left {
+			v.until += PresenceGraceMs
+		}
 	}
 }
 

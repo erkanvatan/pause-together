@@ -79,11 +79,11 @@ func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, rm Room, who Who)
 		defer close(wrote)
 		s.write(ctx, conn)
 	}()
-	h.read(ctx, conn, l, s)
+	left := h.read(ctx, conn, l, s)
 	drop()
 	<-wrote
 	_ = conn.CloseNow()
-	l.do(func() { l.leave(s) })
+	l.do(func() { l.leave(s, left) })
 }
 
 // join counts s in, starting rm's loop if it has none, and hands s to the loop.
@@ -108,14 +108,16 @@ func (h *Hub) join(rm Room, s *socket) *loop {
 }
 
 // read passes s's messages to its loop, and answers pings itself. It returns when the socket closes,
-// or sends nothing for Heartbeat.
-func (h *Hub) read(ctx context.Context, conn *websocket.Conn, l *loop, s *socket) {
+// or sends nothing for Heartbeat. It reports whether the page left on purpose: a clean close, which a
+// browser sends when the tab closes or the page moves on, unlike a dropped connection.
+func (h *Hub) read(ctx context.Context, conn *websocket.Conn, l *loop, s *socket) (left bool) {
 	for {
 		readCtx, cancel := context.WithTimeout(ctx, h.Heartbeat)
 		_, b, err := conn.Read(readCtx)
 		cancel()
 		if err != nil {
-			return
+			code := websocket.CloseStatus(err)
+			return code == websocket.StatusNormalClosure || code == websocket.StatusGoingAway
 		}
 		var m ClientMsg
 		if json.Unmarshal(b, &m) != nil {
@@ -126,7 +128,7 @@ func (h *Hub) read(ctx context.Context, conn *websocket.Conn, l *loop, s *socket
 			continue
 		}
 		if !l.do(func() { l.intent(s, m) }) {
-			return
+			return false
 		}
 	}
 }

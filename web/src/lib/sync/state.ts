@@ -23,7 +23,7 @@ export function target(s: PlayState, now: number): number {
 }
 
 // local applies one of our intents right away, before the server answers.
-export function local(s: PlayState, i: Intent, now: number): PlayState {
+export function local<S extends PlayState>(s: S, i: Intent, now: number): S {
 	switch (i.type) {
 		case 'play':
 			return { ...s, playing: true, positionMs: target(s, now), atMs: now };

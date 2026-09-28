@@ -69,6 +69,8 @@ uses it:
   listens on `8080` and `8081`. Only the host side changes, so a clash on the host (8080 is a popular
   port) never touches code or tests.
 
+## Dev setup
+
 Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env` is prod only.
 
 - `compose.dev.yml` hardcodes dev's ports and data dir: `./.dev-data`, set through Go's `DATA_DIR`
@@ -126,9 +128,12 @@ web/                 SvelteKit app; web/embed.go embeds its build (go:embed can'
 web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle), Picker.svelte,
                      FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts,
-                     protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID);
-                     sync/ (pure): clock.ts (server clock offset), drift.ts, state.ts (target position,
-                     local intents), timing.ts (its timing constants)
+                     protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID),
+                     Player.svelte (the <video>, "Tap to join", controls, the follow loop), prefs.ts (per-device
+                     player settings in localStorage), time.ts (1:40:00);
+                     sync/ (pure): clock.ts (server clock offset), drift.ts (drift fix, follow step), state.ts
+                     (target position, local intents), status.ts (what the player reports, and when),
+                     timing.ts (its timing constants)
 web/src/routes/      homepage (room list), rooms/[id] (room page), admin
 Dockerfile           web build → Go build → runtime image with Debian's ffmpeg; go-dev stage (also ffmpeg) for dev and tests
 compose.yml          production
@@ -369,8 +374,9 @@ So each room's video is **prepared once**, then served as a plain file.
 - Progress is per room only: the position is saved on pause, seek and switch, and every 5 s while
   playing. No per-user progress.
 - Presence: "watching now" (open socket) and "was here" (joined before, gone now), with a 15 s
-  reconnect grace so flaky phones don't flicker between the two. Each user shows once, even with two
-  tabs open.
+  reconnect grace so flaky phones don't flicker between the two. A page that closes its socket cleanly
+  (tab closed, or went to another page) skips the grace: it left on purpose. Each user shows once,
+  even with two tabs open.
 
 ## Sync
 
@@ -399,12 +405,17 @@ So each room's video is **prepared once**, then served as a plain file.
 - The room waits for everyone. A client buffering or away (tab hidden or backgrounded) for longer than
   3 s pauses the room ("Waiting for Alice"). It resumes when everyone is ready. Anyone can press "Play
   anyway": the blocking client is then skipped until it catches up or comes back.
+- Leaving (closing the tab, or going to another page) counts as away, so the room pauses 3 s later
+  too. It waits until that person is back and ready on a new socket. "Play anyway" forgets them
+  instead of skipping: they can't catch up. Closing one of two tabs doesn't count: the person is
+  still there.
 - Some clients never block, and none of them count as away:
   - a device marked "can't play" (it can't decode the video),
   - someone who hasn't pressed "Tap to join" yet,
   - a new joiner, until it has been ready once.
 - When someone pauses, the player shows a small note for 2 s ("Alice paused"). Not in chat, not stored.
-- The room pauses when the last person leaves. On server start, every room loads paused.
+- The room pauses when the last person leaves, and forgets who left before. On server start, every
+  room loads paused.
 - Timing numbers in this spec are named constants, kept in one place per side.
 - Keep sync logic pure (no IO, clock injected) on both sides, `internal/room` and `web/src/lib/sync`,
   so it can be unit-tested.
@@ -427,7 +438,7 @@ So each room's video is **prepared once**, then served as a plain file.
 - Library picker: a search box, show → season → episode grouping, and a "recently added" sort. Videos
   this device can't play are greyed out.
 
-## Chat
+## Chat (planned)
 
 - One chat per room, kept forever, deleted with the room (foreign-key cascade).
 - Plain text, at most 1000 characters. Emoji are ordinary Unicode typed on the device keyboard; each
@@ -448,11 +459,11 @@ So each room's video is **prepared once**, then served as a plain file.
 
 ## Operations
 
-- Start at boot: `restart: unless-stopped` in `compose.yml`, and the Docker service enabled in systemd.
-  The host PC is restarted often.
-- Clean shutdown on SIGTERM (`task down`, or the PC shutting down): save room positions, close sockets,
-  stop ffmpeg and delete its temp file. Set `stop_grace_period` in compose so the save has time to
-  finish; Docker kills the process after 10 s by default.
+- (planned) Start at boot: `restart: unless-stopped` in `compose.yml`, and the Docker service enabled
+  in systemd. The host PC is restarted often.
+- (planned) Clean shutdown on SIGTERM (`task down`, or the PC shutting down): save room positions,
+  close sockets, stop ffmpeg and delete its temp file. Set `stop_grace_period` in compose so the save
+  has time to finish; Docker kills the process after 10 s by default.
 - Backups: `VACUUM INTO` a file in `/data/backups` on start, then every 24 h while up. Skip it if the
   newest backup is under 24 h old (checked hourly, so a restart never stretches the gap to 48 h). The
   time is in the file name. Keep the last 7. Never copy the live database file: with WAL, a
@@ -478,6 +489,7 @@ So each room's video is **prepared once**, then served as a plain file.
   `PRAGMA foreign_key_check` before commit. Turn `foreign_keys` back `ON` before the connection returns
   to the pool.
 - WebSocket messages are JSON `{"type": ..., ...}`, defined once per side (`internal/room/protocol.go`,
-  `web/src/lib/protocol.ts`). Change both together.
+  `web/src/lib/protocol.ts`). Change both together. `internal/room/testdata/protocol.json` holds one of
+  each message and both sides' tests read it, so a new message goes there too.
 - The frontend uses relative URLs only, so one build works on both ports and behind the dev proxy.
 - LF line endings everywhere.

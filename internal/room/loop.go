@@ -112,10 +112,11 @@ func (l *loop) join(s *socket) {
 	l.sockets = append(l.sockets, s)
 }
 
-func (l *loop) leave(s *socket) {
+// leave takes s out. left: the page closed it on purpose.
+func (l *loop) leave(s *socket, left bool) {
 	now := l.hub.now()
 	l.sockets = slices.DeleteFunc(l.sockets, func(o *socket) bool { return o == s })
-	l.presence.Leave(s.who.UserID, now)
+	l.presence.Leave(s.who.UserID, now, left)
 	l.apply(l.sync.Leave(s.id, now), now)
 	l.hub.mu.Lock()
 	if r := l.hub.rooms[l.id]; r != nil && r.loop == l {

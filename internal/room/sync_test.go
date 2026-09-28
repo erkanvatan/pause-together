@@ -178,12 +178,77 @@ func TestSync(t *testing.T) {
 		sc.at(610_000).wantPos(0)
 	})
 
-	t.Run("Alice leaves while the room waits for her → it resumes", func(t *testing.T) {
+	t.Run("Alice leaves → room pauses after 3 s, like away", func(t *testing.T) {
 		sc, a, _ := watching(t)
-		sc.at(10_000).status(a, Buffering)
-		sc.at(14_000).leave(a)
+		sc.at(10_000).leave(a)
+		sc.at(12_000)
+		sc.check("running after 2 s", sc.running(), true)
+		sc.at(13_500)
+		sc.check("waiting", sc.waiting(), []Who{alice})
+		sc.at(20_000).wantPos(13_500)
+	})
+
+	t.Run("Alice hides her tab, then closes it → the stall counts from hiding", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		sc.at(10_000).status(a, Away)
+		sc.at(12_000).leave(a)
+		sc.at(13_500)
+		sc.check("waiting", sc.waiting(), []Who{alice})
+	})
+
+	t.Run("Alice leaves and comes back → room waits until her new tab is ready", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		sc.at(10_000).leave(a)
+		sc.at(13_500)
+		sc.at(20_000)
+		a2 := sc.join(alice)
+		sc.check("waiting before she's ready", sc.waiting(), []Who{alice})
+		sc.at(22_000).status(a2, Ready, 13_500)
+		sc.check("waiting", sc.waiting(), []Who{})
+		sc.at(23_000).wantPos(14_500)
+	})
+
+	t.Run("Alice closes one of two tabs → room plays on", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		a2 := sc.join(alice)
+		sc.status(a2, Ready)
+		sc.at(10_000).leave(a2)
+		sc.at(20_000)
 		sc.check("running", sc.running(), true)
-		sc.at(15_000).wantPos(15_000)
+		sc.check("waiting", sc.waiting(), []Who{})
+		sc.leave(a)
+		sc.at(24_000)
+		sc.check("waiting", sc.waiting(), []Who{alice})
+	})
+
+	t.Run("Alice left, Play anyway → she's forgotten, not shown behind", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		sc.at(10_000).leave(a)
+		sc.at(14_000).playAnyway()
+		sc.check("running", sc.running(), true)
+		sc.at(30_000)
+		sc.check("behind", sc.behind(), []Lag{})
+		sc.pause(0)
+		sc.at(40_000).play()
+		sc.check("waiting", sc.waiting(), []Who{})
+	})
+
+	t.Run("Alice left while paused, Bob presses play → room waits for Alice at once", func(t *testing.T) {
+		sc := newScene(t, hour)
+		a, b := sc.join(alice), sc.join(bob)
+		sc.status(a, Ready)
+		sc.status(b, Ready)
+		sc.at(1000).leave(a)
+		sc.at(600_000).play()
+		sc.check("waiting", sc.waiting(), []Who{alice})
+	})
+
+	t.Run("a newcomer who never got ready leaves → nobody waits for them", func(t *testing.T) {
+		sc, _, _ := watching(t)
+		c := sc.join(carol)
+		sc.at(10_000).leave(c)
+		sc.at(20_000)
+		sc.check("waiting", sc.waiting(), []Who{})
 	})
 
 	t.Run("Play anyway → Alice is skipped until she catches up, shown behind meanwhile", func(t *testing.T) {
@@ -338,7 +403,7 @@ func TestSync(t *testing.T) {
 		sc.wantPos(0)
 	})
 
-	t.Run("the last one leaves → room pauses, saved", func(t *testing.T) {
+	t.Run("the last one leaves → room pauses, saved, and forgets who left", func(t *testing.T) {
 		sc, a, b := watching(t)
 		sc.at(5000).leave(a)
 		sc.check("playing with Bob left", sc.state().Playing, true)
@@ -346,6 +411,10 @@ func TestSync(t *testing.T) {
 		sc.check("playing", sc.state().Playing, false)
 		sc.check("save", sc.e.Save, true)
 		sc.at(20_000).wantPos(8000)
+		c := sc.join(carol)
+		sc.status(c, Ready)
+		sc.play()
+		sc.check("waiting", sc.waiting(), []Who{})
 	})
 
 	t.Run("position is saved every 5 s while playing, not while paused or waiting", func(t *testing.T) {

@@ -21,3 +21,12 @@ export const PONG_TIMEOUT_MS = 10000;
 // RECONNECT_MAX_MS.
 export const RECONNECT_MIN_MS = 500;
 export const RECONNECT_MAX_MS = 10000;
+
+// The player checks its video against the room this often (and on every new state and video event).
+export const FOLLOW_EVERY_MS = 250;
+// While the room plays, the player reports its status and position at least this often.
+export const STATUS_EVERY_MS = 2000;
+// How long the "Alice paused" note stays up.
+export const PAUSED_NOTE_MS = 2000;
+// After a network error, the player loads the video again this much later.
+export const MEDIA_RETRY_MS = 2000;

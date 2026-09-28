@@ -2,7 +2,7 @@ const nameInvalid = 'Use 1 to 32 letters, numbers, spaces or punctuation. No emo
 
 // Every piece of UI text lives here, so a Turkish version is one more object later.
 export const strings = {
-	locale: 'en', // for language names, and sorting titles
+	locale: 'en', // for language names, sorting titles, and joining names into a list
 	appName: 'PauseTogether',
 	tagline: "Distance can't pause us.",
 
@@ -121,7 +121,18 @@ export const strings = {
 	watchingNow: 'Watching now',
 	wasHere: 'Was here',
 	watchingList: (names: string) => `Watching: ${names}`,
-	prepareReady: 'Ready to play',
+	tapToJoin: 'Tap to join',
+	play: 'Play',
+	pause: 'Pause',
+	mute: 'Mute',
+	unmute: 'Unmute',
+	volume: 'Volume',
+	position: 'Position',
+	playAnyway: 'Play anyway',
+	waitingFor: (names: string[]) => `Waiting for ${list(names)}`,
+	behind: (name: string, ms: number) => `${name} is ${Math.round(ms / 1000)} s behind`,
+	pausedBy: (name: string) => `${name} paused`,
+	hostOffline: 'Host is offline, reconnecting…',
 	pickVideo: 'Pick a video',
 	close: 'Close',
 	back: 'Back',
@@ -157,6 +168,11 @@ export const strings = {
 export function reasonText(code: string): string {
 	const reasons: Record<string, string> = strings.reasons;
 	return reasons[code] ?? code;
+}
+
+// list joins names: "Alice", "Alice and Bob", "Alice, Bob, and Carol".
+function list(names: string[]): string {
+	return new Intl.ListFormat(strings.locale, { type: 'conjunction' }).format(names);
 }
 
 // ordinal writes 1st, 2nd, 3rd, 4th, 11th, 21st…
