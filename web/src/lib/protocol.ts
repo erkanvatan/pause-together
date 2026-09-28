@@ -40,6 +40,7 @@ export type Prepare = {
 	progress: number; // running: 0 to 1
 	error: string; // failed: a strings.jobErrors code
 	key: string; // ready: the copy's /stream key
+	subtitles: number[]; // ready: the embedded subtitle streams the copy has as WebVTT
 };
 
 // What the server sends. hello comes first; buildId is the server's web build.

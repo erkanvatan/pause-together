@@ -41,9 +41,11 @@ export type SubtitleTrack = {
 	unavailable: string; // a code; '' = can be shown
 };
 
-export type Sidecar = { id: number; lang: string; forced: boolean; sdh: boolean };
+// key names its converted copy under /stream.
+export type Sidecar = { id: number; lang: string; forced: boolean; sdh: boolean; key: string };
 
-export type VideoDetail = VideoSummary & {
+// Missing videos too: a room may still play one's prepared copy, with its subtitles.
+export type VideoDetail = VideoRef & {
 	audio: AudioTrack[];
 	subtitles: SubtitleTrack[];
 	sidecars: Sidecar[];

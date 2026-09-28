@@ -1,12 +1,15 @@
 // Player settings kept per device in localStorage. Everything shared lives in the room's state instead.
 
-export type PlayerPrefs = { volume: number; muted: boolean };
+export const SUBTITLE_SIZES = ['small', 'medium', 'large'] as const;
+export type SubtitleSize = (typeof SUBTITLE_SIZES)[number];
+
+export type PlayerPrefs = { volume: number; muted: boolean; subtitleSize: SubtitleSize };
 
 // PrefsStorage is the part of localStorage used here.
 export type PrefsStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
 const key = 'pt.player';
-const defaults: PlayerPrefs = { volume: 1, muted: false };
+const defaults: PlayerPrefs = { volume: 1, muted: false, subtitleSize: 'small' };
 
 // loadPlayerPrefs reads the stored settings. Anything missing or broken gets its default. storage is
 // a getter: with site data blocked, even reading window.localStorage throws, which means defaults too.
@@ -18,10 +21,11 @@ export function loadPlayerPrefs(storage: () => PrefsStorage): PlayerPrefs {
 		return { ...defaults };
 	}
 	if (typeof v !== 'object' || v === null) return { ...defaults };
-	const { volume, muted } = v as Record<string, unknown>;
+	const { volume, muted, subtitleSize } = v as Record<string, unknown>;
 	return {
 		volume: typeof volume === 'number' && Number.isFinite(volume) ? Math.min(Math.max(volume, 0), 1) : defaults.volume,
-		muted: typeof muted === 'boolean' ? muted : defaults.muted
+		muted: typeof muted === 'boolean' ? muted : defaults.muted,
+		subtitleSize: SUBTITLE_SIZES.find((s) => s === subtitleSize) ?? defaults.subtitleSize
 	};
 }
 

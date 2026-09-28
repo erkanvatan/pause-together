@@ -1,13 +1,22 @@
 <script lang="ts">
 	// The room's player: one <video> for the page's life, "Tap to join", our own controls, and the loop
 	// that keeps the video with the room. <video> events are status only; only the controls send intents.
+	// Subtitles, fullscreen and "Next episode" at the end live here too, so they work in fullscreen.
 	import { onMount, untrack } from 'svelte';
-	import type { Room } from '$lib/api';
-	import { codecName, whyUnplayable } from '$lib/picker';
-	import { loadPlayerPrefs, savePlayerPrefs } from '$lib/prefs';
+	import type { Room, SubtitleChoice, VideoDetail, VideoSummary } from '$lib/api';
+	import {
+		codecName,
+		episodeCode,
+		subtitleLabel,
+		subtitleOptions,
+		whyUnplayable
+	} from '$lib/picker';
+	import { loadPlayerPrefs, savePlayerPrefs, SUBTITLE_SIZES } from '$lib/prefs';
 	import type { Prepare, RoomState } from '$lib/protocol';
 	import type { RoomSocket } from '$lib/socket';
 	import { strings } from '$lib/strings';
+	import Subtitles from '$lib/Subtitles.svelte';
+	import { sameSubtitle, subtitleUrl } from '$lib/subtitles';
 	import { follow, type Step } from '$lib/sync/drift';
 	import { local, running, target, type Intent } from '$lib/sync/state';
 	import { reportDue, statusOf, type Report } from '$lib/sync/status';
@@ -16,26 +25,37 @@
 
 	let {
 		room,
+		detail,
 		prepare,
 		playState = $bindable(),
 		socket,
 		online,
-		note
+		note,
+		next,
+		onnext
 	}: {
 		room: Room;
+		detail: VideoDetail | null; // the room's video with its tracks; null until loaded
 		prepare: Prepare | null;
 		playState: RoomState | null; // the server's, or ours applied on top until the next one arrives
 		socket: RoomSocket | null;
 		online: boolean; // the socket said hello and hasn't dropped since
 		note: string; // "Alice paused"
+		next: VideoSummary | null; // the next episode, offered at the end
+		onnext: () => void;
 	} = $props();
 
+	// One press of the subtitle timing buttons.
+	const offsetStepMs = 250;
+
+	let wrapper: HTMLDivElement;
 	let video: HTMLVideoElement;
 	const src = $derived(prepare?.state === 'ready' ? `/stream/${prepare.key}/video.mp4` : '');
 
 	const prefs = loadPlayerPrefs(() => localStorage);
 	let volume = $state(prefs.volume);
 	let muted = $state(prefs.muted);
+	let subtitleSize = $state(prefs.subtitleSize);
 	// iPhones ignore volume set from script: the hardware buttons own it. No slider there.
 	const volumeWorks = (() => {
 		const v = document.createElement('video');
@@ -60,6 +80,25 @@
 	);
 	const cantPlay = $derived(unplayable !== '');
 	const durationMs = $derived(playState?.durationMs ?? 0);
+
+	let subtitlesOpen = $state(false); // the subtitle panel
+	const options = $derived(detail ? subtitleOptions(detail) : []);
+	const subtitleKey = $derived(
+		options.find((o) => sameSubtitle(o.choice, playState?.subtitle ?? null))?.key ?? ''
+	);
+	const subUrl = $derived(subtitleUrl(playState?.subtitle ?? null, prepare, detail?.sidecars ?? []));
+	const offsetMs = $derived(playState?.subtitleOffsetMs ?? 0);
+
+	// Fullscreen is the wrapper's, so subtitles and controls stay on top. Where the browser can't
+	// (iPhone), the wrapper fills the window instead.
+	let native = $state(false); // the browser's fullscreen
+	let filled = $state(false); // the CSS fill
+	const full = $derived(native || filled);
+
+	// At the end the room pauses; a TV episode then offers the next one.
+	const atEnd = $derived(
+		playState !== null && !playState.playing && durationMs > 0 && playState.positionMs >= durationMs
+	);
 
 	// Only src changes, never the element: a new one may need a fresh tap on iOS.
 	$effect(() => {
@@ -88,7 +127,13 @@
 		untrack(tick);
 	});
 
-	$effect(() => savePlayerPrefs(() => localStorage, { volume, muted }));
+	$effect(() => savePlayerPrefs(() => localStorage, { volume, muted, subtitleSize }));
+
+	// The page behind a CSS fill mustn't scroll.
+	$effect(() => {
+		document.documentElement.style.overflow = filled ? 'hidden' : '';
+		return () => (document.documentElement.style.overflow = '');
+	});
 
 	onMount(() => {
 		const timer = setInterval(tick, FOLLOW_EVERY_MS);
@@ -97,10 +142,13 @@
 			tick();
 		};
 		document.addEventListener('visibilitychange', visibility);
+		const fullscreen = () => (native = document.fullscreenElement === wrapper);
+		document.addEventListener('fullscreenchange', fullscreen);
 		return () => {
 			clearInterval(timer);
 			clearTimeout(retryTimer);
 			document.removeEventListener('visibilitychange', visibility);
+			document.removeEventListener('fullscreenchange', fullscreen);
 		};
 	});
 
@@ -177,6 +225,37 @@
 		tick();
 	}
 
+	// setSubtitle and setOffset change room state for everyone. Shown here at once; the server's next
+	// state confirms it.
+	function setSubtitle(choice: SubtitleChoice | null) {
+		if (!playState || !socket) return;
+		playState = { ...playState, subtitle: choice };
+		socket.send({ type: 'subtitle', subtitle: choice });
+	}
+
+	function setOffset(ms: number) {
+		if (!playState || !socket) return;
+		playState = { ...playState, subtitleOffsetMs: ms };
+		socket.send({ type: 'offset', ms });
+	}
+
+	function toggleFullscreen() {
+		if (full) exitFullscreen();
+		else if (document.fullscreenEnabled) wrapper.requestFullscreen().catch(() => (filled = true));
+		else filled = true;
+	}
+
+	function exitFullscreen() {
+		filled = false;
+		if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+	}
+
+	// The picker opens outside the wrapper, where fullscreen would hide it.
+	function nextEpisode() {
+		exitFullscreen();
+		onnext();
+	}
+
 	function failed() {
 		const code = video.error?.code;
 		if (!src || code === undefined) return;
@@ -218,8 +297,15 @@
 	}
 </script>
 
-<div class="flex flex-col overflow-hidden rounded-md bg-black">
-	<div class="relative">
+<svelte:window onkeydown={(e) => e.key === 'Escape' && filled && (filled = false)} />
+
+<div
+	bind:this={wrapper}
+	class="@container flex flex-col overflow-hidden bg-black {full
+		? 'fixed inset-0 z-30 h-dvh'
+		: 'rounded-md'}"
+>
+	<div class="relative {full ? 'min-h-0 flex-1' : ''}">
 		<video
 			bind:this={video}
 			bind:volume
@@ -236,8 +322,17 @@
 			oncanplay={tick}
 			onpause={tick}
 			onloadedmetadata={tick}
-			class="aspect-video w-full"
+			class={full ? 'h-full w-full object-contain' : 'aspect-video w-full'}
 		></video>
+
+		{#if src && !cantPlay}
+			<Subtitles
+				url={subUrl}
+				{offsetMs}
+				size={subtitleSize}
+				videoMs={() => video.currentTime * 1000}
+			/>
+		{/if}
 
 		<div class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
 			{#if cantPlay}
@@ -250,6 +345,14 @@
 					class="rounded-full bg-neutral-100 px-6 py-3 text-lg font-medium text-neutral-950"
 				>
 					{strings.tapToJoin}
+				</button>
+			{/if}
+			{#if atEnd && next}
+				<button
+					onclick={nextEpisode}
+					class="max-w-full rounded-md bg-neutral-100 px-4 py-2 font-medium break-words text-neutral-950"
+				>
+					{strings.nextEpisodeNamed([episodeCode(next), next.episodeTitle].filter(Boolean).join(' · '))}
 				</button>
 			{/if}
 			{#if playState && playState.waiting.length > 0}
@@ -275,6 +378,72 @@
 			{/each}
 		</div>
 	</div>
+
+	{#if subtitlesOpen}
+		<div
+			class="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-800 bg-neutral-900 px-3 py-2 text-sm"
+		>
+			<select
+				aria-label={strings.subtitle}
+				value={subtitleKey}
+				disabled={!online || !playState}
+				onchange={(e) =>
+					setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
+				class="max-w-full min-w-0 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1"
+			>
+				<option value="">{strings.subtitleOff}</option>
+				{#each options as o (o.key)}
+					{@const missing =
+						'stream' in o.choice &&
+						prepare?.state === 'ready' &&
+						!prepare.subtitles.includes(o.choice.stream)}
+					<option value={o.key} disabled={o.unavailable !== '' || missing}>
+						{subtitleLabel(o)}{missing ? ` — ${strings.notInCopy}` : ''}
+					</option>
+				{/each}
+			</select>
+			<div class="flex items-center gap-1">
+				<span class="text-neutral-400">{strings.subtitleTiming}</span>
+				<button
+					onclick={() => setOffset(offsetMs - offsetStepMs)}
+					disabled={!online || !playState}
+					aria-label={strings.subtitleSooner}
+					class="w-8 rounded-md border border-neutral-700 py-0.5 hover:bg-neutral-800 disabled:opacity-50"
+				>
+					−
+				</button>
+				<span class="w-16 text-center tabular-nums">{strings.subtitleOffset(offsetMs)}</span>
+				<button
+					onclick={() => setOffset(offsetMs + offsetStepMs)}
+					disabled={!online || !playState}
+					aria-label={strings.subtitleLater}
+					class="w-8 rounded-md border border-neutral-700 py-0.5 hover:bg-neutral-800 disabled:opacity-50"
+				>
+					+
+				</button>
+				{#if offsetMs !== 0}
+					<button
+						onclick={() => setOffset(0)}
+						disabled={!online || !playState}
+						class="rounded-md px-2 py-0.5 text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+					>
+						{strings.reset}
+					</button>
+				{/if}
+			</div>
+			<label class="flex items-center gap-2">
+				<span class="text-neutral-400">{strings.subtitleSize}</span>
+				<select
+					bind:value={subtitleSize}
+					class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1"
+				>
+					{#each SUBTITLE_SIZES as size (size)}
+						<option value={size}>{strings.subtitleSizes[size]}</option>
+					{/each}
+				</select>
+			</label>
+		</div>
+	{/if}
 
 	<div class="flex items-center gap-3 bg-neutral-900 px-3 py-2 text-sm">
 		<button
@@ -319,5 +488,28 @@
 				class="hidden w-20 accent-neutral-100 sm:block"
 			/>
 		{/if}
+		<button
+			onclick={() => (subtitlesOpen = !subtitlesOpen)}
+			aria-label={strings.subtitle}
+			aria-pressed={subtitlesOpen}
+			class="rounded-md border px-2 py-1 font-semibold hover:bg-neutral-800 {playState?.subtitle
+				? 'border-neutral-300'
+				: 'border-neutral-700 text-neutral-400'}"
+		>
+			{strings.subtitlesButton}
+		</button>
+		<button
+			onclick={toggleFullscreen}
+			aria-label={full ? strings.exitFullscreen : strings.fullscreen}
+			class="rounded-md border border-neutral-700 px-2 py-1 hover:bg-neutral-800"
+		>
+			<svg viewBox="0 0 16 16" class="size-4" fill="none" stroke="currentColor" stroke-width="1.5">
+				{#if full}
+					<path d="M6 1v5H1M10 1v5h5M6 15v-5H1M10 15v-5h5" />
+				{:else}
+					<path d="M1 6V1h5M15 6V1h-5M1 10v5h5M15 10v5h-5" />
+				{/if}
+			</svg>
+		</button>
 	</div>
 </div>

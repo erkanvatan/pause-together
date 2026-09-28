@@ -14,3 +14,10 @@ export function splitArchived<R extends Room>(rooms: R[]): { active: R[]; archiv
 		archived: rooms.filter((r) => r.archived)
 	};
 }
+
+// needsConfirm says whether a switch asks first ("You're at 1:40:00. Switch to …?"). Not when nothing
+// is lost: at 0:00, at the end, or when the video is missing, since that swap keeps the position.
+export function needsConfirm(positionMs: number, durationMs: number, missing: boolean): boolean {
+	if (missing || positionMs < 1000) return false;
+	return durationMs === 0 || positionMs < durationMs;
+}

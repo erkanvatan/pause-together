@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import Picker from '$lib/Picker.svelte';
 	import Player from '$lib/Player.svelte';
 	import {
+		getVideo,
+		listVideos,
 		openRoom,
 		renameRoom,
 		setArchived,
@@ -11,14 +14,18 @@
 		type Pick,
 		type Result,
 		type Room,
+		type VideoDetail,
+		type VideoSummary,
 		type Who
 	} from '$lib/api';
-	import { videoName } from '$lib/picker';
+	import { nextEpisode, videoName } from '$lib/picker';
 	import type { Prepare, RoomState, ServerMessage } from '$lib/protocol';
-	import { roomTitle } from '$lib/rooms';
+	import { needsConfirm, roomTitle } from '$lib/rooms';
 	import { RoomSocket } from '$lib/socket';
 	import { strings } from '$lib/strings';
+	import { target } from '$lib/sync/state';
 	import { PAUSED_NOTE_MS } from '$lib/sync/timing';
+	import { formatTime } from '$lib/time';
 
 	// How soon a failed load tries again.
 	const loadRetryMs = 2000;
@@ -30,6 +37,10 @@
 	let loadFailed = $state(false);
 	let error = $state(''); // why the last change failed
 	let picking = $state(false);
+	let pickStart = $state<VideoSummary | undefined>(); // the picker opens on this video: "Next episode"
+	let confirming = $state<{ pick: Pick; text: string } | null>(null); // a switch waiting for a yes
+	let detail = $state<VideoDetail | null>(null); // the room's video with its tracks
+	let next = $state<VideoSummary | null>(null); // its next episode
 	let renaming = $state(false);
 	let name = $state('');
 	let watching = $state<Who[]>([]);
@@ -53,6 +64,7 @@
 		notFound = false;
 		error = '';
 		picking = false;
+		confirming = null;
 		renaming = false;
 		watching = [];
 		wasHere = [];
@@ -82,6 +94,39 @@
 			socket?.close();
 		};
 	});
+
+	const videoId = $derived(room?.video.id);
+
+	// The room's video, with its subtitles, and its next episode. Again whenever the video changes.
+	$effect(() => {
+		const vid = videoId;
+		detail = null;
+		next = null;
+		if (vid === undefined) return;
+		const v = untrack(() => room!.video);
+		let stopped = false;
+		let timer: ReturnType<typeof setTimeout>;
+		const load = async () => {
+			const [d, list] = await Promise.all([
+				getVideo(vid),
+				v.type === 'tv' ? listVideos() : Promise.resolve(null)
+			]);
+			if (stopped) return;
+			if (d.ok) detail = d.value;
+			if (list?.ok) next = nextEpisode(v, list.value);
+			if ((!d.ok && d.error !== 'not-found') || (list && !list.ok)) timer = setTimeout(load, loadRetryMs);
+		};
+		load();
+		return () => {
+			stopped = true;
+			clearTimeout(timer);
+		};
+	});
+
+	// A room whose video is gone, with no prepared copy to play, offers another pick in its place. The
+	// server says so with no job (state ''); until its prepare message comes, the room isn't counted as
+	// missing, so a switch still asks first.
+	const missing = $derived(room !== null && room.video.missing && prepare?.state === '');
 
 	// received applies a message from the room.
 	function received(m: ServerMessage) {
@@ -144,8 +189,27 @@
 		return r.ok;
 	}
 
-	async function switchTo(p: Pick) {
+	function openPicker(start?: VideoSummary) {
+		pickStart = start;
+		picking = true;
+	}
+
+	// switchTo asks first when the switch would lose the room's place.
+	function switchTo(p: Pick, name: string) {
 		picking = false;
+		if (!room) return;
+		const s = playState;
+		const now = socket?.clock.serverNow(performance.now()) ?? null;
+		const at = s ? target(s, now ?? s.atMs) : room.positionMs;
+		if (needsConfirm(at, s?.durationMs ?? room.video.durationMs, missing)) {
+			confirming = { pick: p, text: strings.switchConfirm(formatTime(at), name) };
+		} else {
+			doSwitch(p);
+		}
+	}
+
+	async function doSwitch(p: Pick) {
+		confirming = null;
 		apply(await switchVideo(id, p));
 	}
 
@@ -224,7 +288,7 @@
 		{#if room.name}
 			<p class="break-words text-neutral-400">{videoName(room.video)}</p>
 		{/if}
-		{#if room.video.missing}
+		{#if missing}
 			<p class="text-amber-400">{strings.videoMissing}</p>
 		{:else if !room.archived && prepareText(prepare)}
 			<p class={prepare?.state === 'failed' ? 'text-red-400' : 'text-neutral-300'}>
@@ -237,7 +301,17 @@
 		{/if}
 
 		{#if !room.archived}
-			<Player {room} {prepare} bind:playState {socket} {online} {note} />
+			<Player
+				{room}
+				{detail}
+				{prepare}
+				bind:playState
+				{socket}
+				{online}
+				{note}
+				{next}
+				onnext={() => openPicker(next ?? undefined)}
+			/>
 		{/if}
 
 		{#if room.archived}
@@ -249,12 +323,22 @@
 				{strings.unarchive}
 			</button>
 		{:else}
-			<button
-				onclick={() => (picking = true)}
-				class="self-start rounded-md border border-neutral-700 px-4 py-2 hover:bg-neutral-800"
-			>
-				{strings.switchVideo}
-			</button>
+			<div class="flex flex-wrap gap-2">
+				<button
+					onclick={() => openPicker()}
+					class="rounded-md border border-neutral-700 px-4 py-2 hover:bg-neutral-800"
+				>
+					{missing ? strings.pickAnother : strings.switchVideo}
+				</button>
+				{#if next && !missing}
+					<button
+						onclick={() => openPicker(next ?? undefined)}
+						class="rounded-md border border-neutral-700 px-4 py-2 hover:bg-neutral-800"
+					>
+						{strings.nextEpisode}
+					</button>
+				{/if}
+			</div>
 		{/if}
 
 		{#each [{ title: strings.watchingNow, people: watching }, { title: strings.wasHere, people: wasHere }] as list (list.title)}
@@ -275,5 +359,32 @@
 </main>
 
 {#if picking}
-	<Picker onpick={switchTo} onclose={() => (picking = false)} />
+	<Picker open={pickStart} onpick={switchTo} onclose={() => (picking = false)} />
+{/if}
+
+{#if confirming}
+	{@const c = confirming}
+	<div
+		class="fixed inset-0 z-20 flex items-center justify-center bg-black/70 p-4"
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class="flex max-w-md flex-col gap-4 rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+			<p class="break-words">{c.text}</p>
+			<div class="flex gap-2">
+				<button
+					onclick={() => doSwitch(c.pick)}
+					class="rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950"
+				>
+					{strings.switchAction}
+				</button>
+				<button
+					onclick={() => (confirming = null)}
+					class="rounded-md border border-neutral-700 px-4 py-2 text-neutral-300"
+				>
+					{strings.cancel}
+				</button>
+			</div>
+		</div>
+	</div>
 {/if}

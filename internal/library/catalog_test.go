@@ -67,8 +67,9 @@ func TestVideoDetail(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := VideoDetail{
-		VideoSummary: VideoSummary{ID: rows["Heat (1995)/Heat (1995).mkv"].ID, Type: Movies, Title: "Heat",
-			Year: 1995, DurationMs: fakeInfo.Duration.Milliseconds(), CodecString: "avc1.640028", AppleOnly: true},
+		VideoRef: VideoRef{VideoSummary: VideoSummary{ID: rows["Heat (1995)/Heat (1995).mkv"].ID, Type: Movies,
+			Title: "Heat", Year: 1995, DurationMs: fakeInfo.Duration.Milliseconds(), CodecString: "avc1.640028",
+			AppleOnly: true}},
 		Audio: []AudioInfo{
 			{Stream: 1, Codec: "eac3", Channels: 6, Lang: "en", Title: "Surround", Default: true},
 			{Stream: 2, Codec: "aac", Channels: 2, Lang: "tr"},
@@ -79,9 +80,9 @@ func TestVideoDetail(t *testing.T) {
 		},
 		// By file name.
 		Sidecars: []SidecarInfo{
-			{ID: sidecars["Heat (1995)/Heat (1995).en.forced.srt"].ID, Lang: "en", Forced: true},
-			{ID: sidecars["Heat (1995)/Heat (1995).ger.sdh.srt"].ID, Lang: "de", SDH: true},
-			{ID: sidecars["Heat (1995)/Heat (1995).tur.srt"].ID, Lang: "tr"},
+			{ID: sidecars["Heat (1995)/Heat (1995).en.forced.srt"].ID, Key: sidecars["Heat (1995)/Heat (1995).en.forced.srt"].Key, Lang: "en", Forced: true},
+			{ID: sidecars["Heat (1995)/Heat (1995).ger.sdh.srt"].ID, Key: sidecars["Heat (1995)/Heat (1995).ger.sdh.srt"].Key, Lang: "de", SDH: true},
+			{ID: sidecars["Heat (1995)/Heat (1995).tur.srt"].ID, Key: sidecars["Heat (1995)/Heat (1995).tur.srt"].Key, Lang: "tr"},
 		},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -101,9 +102,11 @@ func TestVideoDetail(t *testing.T) {
 		t.Fatal(err)
 	}
 	l.scan()
-	for name, id := range map[string]int64{"missing": rows["Ronin (1998).mkv"].ID, "unknown": 999} {
-		if _, err := libs.VideoDetail(ctx, id); !errors.Is(err, ErrNotFound) {
-			t.Errorf("%s video: err = %v, want ErrNotFound", name, err)
-		}
+	// A room still playing its prepared copy needs a missing video's tracks.
+	if ronin, err := libs.VideoDetail(ctx, rows["Ronin (1998).mkv"].ID); err != nil || !ronin.Missing {
+		t.Errorf("missing video: %+v, %v; want it, marked missing", ronin, err)
+	}
+	if _, err := libs.VideoDetail(ctx, 999); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown video: err = %v, want ErrNotFound", err)
 	}
 }

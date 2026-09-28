@@ -27,7 +27,15 @@
 	} from '$lib/picker';
 	import { strings } from '$lib/strings';
 
-	let { onpick, onclose }: { onpick: (p: Pick) => void; onclose: () => void } = $props();
+	let {
+		onpick,
+		onclose,
+		open
+	}: {
+		onpick: (p: Pick, name: string) => void; // name: the video's, as videoName writes it
+		onclose: () => void;
+		open?: VideoSummary; // start on this video's audio and subtitle step: "Next episode"
+	} = $props();
 
 	// How soon a failed load tries again.
 	const loadRetryMs = 2000;
@@ -84,6 +92,7 @@
 			if (v.ok && l.ok) {
 				videos = v.value;
 				langs = l.value;
+				if (open) choose(open);
 			} else {
 				timer = setTimeout(load, loadRetryMs);
 			}
@@ -106,7 +115,7 @@
 		const seq = ++pickSeq;
 		const r = await getVideo(v.id);
 		if (seq !== pickSeq) return; // another video was tapped, or Back, while this one loaded
-		if (!r.ok) {
+		if (!r.ok || r.value.missing) {
 			pickFailed = true; // gone since the list loaded, or no connection
 			return;
 		}
@@ -137,11 +146,14 @@
 
 	function start() {
 		if (!picked) return;
-		onpick({
-			videoId: picked.id,
-			audio,
-			subtitle: options.find((o) => o.key === subtitle)?.choice ?? null
-		});
+		onpick(
+			{
+				videoId: picked.id,
+				audio,
+				subtitle: options.find((o) => o.key === subtitle)?.choice ?? null
+			},
+			videoName(picked)
+		);
 	}
 
 	const canGoBack = $derived(picked !== null || (!results && (show || folder)));

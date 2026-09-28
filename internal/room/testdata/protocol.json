@@ -68,7 +68,14 @@
 		},
 		{
 			"type": "prepare",
-			"prepare": { "state": "queued", "place": 2, "progress": 0, "error": "", "key": "" }
+			"prepare": {
+				"state": "queued",
+				"place": 2,
+				"progress": 0,
+				"error": "",
+				"key": "",
+				"subtitles": []
+			}
 		},
 		{
 			"type": "prepare",
@@ -77,7 +84,8 @@
 				"place": 0,
 				"progress": 0,
 				"error": "",
-				"key": "0123456789abcdef0123456789abcdef"
+				"key": "0123456789abcdef0123456789abcdef",
+				"subtitles": [3, 5]
 			}
 		},
 		{ "type": "paused", "by": { "userId": 2, "name": "Bob" } },

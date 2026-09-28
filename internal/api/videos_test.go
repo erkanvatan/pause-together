@@ -30,7 +30,7 @@ func TestVideosOnGuestPort(t *testing.T) {
 			`"codecString":"avc1.640028","unplayable":"","appleOnly":false}]`},
 		{"/api/videos/7", http.StatusOK, `{"id":7,"type":"movies","title":"Heat","year":1995,"edition":"",` +
 			`"version":"","season":0,"episode":0,"episodeEnd":0,"episodeTitle":"","group":"","durationMs":0,` +
-			`"codecString":"avc1.640028","unplayable":"","appleOnly":false,` +
+			`"codecString":"avc1.640028","unplayable":"","appleOnly":false,"missing":false,` +
 			`"audio":[{"stream":1,"codec":"aac","channels":2,"lang":"en","title":"","default":true}],` +
 			`"subtitles":[],"sidecars":[]}`},
 		{"/api/videos/8", http.StatusNotFound, ""},

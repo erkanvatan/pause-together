@@ -140,6 +140,24 @@ export function episodeCode(v: VideoSummary): string {
 	return v.episodeEnd > v.episode ? `${code}-E${pad(v.episodeEnd)}` : code;
 }
 
+// nextEpisode is the episode after current in its show: the first one past its last episode, in
+// this season or a later one. Never a special, and none from a special: they sit outside the order.
+// Of two files for one episode, the first added. null when there's none, or current isn't an episode.
+export function nextEpisode(current: VideoSummary, videos: VideoSummary[]): VideoSummary | null {
+	if (current.type !== 'tv' || current.season === 0) return null;
+	const order = (a: VideoSummary, b: VideoSummary) =>
+		a.season - b.season || a.episode - b.episode || a.id - b.id;
+	const after = videos.filter(
+		(v) =>
+			v.type === 'tv' &&
+			v.title === current.title &&
+			v.year === current.year &&
+			v.season > 0 &&
+			(v.season > current.season || (v.season === current.season && v.episode > current.episodeEnd))
+	);
+	return after.sort(order)[0] ?? null;
+}
+
 // withYear writes "Title (Year)", or just the title with no year.
 export function withYear(title: string, year: number): string {
 	return year ? `${title} (${year})` : title;

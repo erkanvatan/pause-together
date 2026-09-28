@@ -3,7 +3,6 @@ package library
 import (
 	"context"
 	"database/sql"
-	"errors"
 )
 
 // VideoSummary is a video as the picker lists it. Name fields are as in Video: 0 and "" mean none,
@@ -28,7 +27,7 @@ type VideoSummary struct {
 
 // VideoDetail is a video with the tracks the picker offers. Every lang is NormalizeLang's.
 type VideoDetail struct {
-	VideoSummary
+	VideoRef
 	Audio     []AudioInfo    `json:"audio"`
 	Subtitles []SubtitleInfo `json:"subtitles"`
 	Sidecars  []SidecarInfo  `json:"sidecars"`
@@ -60,6 +59,7 @@ type SidecarInfo struct {
 	Lang   string `json:"lang"`
 	Forced bool   `json:"forced"`
 	SDH    bool   `json:"sdh"`
+	Key    string `json:"key"` // its converted copy's /stream key
 }
 
 // summaryColumns match scanSummary. A removed library's videos are all missing, so "NOT missing" is
@@ -84,16 +84,14 @@ func (l *Libraries) Videos(ctx context.Context) ([]VideoSummary, error) {
 		func(rows *sql.Rows) (VideoSummary, error) { return scanSummary(rows) })
 }
 
-// VideoDetail returns a video that isn't missing, with its tracks, or ErrNotFound.
+// VideoDetail returns a video with its tracks, or ErrNotFound. Missing ones too: a room may still play
+// a missing video's prepared copy, with its subtitles.
 func (l *Libraries) VideoDetail(ctx context.Context, id int64) (VideoDetail, error) {
-	sum, err := scanSummary(l.DB.QueryRowContext(ctx, "SELECT"+summaryColumns+" WHERE v.id = ? AND NOT v.missing", id))
-	if errors.Is(err, sql.ErrNoRows) {
-		return VideoDetail{}, ErrNotFound
-	}
+	ref, err := l.Video(ctx, id)
 	if err != nil {
 		return VideoDetail{}, err
 	}
-	d := VideoDetail{VideoSummary: sum}
+	d := VideoDetail{VideoRef: ref}
 
 	d.Audio, err = queryList(ctx, l.DB, `
 		SELECT stream, codec, channels, lang, title, is_default FROM audio_tracks WHERE video_id = ? ORDER BY stream`,
@@ -119,10 +117,10 @@ func (l *Libraries) VideoDetail(ctx context.Context, id int64) (VideoDetail, err
 		return VideoDetail{}, err
 	}
 	d.Sidecars, err = queryList(ctx, l.DB, `
-		SELECT id, lang, forced, sdh FROM sidecar_subtitles WHERE video_id = ? ORDER BY name`,
+		SELECT id, lang, forced, sdh, cache_key FROM sidecar_subtitles WHERE video_id = ? ORDER BY name`,
 		func(rows *sql.Rows) (SidecarInfo, error) {
 			var s SidecarInfo
-			err := rows.Scan(&s.ID, &s.Lang, &s.Forced, &s.SDH)
+			err := rows.Scan(&s.ID, &s.Lang, &s.Forced, &s.SDH, &s.Key)
 			s.Lang, _ = NormalizeLang(s.Lang)
 			return s, err
 		}, id)

@@ -474,6 +474,14 @@ func TestSync(t *testing.T) {
 		sc.at(19_000)
 		sc.check("waiting", sc.waiting(), []Who{alice})
 	})
+
+	t.Run("video missing swap → the new video starts at the room's kept position, inside its length", func(t *testing.T) {
+		sc := newScene(t, hour)
+		sc.e = sc.s.Switch(videoRoom(2, hour, 40*60_000), sc.now)
+		sc.wantPos(40 * 60_000)
+		sc.e = sc.s.Switch(videoRoom(3, 30*60_000, 40*60_000), sc.now)
+		sc.wantPos(30 * 60_000)
+	})
 }
 
 func TestStateJSON(t *testing.T) {

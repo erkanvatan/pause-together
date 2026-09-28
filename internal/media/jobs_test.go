@@ -474,3 +474,29 @@ func TestFreeSpace(t *testing.T) {
 		t.Errorf("freeSpace = %d, %v; want > 0", free, err)
 	}
 }
+
+func TestJobsSubtitles(t *testing.T) {
+	q := newTestJobs(t)
+	job := testJob(1)
+	dir := filepath.Join(q.dir, job.Key())
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{videoFile, "10.vtt", "3.vtt", "x.vtt", "4.vtt.part", sidecarFile} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tt := range []struct {
+		key  string
+		want []int
+	}{
+		{job.Key(), []int{3, 10}},
+		{testJob(2).Key(), []int{}}, // no copy
+		{"../x", []int{}},
+	} {
+		if got := q.Subtitles(tt.key); !slices.Equal(got, tt.want) || got == nil {
+			t.Errorf("Subtitles(%q) = %#v, want %v", tt.key, got, tt.want)
+		}
+	}
+}

@@ -126,11 +126,14 @@ testdata/make.sh     makes the test clips in testdata/media (git-ignored)
 docs/plan.md         build order in slices, and how to work one
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
 web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
-                     picker.ts (pure picker logic: grouping, search, default audio and subtitle), Picker.svelte,
+                     picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode),
+                     Picker.svelte,
                      FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts,
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID),
-                     Player.svelte (the <video>, "Tap to join", controls, the follow loop), prefs.ts (per-device
-                     player settings in localStorage), time.ts (1:40:00);
+                     Player.svelte (the <video>, "Tap to join", controls, the follow loop, subtitle panel,
+                     fullscreen), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
+                     Subtitles.svelte (the subtitle overlay), prefs.ts (per-device player settings in
+                     localStorage), time.ts (1:40:00);
                      sync/ (pure): clock.ts (server clock offset), drift.ts (drift fix, follow step), state.ts
                      (target position, local intents), status.ts (what the player reports, and when),
                      timing.ts (its timing constants)
@@ -307,7 +310,7 @@ So each room's video is **prepared once**, then served as a plain file.
   - `-movflags +faststart`, so the index sits at the front and playback starts right away.
   - If the run fails, it runs once more without subtitles, so one broken subtitle track never costs a
     video that plays fine. That copy has no embedded subtitle files: check the folder, not the track
-    list, before offering one.
+    list, before offering one. The room's `prepare` message lists the ones the folder has.
   - Output goes to a `{key}.tmp` folder, renamed to `{key}` when done, so a half-written copy never
     looks finished, and every file of one run appears at once. Name the format (`-f mp4`), since ffmpeg
     guesses it from the extension. On start, delete leftover `*.tmp` folders.
@@ -368,7 +371,8 @@ So each room's video is **prepared once**, then served as a plain file.
 - A room plays one video at a time. Anyone can switch it with the library picker, and TV episodes also
   get a "Next episode" button, which never lands on a special. A switch starts at 0:00; only the "Video
   missing" swap keeps the position.
-- Before a switch, the switcher confirms: "You're at 1:40:00. Switch to …?" Nobody else is asked.
+- Before a switch, the switcher confirms: "You're at 1:40:00. Switch to …?" Nobody else is asked. Not
+  asked when nothing is lost: at 0:00, at the end, or the "Video missing" swap.
 - At the end of a video, the server (it knows the duration) pauses the room there. TV episodes show
   "Next episode". No autoplay.
 - Progress is per room only: the position is saved on pause, seek and switch, and every 5 s while

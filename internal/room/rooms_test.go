@@ -38,6 +38,13 @@ const fixture = `
 
 func newTestRooms(t *testing.T) *Rooms {
 	t.Helper()
+	r, _ := newTestRoomsCache(t)
+	return r
+}
+
+// newTestRoomsCache is newTestRooms that also returns its cache folder.
+func newTestRoomsCache(t *testing.T) (*Rooms, string) {
+	t.Helper()
 	db, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "test.db"), store.Migrations())
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +58,19 @@ func newTestRooms(t *testing.T) *Rooms {
 		t.Fatal(err)
 	}
 	// No worker runs, so jobs stay queued and Jobs.List shows every one.
-	return &Rooms{DB: db, Library: &library.Libraries{DB: db, Root: root}, Jobs: media.NewJobs(t.TempDir(), nil)}
+	cache := t.TempDir()
+	return &Rooms{DB: db, Library: &library.Libraries{DB: db, Root: root}, Jobs: media.NewJobs(cache, nil)}, cache
+}
+
+// makeReady puts a prepared copy of key in the cache, as a finished job leaves it.
+func makeReady(t *testing.T, cache, key string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(cache, key), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, key, "video.mp4"), []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func stream(n int) *int { return &n }
@@ -340,6 +359,99 @@ func TestSwitchResetsPosition(t *testing.T) {
 	}
 	if _, err := r.Switch(ctx, 99, pick(2, stream(1))); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown room: err = %v, want ErrNotFound", err)
+	}
+}
+
+// The "Video missing" swap: a room whose video is gone, with no prepared copy, can't play. The new
+// pick resumes where the room was. Any other switch starts at 0:00.
+func TestSwitchFromMissingVideo(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		missing, copy bool
+		want          int64
+	}{
+		{"missing, no copy: keeps the position", true, false, 6_000_000},
+		{"missing, copy ready: it still plays, so 0:00", true, true, 0},
+		{"there: 0:00", false, false, 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			r, cache := newTestRoomsCache(t)
+			rm := mustCreate(t, r, pick(1, stream(1)))
+			if tt.copy {
+				makeReady(t, cache, key(t, r, 1, stream(1)))
+			}
+			if _, err := r.DB.Exec("UPDATE rooms SET position_ms = 6000000 WHERE id = ?", rm.ID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := r.DB.Exec("UPDATE videos SET missing = ? WHERE id = 1", tt.missing); err != nil {
+				t.Fatal(err)
+			}
+			got, err := r.Switch(ctx, rm.ID, pick(2, stream(1)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.PositionMs != tt.want {
+				t.Errorf("position = %d, want %d", got.PositionMs, tt.want)
+			}
+		})
+	}
+}
+
+// A room may play a missing video's prepared copy: its subtitle can still change.
+func TestCheckSubtitleOfMissingVideo(t *testing.T) {
+	ctx := context.Background()
+	r := newTestRooms(t)
+	if _, err := r.DB.Exec("UPDATE videos SET missing = 1 WHERE id = 1"); err != nil {
+		t.Fatal(err)
+	}
+	sidecar := int64(1)
+	for _, sub := range []*Subtitle{nil, {Stream: stream(3)}, {Sidecar: &sidecar}} {
+		if err := r.checkSubtitle(ctx, 1, sub); err != nil {
+			t.Errorf("subtitle %+v: %v", sub, err)
+		}
+	}
+	for _, sub := range []*Subtitle{{Stream: stream(4)}, {Stream: stream(9)}} {
+		if err := r.checkSubtitle(ctx, 1, sub); !errors.Is(err, ErrBadPick) {
+			t.Errorf("subtitle %+v: err = %v, want ErrBadPick", sub, err)
+		}
+	}
+	if err := r.check(ctx, pick(1, stream(1))); !errors.Is(err, ErrBadPick) {
+		t.Errorf("picking the missing video: err = %v, want ErrBadPick", err)
+	}
+}
+
+func TestPlayableKey(t *testing.T) {
+	ctx := context.Background()
+	r, cache := newTestRoomsCache(t)
+	heat, gone := key(t, r, 1, stream(1)), key(t, r, 3, stream(1))
+	for _, tt := range []struct {
+		name  string
+		video int64
+		audio *int
+		ready string // a copy to make first
+		want  string
+	}{
+		{"there", 1, stream(1), "", heat},
+		{"gone, no copy", 3, stream(1), "", ""},
+		{"gone, copy ready", 3, stream(1), gone, gone},
+		{"audio track gone", 1, stream(9), "", ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.ready != "" {
+				makeReady(t, cache, tt.ready)
+			}
+			got, err := r.playableKey(ctx, tt.video, tt.audio)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("playableKey = %q, want %q", got, tt.want)
+			}
+		})
+	}
+	if _, err := r.playableKey(ctx, 99, nil); !errors.Is(err, library.ErrNotFound) {
+		t.Errorf("unknown video: err = %v, want ErrNotFound", err)
 	}
 }
 

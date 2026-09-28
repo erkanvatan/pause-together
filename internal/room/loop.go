@@ -26,14 +26,15 @@ type loop struct {
 	sync              *Sync
 	presence          Presence
 	sockets           []*socket
-	key               string  // the cache key of the room's prepared copy; "" when it can't be prepared
+	key               string  // the cache key of the room's prepared copy; "" when it can't play
 	prepare           Prepare // as last sent
 	watching, wasHere []Who   // as last sent
 	gone              bool    // deleted
 }
 
 func newLoop(h *Hub, rm Room) *loop {
-	return &loop{hub: h, id: rm.ID, in: make(chan func()), done: make(chan struct{}), room: rm}
+	return &loop{hub: h, id: rm.ID, in: make(chan func()), done: make(chan struct{}), room: rm,
+		prepare: Prepare{Subtitles: []int{}}}
 }
 
 // do runs f on the loop. It reports false when the loop has stopped: f never runs.
@@ -151,8 +152,7 @@ func (l *loop) intent(s *socket, m ClientMsg) {
 	case MsgPlayAnyway:
 		e = l.sync.PlayAnyway(now)
 	case MsgSubtitle:
-		p := Pick{VideoID: l.room.Video.ID, Audio: l.room.Audio, Subtitle: m.Subtitle}
-		if err := l.hub.Rooms.check(l.hub.ctx, p); err != nil {
+		if err := l.hub.Rooms.checkSubtitle(l.hub.ctx, l.room.Video.ID, m.Subtitle); err != nil {
 			snap()
 			return
 		}
@@ -226,31 +226,29 @@ func (l *loop) publish(now int64) {
 	l.hub.mu.Unlock()
 }
 
-// findKey looks up the cache key of the room's video and audio track.
+// findKey looks up the cache key of the room's video and audio track. A copy that is ready still plays
+// when its source is gone.
 func (l *loop) findKey() {
-	l.key = ""
-	j, missing, err := l.hub.Rooms.Library.PrepareJob(l.hub.ctx, l.room.Video.ID, l.room.Audio)
+	key, err := l.hub.Rooms.playableKey(l.hub.ctx, l.room.Video.ID, l.room.Audio)
 	if err != nil {
 		slog.Error("find prepare job", "room", l.id, "err", err)
-		return
 	}
-	if !missing {
-		l.key = j.Key()
-	}
+	l.key = key
 }
 
 // checkPrepare sends where the room's prepared copy stands, when that changed.
 func (l *loop) checkPrepare() {
-	var p Prepare
+	p := Prepare{Subtitles: []int{}}
 	if l.key != "" {
 		j := l.hub.Rooms.Jobs.Status(l.key)
 		// Whole percents: finer steps would send a message on every tick.
-		p = Prepare{State: j.State, Place: j.Place, Progress: math.Round(j.Progress*100) / 100, Error: j.Error}
+		p.State, p.Place, p.Progress, p.Error = j.State, j.Place, math.Round(j.Progress*100)/100, j.Error
 		if j.State == media.JobReady {
 			p.Key = l.key
+			p.Subtitles = l.hub.Rooms.Jobs.Subtitles(l.key)
 		}
 	}
-	if p == l.prepare {
+	if reflect.DeepEqual(p, l.prepare) {
 		return
 	}
 	l.prepare = p

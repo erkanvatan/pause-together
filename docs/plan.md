@@ -332,7 +332,7 @@ also the first check off `localhost`, which counts as secure and hides HTTPS-onl
 
 **Not here:** subtitles, fullscreen, switching.
 
-### [ ] 15. Player extras
+### [x] 15. Player extras
 
 **Goal:** the rest of the player.
 

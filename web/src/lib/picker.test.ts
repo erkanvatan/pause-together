@@ -7,6 +7,7 @@ import {
 	defaultSubtitle,
 	episodeCode,
 	langName,
+	nextEpisode,
 	search,
 	searchIndex,
 	searchKey,
@@ -111,12 +112,13 @@ describe('subtitleOptions', () => {
 	it('lists embedded tracks, then sidecars', () => {
 		const v: VideoDetail = {
 			...summary({}),
+			missing: false,
 			audio: [],
 			subtitles: [
 				{ stream: 3, lang: 'en', title: 'Signs', default: true, forced: true, sdh: false, unavailable: '' },
 				{ stream: 4, lang: 'tr', title: '', default: false, forced: false, sdh: false, unavailable: 'image' }
 			],
-			sidecars: [{ id: 9, lang: 'tr', forced: false, sdh: true }]
+			sidecars: [{ id: 9, lang: 'tr', forced: false, sdh: true, key: '' }]
 		};
 		expect(subtitleOptions(v)).toEqual([
 			{ key: 's3', choice: { stream: 3 }, lang: 'en', title: 'Signs', default: true, forced: true, sdh: false, unavailable: '' },
@@ -279,5 +281,37 @@ describe('shelves', () => {
 
 	it('leaves out empty types', () => {
 		expect(shelves([summary({ type: 'other', title: 'x' })], 'title').map((s) => s.type)).toEqual(['other']);
+	});
+});
+
+describe('nextEpisode', () => {
+	// ep makes an episode of Dark (2017) unless show says otherwise.
+	const ep = (id: number, season: number, episode: number, over: Partial<VideoSummary> = {}) =>
+		summary({ id, type: 'tv', title: 'Dark', year: 2017, season, episode, episodeEnd: episode, ...over });
+	const s1e1 = ep(1, 1, 1);
+	const s1e1e2 = ep(2, 1, 1, { episodeEnd: 2 });
+	const s1e2 = ep(3, 1, 2);
+	const s1e3 = ep(4, 1, 3);
+	const s1e5 = ep(5, 1, 5);
+	const s2e1 = ep(6, 2, 1);
+	const special = ep(7, 0, 1);
+	const s2e2 = ep(8, 2, 2);
+	const other = ep(9, 1, 2, { year: 2020 }); // another show with the same title
+	const movie = summary({ id: 10, title: 'Heat', year: 1995 });
+	const all = [s2e2, special, s1e5, s1e3, other, s2e1, s1e2, s1e1, movie];
+
+	it.each([
+		['the next one', s1e1, all, s1e2],
+		['after a two-episode file', s1e1e2, all, s1e3],
+		['over a gap', s1e3, all, s1e5],
+		['across a season end, past a special', s1e5, all, s2e1],
+		['the last episode', s2e2, all, null],
+		['from a special', special, all, null],
+		['the same show only', s1e1, [other, s1e3], s1e3],
+		['specials only after it', s1e5, [special], null],
+		['a movie', movie, all, null],
+		['two files of one episode: the first added', s1e1, [ep(12, 1, 2), ep(11, 1, 2)], ep(11, 1, 2)]
+	])('%s', (_, current, videos, want) => {
+		expect(nextEpisode(current, videos)).toEqual(want);
 	});
 });

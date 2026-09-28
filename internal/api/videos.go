@@ -17,7 +17,7 @@ func (s *server) listVideos(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, videos)
 }
 
-// getVideo returns one video with its tracks, once the picker has picked it.
+// getVideo returns one video with its tracks, missing ones too: the picker's pick, or a room's video.
 func (s *server) getVideo(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {

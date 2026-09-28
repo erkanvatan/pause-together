@@ -74,10 +74,20 @@ const server: ServerMessage[] = [
 		}
 	},
 	{ type: 'presence', watching: [alice], wasHere: [] },
-	{ type: 'prepare', prepare: { state: 'queued', place: 2, progress: 0, error: '', key: '' } },
 	{
 		type: 'prepare',
-		prepare: { state: 'ready', place: 0, progress: 0, error: '', key: '0123456789abcdef0123456789abcdef' }
+		prepare: { state: 'queued', place: 2, progress: 0, error: '', key: '', subtitles: [] }
+	},
+	{
+		type: 'prepare',
+		prepare: {
+			state: 'ready',
+			place: 0,
+			progress: 0,
+			error: '',
+			key: '0123456789abcdef0123456789abcdef',
+			subtitles: [3, 5]
+		}
 	},
 	{ type: 'paused', by: bob },
 	{ type: 'pong', t: 1234.5, serverMs: 98765 },

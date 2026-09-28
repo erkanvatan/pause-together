@@ -216,12 +216,13 @@ func (s *Sync) PlayAnyway(now int64) Effect {
 	return s.settle(now, Effect{Changed: true})
 }
 
-// Switch puts on the room's new video at 0:00, paused. Who has been ready once stays so: pressing
-// play waits for everyone to load the new video.
+// Switch puts on the room's new video, paused, at r's position: 0:00, or where the room was for the
+// "Video missing" swap. Who has been ready once stays so: pressing play waits for everyone to load the
+// new video.
 func (s *Sync) Switch(r Room, now int64) Effect {
 	s.load(r)
 	s.playing, s.running = false, false
-	s.positionMs, s.atMs = 0, now
+	s.positionMs, s.atMs = clamp(r.PositionMs, s.durationMs), now
 	for _, c := range s.clients {
 		c.skipped = false
 	}

@@ -91,6 +91,8 @@ type Prepare struct {
 	Progress float64 `json:"progress"` // running: 0 to 1
 	Error    string  `json:"error"`    // failed: media.FailNoSpace or FailPrepare
 	Key      string  `json:"key"`      // ready: the copy's /stream key
+	// Subtitles are the embedded subtitle streams the ready copy has as WebVTT. Never nil.
+	Subtitles []int `json:"subtitles"`
 }
 
 type PausedMsg struct {

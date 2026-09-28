@@ -149,8 +149,10 @@ func (r *Rooms) Create(ctx context.Context, p Pick) (Room, error) {
 	return r.opened(ctx, id)
 }
 
-// Switch changes a room's video, back to 0:00. The new video's prepare is queued, and the old one's
-// cancelled unless another room still needs it. An archived room can't switch.
+// Switch changes a room's video, back to 0:00. When the old video can't play any more (its source is
+// gone, with no prepared copy), this is the "Video missing" swap: the new video resumes at the room's
+// position. The new video's prepare is queued, and the old one's cancelled unless another room still
+// needs it. An archived room can't switch.
 func (r *Rooms) Switch(ctx context.Context, id int64, p Pick) (Room, error) {
 	if err := r.check(ctx, p); err != nil {
 		return Room{}, err
@@ -165,9 +167,17 @@ func (r *Rooms) Switch(ctx context.Context, id int64, p Pick) (Room, error) {
 	if old.Archived {
 		return Room{}, ErrArchived
 	}
+	oldKey, err := r.playableKey(ctx, old.videoID, old.Audio)
+	if err != nil {
+		return Room{}, err
+	}
+	var position int64
+	if oldKey == "" {
+		position = old.PositionMs
+	}
 	if _, err := r.DB.ExecContext(ctx, `
-		UPDATE rooms SET video_id = ?, audio_stream = ?, subtitle_stream = ?, subtitle_sidecar = ?, position_ms = 0
-		WHERE id = ?`, p.VideoID, p.Audio, stream, sidecar, id); err != nil {
+		UPDATE rooms SET video_id = ?, audio_stream = ?, subtitle_stream = ?, subtitle_sidecar = ?, position_ms = ?
+		WHERE id = ?`, p.VideoID, p.Audio, stream, sidecar, position, id); err != nil {
 		return Room{}, err
 	}
 	if err := r.need(ctx, p.VideoID, p.Audio); err != nil {
@@ -287,6 +297,19 @@ func (r *Rooms) need(ctx context.Context, videoID int64, audio *int) error {
 	return nil
 }
 
+// playableKey returns the cache key of a video and audio track's prepared copy, or "" when the video
+// can't play: its source is gone (file, library folder or audio track) and no copy is ready.
+func (r *Rooms) playableKey(ctx context.Context, videoID int64, audio *int) (string, error) {
+	j, missing, err := r.Library.PrepareJob(ctx, videoID, audio)
+	if err != nil {
+		return "", err
+	}
+	if missing && r.Jobs.Status(j.Key()).State != media.JobReady {
+		return "", nil
+	}
+	return j.Key(), nil
+}
+
 // release cancels the prepare of a video and audio track if no room that isn't archived still has
 // them. It runs after the room's own change, so the room no longer counts.
 func (r *Rooms) release(ctx context.Context, videoID int64, audio *int) error {
@@ -301,16 +324,13 @@ func (r *Rooms) release(ctx context.Context, videoID int64, audio *int) error {
 }
 
 // check returns ErrBadPick unless the video is there and playable, the audio track is one of its own
-// (or nil when it has none), and the subtitle is off, one of its text tracks, or one of its sidecars.
+// (or nil when it has none), and the subtitle is one subtitleOK takes.
 func (r *Rooms) check(ctx context.Context, p Pick) error {
-	d, err := r.Library.VideoDetail(ctx, p.VideoID)
-	if errors.Is(err, library.ErrNotFound) {
-		return ErrBadPick
-	}
+	d, err := r.detail(ctx, p.VideoID)
 	if err != nil {
 		return err
 	}
-	if d.Unplayable != "" {
+	if d.Missing || d.Unplayable != "" {
 		return ErrBadPick
 	}
 	if p.Audio == nil {
@@ -320,8 +340,32 @@ func (r *Rooms) check(ctx context.Context, p Pick) error {
 	} else if !slices.ContainsFunc(d.Audio, func(a library.AudioInfo) bool { return a.Stream == *p.Audio }) {
 		return ErrBadPick
 	}
+	return subtitleOK(d, p.Subtitle)
+}
+
+// checkSubtitle returns ErrBadPick unless the subtitle is off, or one of the video's text tracks or
+// sidecars. The video may be missing: its room may still play the prepared copy.
+func (r *Rooms) checkSubtitle(ctx context.Context, videoID int64, sub *Subtitle) error {
+	d, err := r.detail(ctx, videoID)
+	if err != nil {
+		return err
+	}
+	return subtitleOK(d, sub)
+}
+
+// detail returns a video's tracks. An unknown video is ErrBadPick.
+func (r *Rooms) detail(ctx context.Context, videoID int64) (library.VideoDetail, error) {
+	d, err := r.Library.VideoDetail(ctx, videoID)
+	if errors.Is(err, library.ErrNotFound) {
+		return d, ErrBadPick
+	}
+	return d, err
+}
+
+// subtitleOK returns ErrBadPick unless s is off, one of d's text tracks, or one of its sidecars.
+func subtitleOK(d library.VideoDetail, s *Subtitle) error {
 	ok := true
-	switch s := p.Subtitle; {
+	switch {
 	case s == nil:
 	case s.Stream != nil && s.Sidecar == nil:
 		ok = slices.ContainsFunc(d.Subtitles, func(t library.SubtitleInfo) bool {

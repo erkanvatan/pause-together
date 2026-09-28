@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -180,6 +181,27 @@ func (q *Jobs) Open(key, name string) (*os.File, error) {
 		return nil, fs.ErrNotExist
 	}
 	return os.Open(filepath.Join(q.dir, key, name))
+}
+
+// Subtitles returns the embedded subtitle streams key's copy has as WebVTT, in order. A copy made by the
+// run without subtitles has none, whatever its video's track list says. Never nil.
+func (q *Jobs) Subtitles(key string) []int {
+	streams := []int{}
+	if !validKey(key) {
+		return streams
+	}
+	entries, err := os.ReadDir(filepath.Join(q.dir, key))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		slog.Error("list prepared subtitles", "err", err)
+	}
+	for _, e := range entries {
+		n, ok := strings.CutSuffix(e.Name(), subtitleExt)
+		if s, err := strconv.Atoi(n); ok && err == nil && cacheFilePattern.MatchString(e.Name()) {
+			streams = append(streams, s)
+		}
+	}
+	slices.Sort(streams)
+	return streams
 }
 
 // Disk returns the bytes in the cache folder, half-written copies included, and the free bytes on
