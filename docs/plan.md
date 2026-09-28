@@ -265,7 +265,7 @@ quiet skip, or skip with a reason.
 **Not here:** WebSocket, playback, who's watching on room cards, "nobody watching" check for archive
 (slice 13).
 
-### [ ] 12. Sync logic (pure)
+### [x] 12. Sync logic (pure)
 
 **Goal:** the rules of sync, with no IO, fully tested on both sides.
 
@@ -298,6 +298,7 @@ quiet skip, or skip with a reason.
 - Presence: watching now / was here, 15 s grace, one entry per user. `GET /api/rooms` shows who's watching.
 - Prepare progress and queue place pushed to the room. "Room deleted" message.
 - Position saved on pause, seek, switch and every 5 s while playing. Archive only when nobody is watching.
+- The subtitle offset is saved too (`rooms` has no column for it yet) and loaded by `NewSync`.
 
 **Done when (tests):**
 - `httptest` + two socket clients: play from one reaches the other.

@@ -106,7 +106,8 @@ Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env`
 cmd/pausetogether/   main: config, wiring, both HTTP listeners
 internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only), SPA serving
 internal/room/       rooms (create, switch, rename, archive, delete) and the prepare jobs they need;
-                     (planned) room state, sync engine, presence, chat, WebSocket hub
+                     sync.go: one room's sync rules, pure (clock passed in); timing.go: its timing constants;
+                     (planned) room loop, presence, chat, WebSocket hub
 internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks,
                      scan queue with progress, add/remove libraries, folder picker, file watching; the picker's
                      video list and details, language codes (normalized to 2 letters), language defaults;
@@ -120,7 +121,9 @@ docs/plan.md         build order in slices, and how to work one
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
 web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle), Picker.svelte,
-                     FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts
+                     FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts;
+                     sync/ (pure): clock.ts (server clock offset), drift.ts, state.ts (target position,
+                     local intents), timing.ts (its timing constants)
 web/src/routes/      homepage (room list), rooms/[id] (room page), admin
 Dockerfile           web build → Go build → runtime image with Debian's ffmpeg; go-dev stage (also ffmpeg) for dev and tests
 compose.yml          production
