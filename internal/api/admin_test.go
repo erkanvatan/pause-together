@@ -11,9 +11,10 @@ import (
 
 	"github.com/erkanvatan/pause-together/internal/library"
 	"github.com/erkanvatan/pause-together/internal/media"
+	"github.com/erkanvatan/pause-together/internal/room"
 )
 
-// adminDeps adds Libraries, Scans and Jobs over a media folder holding two empty folders, Movies and TV.
+// adminDeps adds Libraries, Scans, Jobs and Rooms over a media folder holding two empty folders, Movies and TV.
 // No scan worker runs, so requested scans stay queued. The cache folder is empty.
 func adminDeps(t *testing.T) Deps {
 	t.Helper()
@@ -28,6 +29,7 @@ func adminDeps(t *testing.T) Deps {
 	d.Libraries = &library.Libraries{DB: users.DB, Root: root}
 	d.Scans = library.NewScans(&library.Scanner{DB: users.DB, Root: root})
 	d.Jobs = media.NewJobs(t.TempDir(), media.FFmpeg{})
+	d.Rooms = &room.Rooms{DB: users.DB, Library: d.Libraries, Jobs: d.Jobs}
 	return d
 }
 
@@ -58,6 +60,7 @@ func TestAdminRoutesOnlyOnAdminPort(t *testing.T) {
 		{http.MethodGet, "/api/admin/problems", ""},
 		{http.MethodGet, "/api/admin/jobs", ""},
 		{http.MethodPut, "/api/admin/languages", `{"audio":"","subtitles":["tr"]}`},
+		{http.MethodDelete, "/api/admin/rooms/1", ""},
 	}
 	build := fakeBuild()
 	for _, rt := range routes {
@@ -70,6 +73,11 @@ func TestAdminRoutesOnlyOnAdminPort(t *testing.T) {
 			// So the delete and scan routes find library 1.
 			if rec := adminRequest(admin, http.MethodPost, "/api/admin/libraries", `{"path":"TV","type":"tv"}`); rec.Code != http.StatusCreated {
 				t.Fatalf("add: status = %d", rec.Code)
+			}
+			// So the room delete finds room 1.
+			seedVideo(t, d, 1)
+			if rec := adminRequest(admin, http.MethodPost, "/api/rooms", `{"videoId":7,"audio":1}`); rec.Code != http.StatusCreated {
+				t.Fatalf("create room: status = %d (body %q)", rec.Code, rec.Body.String())
 			}
 			if rec := adminRequest(admin, rt.method, rt.path, rt.body); rec.Code >= 400 {
 				t.Errorf("admin: status = %d (body %q), want success", rec.Code, rec.Body.String())

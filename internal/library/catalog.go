@@ -69,10 +69,12 @@ const summaryColumns = `
 	v.group_name, v.duration_ms, v.codec_string, COALESCE(v.unplayable, ''), v.apple_only
 	FROM videos v JOIN libraries l ON l.id = v.library_id`
 
-func scanSummary(row interface{ Scan(...any) error }) (VideoSummary, error) {
+// scanSummary scans a row of summaryColumns. before gets the columns selected ahead of them.
+func scanSummary(row interface{ Scan(...any) error }, before ...any) (VideoSummary, error) {
 	var v VideoSummary
-	err := row.Scan(&v.ID, &v.Type, &v.Title, &v.Year, &v.Edition, &v.Version, &v.Season, &v.Episode,
-		&v.EpisodeEnd, &v.EpisodeTitle, &v.Group, &v.DurationMs, &v.CodecString, &v.Unplayable, &v.AppleOnly)
+	err := row.Scan(append(before, &v.ID, &v.Type, &v.Title, &v.Year, &v.Edition, &v.Version, &v.Season,
+		&v.Episode, &v.EpisodeEnd, &v.EpisodeTitle, &v.Group, &v.DurationMs, &v.CodecString, &v.Unplayable,
+		&v.AppleOnly)...)
 	return v, err
 }
 

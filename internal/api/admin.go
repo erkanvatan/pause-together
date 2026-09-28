@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -21,6 +20,7 @@ func (s *server) adminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/admin/problems", s.listProblems)
 	mux.HandleFunc("GET /api/admin/jobs", s.listJobs)
 	mux.HandleFunc("PUT /api/admin/languages", s.putLanguages)
+	mux.HandleFunc("DELETE /api/admin/rooms/{id}", s.deleteRoom)
 }
 
 // Error codes the admin page turns into text.
@@ -61,8 +61,7 @@ func (s *server) addLibrary(w http.ResponseWriter, r *http.Request) {
 		Path string       `json:"path"`
 		Type library.Type `json:"type"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errBadRequest)
+	if !decodeBody(w, r, &req) {
 		return
 	}
 	lib, err := s.Libraries.Add(r.Context(), req.Path, req.Type)
@@ -156,8 +155,7 @@ func (s *server) listJobs(w http.ResponseWriter, _ *http.Request) {
 
 func (s *server) putLanguages(w http.ResponseWriter, r *http.Request) {
 	var req library.Languages
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errBadRequest)
+	if !decodeBody(w, r, &req) {
 		return
 	}
 	langs, err := s.Libraries.SetLanguages(r.Context(), req)

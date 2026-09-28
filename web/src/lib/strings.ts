@@ -1,3 +1,5 @@
+const nameInvalid = 'Use 1 to 32 letters, numbers, spaces or punctuation. No emoji.';
+
 // Every piece of UI text lives here, so a Turkish version is one more object later.
 export const strings = {
 	locale: 'en', // for language names, and sorting titles
@@ -9,7 +11,7 @@ export const strings = {
 	save: 'Save',
 	cancel: 'Cancel',
 	rename: 'Change name',
-	nameInvalid: 'Use 1 to 32 letters, numbers, spaces or punctuation. No emoji.',
+	nameInvalid,
 	saveFailed: "Couldn't save your name. Try again.",
 	loadFailed: "Can't reach the server. Retrying…",
 
@@ -94,6 +96,26 @@ export const strings = {
 	},
 
 	watchSomething: 'Watch something',
+	rooms: 'Rooms',
+	noRooms: 'No rooms yet. Pick something to watch.',
+	archivedRooms: 'Archived',
+	archive: 'Archive',
+	unarchive: 'Unarchive',
+	deleteRoom: 'Delete',
+	deleteRoomConfirm: 'Delete this room for good?',
+	videoMissing: 'Video missing',
+	roomNotFound: 'This room is gone.',
+	roomArchived: 'This room is archived. Unarchive it to watch.',
+	switchVideo: 'Switch video',
+	renameRoom: 'Rename',
+	roomName: 'Room name',
+	roomNameHint: "Leave it blank to show the video's name.",
+	// Why a room change failed (the room API's error codes). Others show actionFailed.
+	roomErrors: {
+		'bad-pick': "That video can't be picked any more. Try another.",
+		'bad-name': nameInvalid,
+		archived: 'This room is archived.'
+	} as Record<string, string>,
 	pickVideo: 'Pick a video',
 	close: 'Close',
 	back: 'Back',

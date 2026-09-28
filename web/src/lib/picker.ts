@@ -4,17 +4,11 @@ import type {
 	AudioTrack,
 	Languages,
 	LibraryType,
+	SubtitleChoice,
 	VideoDetail,
 	VideoSummary
 } from '$lib/api';
 import { reasonText, strings } from '$lib/strings';
-
-// Pick is what the picker hands back: a video, its audio track (null: the video has none) and its
-// subtitle (null: off).
-export type Pick = { videoId: number; audio: number | null; subtitle: SubtitleChoice | null };
-
-// A subtitle the picker offers: an embedded track or a sidecar file, in one list.
-export type SubtitleChoice = { stream: number } | { sidecar: number };
 
 export type SubtitleOption = {
 	key: string; // unique in its video, for <select> values

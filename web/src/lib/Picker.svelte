@@ -6,6 +6,7 @@
 		listVideos,
 		type Languages,
 		type LibraryType,
+		type Pick,
 		type VideoDetail,
 		type VideoSummary
 	} from '$lib/api';
@@ -22,7 +23,6 @@
 		videoName,
 		whyUnplayable,
 		withYear,
-		type Pick,
 		type Sort
 	} from '$lib/picker';
 	import { strings } from '$lib/strings';

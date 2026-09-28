@@ -55,6 +55,25 @@ export type Languages = {
 	subtitles: string[]; // in order of preference
 };
 
+// Pick is a video, its audio track (null: the video has none) and its subtitle (null: off).
+export type Pick = { videoId: number; audio: number | null; subtitle: SubtitleChoice | null };
+
+// A subtitle: an embedded track or a sidecar file.
+export type SubtitleChoice = { stream: number } | { sidecar: number };
+
+// A room's video. Missing ones too: the room keeps its video's name.
+export type VideoRef = VideoSummary & { missing: boolean };
+
+export type Room = {
+	id: number;
+	name: string; // '' = none: show the video's name
+	video: VideoRef;
+	audio: number | null; // stream; null = the video has none
+	subtitle: SubtitleChoice | null; // null = off
+	positionMs: number;
+	archived: boolean;
+};
+
 // The server's error code, or 'failed' for no connection, a server error, or an unexpected body.
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -86,3 +105,19 @@ export const listVideos = () => call<VideoSummary[]>('GET', '/api/videos');
 export const getVideo = (id: number) => call<VideoDetail>('GET', `/api/videos/${id}`);
 
 export const getLanguages = () => call<Languages>('GET', '/api/languages');
+
+export const listRooms = () => call<Room[]>('GET', '/api/rooms');
+
+export const createRoom = (p: Pick) => call<Room>('POST', '/api/rooms', p);
+
+// openRoom loads a room for its page. The server starts preparing its video.
+export const openRoom = (id: number) => call<Room>('GET', `/api/rooms/${id}`);
+
+export const switchVideo = (id: number, p: Pick) => call<Room>('PUT', `/api/rooms/${id}/video`, p);
+
+// renameRoom sets a room's name; '' clears it.
+export const renameRoom = (id: number, name: string) =>
+	call<Room>('PUT', `/api/rooms/${id}/name`, { name });
+
+export const setArchived = (id: number, archived: boolean) =>
+	call<Room>('POST', `/api/rooms/${id}/${archived ? 'archive' : 'unarchive'}`);

@@ -80,7 +80,13 @@ type Jobs struct {
 	// queues it anew instead of counting the dying run.
 	cancelled bool
 	done      time.Duration // how much of the current job's video is done
-	failed    []JobStatus
+	failed    []failedJob
+}
+
+// failedJob keeps its job, so Cancel can find it by video.
+type failedJob struct {
+	job    Job
+	status JobStatus
 }
 
 // NewJobs returns an empty queue that prepares into dir with p. Run works through it.
@@ -96,7 +102,7 @@ func (q *Jobs) Add(j Job) {
 		return
 	}
 	q.mu.Lock()
-	q.failed = slices.DeleteFunc(q.failed, func(s JobStatus) bool { return s.Key == key })
+	q.failed = slices.DeleteFunc(q.failed, func(f failedJob) bool { return f.status.Key == key })
 	running := q.current != nil && !q.cancelled && q.current.Key() == key
 	if running || slices.ContainsFunc(q.queue, func(queued Job) bool { return queued.Key() == key }) {
 		q.mu.Unlock()
@@ -110,14 +116,21 @@ func (q *Jobs) Add(j Job) {
 	}
 }
 
-// Cancel drops a job nobody needs any more: out of the queue, stopped if it is running, and its
-// failure forgotten. A copy that is already ready stays.
-func (q *Jobs) Cancel(key string) {
+// Cancel drops the jobs of a video and audio stream (nil: no audio) nobody needs any more: out of the
+// queue, stopped if running, and their failures forgotten. It goes by video, not key: the file may have
+// changed since a job was queued, and with it the key. A copy that is already ready stays.
+func (q *Jobs) Cancel(videoID int64, audio *int) {
+	match := func(j Job) bool {
+		if j.VideoID != videoID || (j.Audio == nil) != (audio == nil) {
+			return false
+		}
+		return audio == nil || j.Audio.Stream == *audio
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	q.queue = slices.DeleteFunc(q.queue, func(j Job) bool { return j.Key() == key })
-	q.failed = slices.DeleteFunc(q.failed, func(s JobStatus) bool { return s.Key == key })
-	if q.current != nil && q.current.Key() == key {
+	q.queue = slices.DeleteFunc(q.queue, match)
+	q.failed = slices.DeleteFunc(q.failed, func(f failedJob) bool { return match(f.job) })
+	if q.current != nil && match(*q.current) {
 		q.cancel()
 		q.cancelled = true
 	}
@@ -138,7 +151,10 @@ func (q *Jobs) List() []JobStatus {
 	for i, j := range q.queue {
 		list = append(list, JobStatus{Key: j.Key(), Name: j.Name, State: JobQueued, Place: i + 1})
 	}
-	return append(list, q.failed...)
+	for _, f := range q.failed {
+		list = append(list, f.status)
+	}
+	return list
 }
 
 // Open opens a file of key's copy in the cache: a prepared video, one of its subtitle tracks, or a
@@ -289,12 +305,12 @@ func (q *Jobs) finish(ctx context.Context, j Job, err error) {
 		// Cancelled, or shutdown; rooms ask for it again when they need it.
 	case errors.Is(err, errNoSpace):
 		slog.Error("prepare", "video", j.Name, "err", err)
-		q.failed = append(q.failed, JobStatus{Key: j.Key(), Name: j.Name, State: JobFailed, Error: FailNoSpace,
-			Detail: strings.TrimPrefix(err.Error(), errNoSpace.Error()+": ")})
+		q.failed = append(q.failed, failedJob{j, JobStatus{Key: j.Key(), Name: j.Name, State: JobFailed,
+			Error: FailNoSpace, Detail: strings.TrimPrefix(err.Error(), errNoSpace.Error()+": ")}})
 	default:
 		slog.Error("prepare", "video", j.Name, "err", err)
-		q.failed = append(q.failed, JobStatus{Key: j.Key(), Name: j.Name, State: JobFailed, Error: FailPrepare,
-			Detail: err.Error()})
+		q.failed = append(q.failed, failedJob{j, JobStatus{Key: j.Key(), Name: j.Name, State: JobFailed,
+			Error: FailPrepare, Detail: err.Error()}})
 	}
 	q.cancel()
 	q.current, q.cancel = nil, nil

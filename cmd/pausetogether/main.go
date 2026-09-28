@@ -17,6 +17,7 @@ import (
 	"github.com/erkanvatan/pause-together/internal/api"
 	"github.com/erkanvatan/pause-together/internal/library"
 	"github.com/erkanvatan/pause-together/internal/media"
+	"github.com/erkanvatan/pause-together/internal/room"
 	"github.com/erkanvatan/pause-together/internal/store"
 	"github.com/erkanvatan/pause-together/internal/user"
 	"github.com/erkanvatan/pause-together/web"
@@ -119,12 +120,14 @@ func run() error {
 	}
 
 	build := web.Build()
+	libraries := &library.Libraries{DB: db, Root: mediaDir}
 	deps := api.Deps{
 		Users:       &user.Store{DB: db},
 		TokenCookie: cfg.tokenCookie,
-		Libraries:   &library.Libraries{DB: db, Root: mediaDir},
+		Libraries:   libraries,
 		Scans:       scans,
 		Jobs:        jobs,
+		Rooms:       &room.Rooms{DB: db, Library: libraries, Jobs: jobs},
 	}
 	servers := []*http.Server{
 		newServer(cfg.guestAddr, api.Guest(build, deps)),

@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -108,6 +109,44 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 }
 
+// cancel cancels a job by its video and audio stream, as rooms do.
+func (q *testJobs) cancel(j Job) {
+	q.Cancel(j.VideoID, &j.Audio.Stream)
+}
+
+// Cancel goes by video and audio stream: a job queued before its file changed goes too, and another
+// audio stream of the same video stays.
+func TestJobsCancelByVideo(t *testing.T) {
+	q := newTestJobs(t)
+	q.start(t)
+	q.Add(testJob(1))
+	q.started(t)
+	queued := testJob(2)
+	other := testJob(2)
+	other.Audio = &AudioTrack{Stream: 2}
+	noAudio := testJob(2)
+	noAudio.Audio = nil
+	q.Add(queued)
+	q.Add(other)
+	q.Add(noAudio)
+
+	changed := queued
+	changed.Size, changed.Mtime = 2000, 2 // the file as it is now: another key
+	q.Cancel(changed.VideoID, &changed.Audio.Stream)
+	var keys []string
+	for _, s := range q.List() {
+		keys = append(keys, s.Key)
+	}
+	if want := []string{testJob(1).Key(), other.Key(), noAudio.Key()}; !slices.Equal(keys, want) {
+		t.Errorf("after cancel: %v, want %v", keys, want)
+	}
+	q.Cancel(2, nil)
+	if l := q.List(); len(l) != 2 {
+		t.Errorf("after cancelling no audio: %+v, want jobs 1 and 2's other stream", l)
+	}
+	q.cancel(testJob(1))
+}
+
 func testJob(id int64) Job {
 	return Job{VideoID: id, Name: "video " + string(rune('0'+id)), Source: "/media/x.mkv",
 		Duration: 10 * time.Second, Size: 1000, Mtime: 1, Audio: &AudioTrack{Stream: 1}}
@@ -146,7 +185,7 @@ func TestJobsCancelMidJob(t *testing.T) {
 	if tmp := q.tmpLeft(t); len(tmp) != 1 {
 		t.Fatalf("tmp while running = %v, want one", tmp)
 	}
-	q.Cancel(job.Key())
+	q.cancel(job)
 	waitFor(t, "the queue to empty", func() bool { return len(q.List()) == 0 })
 	waitFor(t, "the tmp folder to go", func() bool { return len(q.tmpLeft(t)) == 0 })
 	if _, err := q.Open(job.Key(), videoFile); !errors.Is(err, fs.ErrNotExist) {
@@ -162,7 +201,7 @@ func TestJobsAddAgainWhileCancelling(t *testing.T) {
 	job := testJob(1)
 	q.Add(job)
 	q.started(t)
-	q.Cancel(job.Key())
+	q.cancel(job)
 	q.Add(job)
 	close(q.prep.afterCancel)
 	q.started(t) // runs again
@@ -192,7 +231,7 @@ func TestJobsCancelQueued(t *testing.T) {
 	q.Add(testJob(1))
 	q.started(t)
 	q.Add(testJob(2))
-	q.Cancel(testJob(2).Key())
+	q.cancel(testJob(2))
 	if l := q.List(); len(l) != 1 || l[0].Key != testJob(1).Key() {
 		t.Errorf("list = %+v, want only job 1", l)
 	}
@@ -277,7 +316,7 @@ func TestJobsCancelDropsFailure(t *testing.T) {
 	q.started(t)
 	q.prep.finish <- errors.New("boom")
 	waitFor(t, "the job to fail", func() bool { return len(q.List()) == 1 && q.List()[0].State == JobFailed })
-	q.Cancel(job.Key())
+	q.cancel(job)
 	if l := q.List(); len(l) != 0 {
 		t.Errorf("list = %+v, want empty", l)
 	}
@@ -308,11 +347,11 @@ func TestJobsPlaceInLine(t *testing.T) {
 		}
 	}
 
-	q.Cancel(testJob(2).Key())
+	q.cancel(testJob(2))
 	if l := q.List(); len(l) != 2 || l[1].Key != testJob(3).Key() || l[1].Place != 1 {
 		t.Errorf("after cancel: list = %+v, want job 3 first in line", l)
 	}
-	q.Cancel(testJob(1).Key())
+	q.cancel(testJob(1))
 	q.started(t) // job 3
 }
 

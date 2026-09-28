@@ -1,0 +1,175 @@
+<script lang="ts">
+	import { page } from '$app/state';
+	import Picker from '$lib/Picker.svelte';
+	import {
+		openRoom,
+		renameRoom,
+		setArchived,
+		switchVideo,
+		type Pick,
+		type Result,
+		type Room
+	} from '$lib/api';
+	import { videoName } from '$lib/picker';
+	import { roomTitle } from '$lib/rooms';
+	import { strings } from '$lib/strings';
+
+	// How soon a failed load tries again.
+	const loadRetryMs = 2000;
+
+	const id = $derived(Number(page.params.id));
+
+	let room = $state<Room | null>(null);
+	let notFound = $state(false);
+	let loadFailed = $state(false);
+	let error = $state(''); // why the last change failed
+	let picking = $state(false);
+	let renaming = $state(false);
+	let name = $state('');
+
+	// Opening the room starts preparing its video. It runs again when a link leads to another room,
+	// since that reuses this page.
+	$effect(() => {
+		const roomId = id;
+		let stopped = false;
+		let timer: ReturnType<typeof setTimeout>;
+		room = null;
+		notFound = false;
+		error = '';
+		picking = false;
+		renaming = false;
+		const load = async () => {
+			const r = await openRoom(roomId);
+			if (stopped) return;
+			loadFailed = !r.ok && r.error !== 'not-found';
+			if (r.ok) room = r.value;
+			else if (r.error === 'not-found') notFound = true;
+			else timer = setTimeout(load, loadRetryMs);
+		};
+		load();
+		return () => {
+			stopped = true;
+			clearTimeout(timer);
+		};
+	});
+
+	// apply shows a changed room, or why the change failed.
+	function apply(r: Result<Room>) {
+		if (r.ok) {
+			room = r.value;
+			error = '';
+		} else if (r.error === 'not-found') {
+			notFound = true;
+		} else {
+			error = strings.roomErrors[r.error] ?? strings.actionFailed;
+		}
+		return r.ok;
+	}
+
+	async function switchTo(p: Pick) {
+		picking = false;
+		apply(await switchVideo(id, p));
+	}
+
+	function startRename() {
+		name = room?.name ?? '';
+		renaming = true;
+	}
+
+	async function saveName(e: SubmitEvent) {
+		e.preventDefault();
+		if (apply(await renameRoom(id, name))) renaming = false;
+	}
+
+	// unarchive opens the room again afterwards: this page is open, so its video is needed.
+	async function unarchive() {
+		if (apply(await setArchived(id, false))) apply(await openRoom(id));
+	}
+</script>
+
+<svelte:head>
+	<title>{room ? `${roomTitle(room)} · ` : ''}{strings.appName}</title>
+</svelte:head>
+
+<main class="mx-auto flex max-w-3xl flex-col gap-4 p-4 pb-16">
+	{#if notFound}
+		<div class="flex flex-col items-center gap-3 pt-24">
+			<p class="text-neutral-400">{strings.roomNotFound}</p>
+			<a href="/" class="underline">{strings.backHome}</a>
+		</div>
+	{:else if room}
+		{#if renaming}
+			<form onsubmit={saveName} class="flex max-w-md flex-col gap-2">
+				<label for="room-name" class="text-sm text-neutral-400">{strings.roomName}</label>
+				<!-- No maxlength: it counts UTF-16 units, not runes. The server decides. -->
+				<!-- svelte-ignore a11y_autofocus -->
+				<input
+					id="room-name"
+					bind:value={name}
+					placeholder={videoName(room.video)}
+					autofocus
+					class="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 outline-none focus:border-neutral-400"
+				/>
+				<p class="text-sm text-neutral-400">{strings.roomNameHint}</p>
+				<div class="flex gap-2">
+					<button
+						type="submit"
+						class="rounded-md bg-neutral-100 px-3 py-1.5 font-medium text-neutral-950"
+					>
+						{strings.save}
+					</button>
+					<button
+						type="button"
+						onclick={() => (renaming = false)}
+						class="rounded-md border border-neutral-700 px-3 py-1.5 text-neutral-300"
+					>
+						{strings.cancel}
+					</button>
+				</div>
+			</form>
+		{:else}
+			<div class="flex flex-wrap items-baseline gap-3">
+				<h1 class="min-w-0 text-2xl font-bold break-words">{roomTitle(room)}</h1>
+				<button
+					onclick={startRename}
+					class="rounded-md border border-neutral-700 px-2.5 py-1 text-sm hover:bg-neutral-800"
+				>
+					{strings.renameRoom}
+				</button>
+			</div>
+		{/if}
+		{#if room.name}
+			<p class="break-words text-neutral-400">{videoName(room.video)}</p>
+		{/if}
+		{#if room.video.missing}
+			<p class="text-amber-400">{strings.videoMissing}</p>
+		{/if}
+
+		{#if error}
+			<p class="text-sm text-red-400" role="alert">{error}</p>
+		{/if}
+
+		{#if room.archived}
+			<p class="text-neutral-300">{strings.roomArchived}</p>
+			<button
+				onclick={unarchive}
+				class="self-start rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950"
+			>
+				{strings.unarchive}
+			</button>
+		{:else}
+			<button
+				onclick={() => (picking = true)}
+				class="self-start rounded-md border border-neutral-700 px-4 py-2 hover:bg-neutral-800"
+			>
+				{strings.switchVideo}
+			</button>
+		{/if}
+	{:else if loadFailed}
+		<p class="pt-24 text-center text-neutral-400">{strings.loadFailed}</p>
+	{/if}
+</main>
+
+{#if picking}
+	<Picker onpick={switchTo} onclose={() => (picking = false)} />
+{/if}

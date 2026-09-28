@@ -7,6 +7,7 @@ import (
 
 	"github.com/erkanvatan/pause-together/internal/library"
 	"github.com/erkanvatan/pause-together/internal/media"
+	"github.com/erkanvatan/pause-together/internal/room"
 	"github.com/erkanvatan/pause-together/internal/user"
 )
 
@@ -19,6 +20,7 @@ type Deps struct {
 	Libraries   *library.Libraries
 	Scans       *library.Scans // admin API only
 	Jobs        *media.Jobs    // prepared videos and subtitles, served under /stream
+	Rooms       *room.Rooms
 }
 
 // Guest returns the handler for the guest port: the whole app except the admin API.
@@ -50,6 +52,13 @@ func (s *server) mux(web fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/videos", s.listVideos)
 	mux.HandleFunc("GET /api/videos/{id}", s.getVideo)
 	mux.HandleFunc("GET /api/languages", s.getLanguages)
+	mux.HandleFunc("GET /api/rooms", s.listRooms)
+	mux.HandleFunc("POST /api/rooms", s.createRoom)
+	mux.HandleFunc("GET /api/rooms/{id}", s.openRoom)
+	mux.HandleFunc("PUT /api/rooms/{id}/video", s.switchVideo)
+	mux.HandleFunc("PUT /api/rooms/{id}/name", s.renameRoom)
+	mux.HandleFunc("POST /api/rooms/{id}/archive", s.setArchived(true))
+	mux.HandleFunc("POST /api/rooms/{id}/unarchive", s.setArchived(false))
 	mux.HandleFunc("GET /stream/{key}/{name}", s.streamFile)
 	if s.admin {
 		s.adminRoutes(mux)

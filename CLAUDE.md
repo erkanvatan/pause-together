@@ -93,9 +93,10 @@ Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env`
   (`localhost:5173`) and prod (`localhost:8421`) would otherwise overwrite each other's user.
 - `kill_delay` in `.air.toml` (6 s) must stay longer than `main.go`'s 5 s shutdown timeout, or reloads
   skip the clean shutdown.
-- Vite proxies only `/api`, `/stream` and `/ws` (and paths under them). A new Go URL prefix needs
-  its own entry in `web/vite.config.ts`, shaped like the others: a regex key (`'^/api(/|$)'`, so
-  `/streams` stays an SPA page) and an object value.
+- Vite proxies only `/api` and `/stream` (and paths under them), and `/ws` (exactly, plus a query
+  string). A new Go URL prefix needs its own entry in `web/vite.config.ts`, shaped like the others: a
+  regex key (`'^/api(/|$)'`, so `/streams` stays an SPA page) and an object value (why: see
+  `changeOrigin` under "Access and networking").
 - The Dockerfile's Go stage copies only `cmd/`, `internal/` and `web/embed.go`. A new top-level Go folder
   must be added there, or the prod build fails while dev still works.
 
@@ -104,10 +105,12 @@ Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env`
 ```
 cmd/pausetogether/   main: config, wiring, both HTTP listeners
 internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only), SPA serving
-internal/room/       (planned) room state, sync engine, presence, chat, WebSocket hub
+internal/room/       rooms (create, switch, rename, archive, delete) and the prepare jobs they need;
+                     (planned) room state, sync engine, presence, chat, WebSocket hub
 internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks,
                      scan queue with progress, add/remove libraries, folder picker, file watching; the picker's
-                     video list and details, language codes (normalized to 2 letters), language defaults
+                     video list and details, language codes (normalized to 2 letters), language defaults;
+                     a room's video and its prepare job
 internal/media/      ffprobe and the codec check; prepare jobs (ffmpeg arguments, job queue, cache in DATA_DIR/cache);
                      sidecar subtitles to WebVTT (encoding, ffmpeg over stdin)
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
@@ -115,8 +118,10 @@ internal/user/       name rules, users table (token stored as a SHA-256 hash), l
 testdata/make.sh     makes the test clips in testdata/media (git-ignored)
 docs/plan.md         build order in slices, and how to work one
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
-web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), picker.ts (pure picker logic:
-                     grouping, search, default audio and subtitle), Picker.svelte, strings.ts
+web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
+                     picker.ts (pure picker logic: grouping, search, default audio and subtitle), Picker.svelte,
+                     FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts
+web/src/routes/      homepage (room list), rooms/[id] (room page), admin
 Dockerfile           web build → Go build → runtime image with Debian's ffmpeg; go-dev stage (also ffmpeg) for dev and tests
 compose.yml          production
 compose.dev.yml      development
@@ -336,7 +341,10 @@ So each room's video is **prepared once**, then served as a plain file.
     audio's language, then the file's default track, then off.
   - Language codes are compared after normalizing to 2 letters where one exists (`eng`, `en` → `en`;
     `ger`, `deu` → `de`), on the server.
-- Rooms have an optional name. Without one, show the current video.
+- Rooms have an optional name, set on the room page. It follows the rules for user names; blank means
+  none. Without one, show the current video.
+- A deleted room's id is never reused (`AUTOINCREMENT`), so an old link or open tab can't lead to
+  another room.
 - The homepage lists every room with its current video and who's watching. It polls `GET /api/rooms`
   every 5 s while the tab is visible, and right away when it becomes visible again.
 - Rooms live until the host deletes them. Then the server sends "room deleted" to everyone in it, and

@@ -245,7 +245,7 @@ quiet skip, or skip with a reason.
 
 **Not here:** rooms.
 
-### [ ] 11. Rooms
+### [x] 11. Rooms
 
 **Goal:** rooms exist, list on the homepage, and start a prepare when opened.
 

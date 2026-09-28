@@ -54,6 +54,9 @@ export const listProblems = () => call<Problems>('GET', '/api/admin/problems');
 
 export const listJobs = () => call<Jobs>('GET', '/api/admin/jobs');
 
+// deleteRoom deletes a room for good. Its videos stay.
+export const deleteRoom = (id: number) => call<void>('DELETE', `/api/admin/rooms/${id}`);
+
 // setLanguages returns the defaults as saved: codes normalized, duplicates dropped.
 export const setLanguages = (langs: Languages) =>
 	call<Languages>('PUT', '/api/admin/languages', langs);
