@@ -103,6 +103,14 @@ func TestSync(t *testing.T) {
 		}
 	})
 
+	t.Run("the server loads a room's subtitle offset with it", func(t *testing.T) {
+		r := videoRoom(1, hour, 0)
+		r.SubtitleOffsetMs = -1500
+		if got := NewSync(r, 0).State(0).SubtitleOffsetMs; got != -1500 {
+			t.Errorf("offset = %d, want -1500", got)
+		}
+	})
+
 	t.Run("Bob presses play: the server applies it and sends the full state", func(t *testing.T) {
 		sc := newScene(t, hour)
 		sc.join(alice)

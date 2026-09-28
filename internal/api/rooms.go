@@ -13,9 +13,16 @@ const (
 	errBadPick  = "bad-pick"
 	errBadName  = "bad-name"
 	errArchived = "archived"
+	errWatching = "watching" // archive refused: someone is in the room
 	// The room page tells a room that is gone from a failed connection by this code.
 	errRoomNotFound = "not-found"
 )
+
+// roomCard is a room on the homepage, with who's watching it.
+type roomCard struct {
+	room.Room
+	Watching []room.Who `json:"watching"`
+}
 
 func (s *server) listRooms(w http.ResponseWriter, r *http.Request) {
 	rooms, err := s.Rooms.List(r.Context())
@@ -23,7 +30,11 @@ func (s *server) listRooms(w http.ResponseWriter, r *http.Request) {
 		internalError(w, "list rooms", err)
 		return
 	}
-	writeJSON(w, rooms)
+	cards := make([]roomCard, len(rooms))
+	for i, rm := range rooms {
+		cards[i] = roomCard{Room: rm, Watching: s.Hub.Watching(rm.ID)}
+	}
+	writeJSON(w, cards)
 }
 
 func (s *server) createRoom(w http.ResponseWriter, r *http.Request) {
@@ -59,6 +70,9 @@ func (s *server) switchVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rm, err := s.Rooms.Switch(r.Context(), id, p)
+	if err == nil {
+		s.Hub.Switched(rm)
+	}
 	writeRoom(w, "switch video", rm, err)
 }
 
@@ -74,17 +88,21 @@ func (s *server) renameRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rm, err := s.Rooms.Rename(r.Context(), id, req.Name)
+	if err == nil {
+		s.Hub.Changed(rm)
+	}
 	writeRoom(w, "rename room", rm, err)
 }
 
-// setArchived returns the handler that archives a room, or unarchives it.
+// setArchived returns the handler that archives a room, or unarchives it. Archiving is refused while
+// someone is watching.
 func (s *server) setArchived(archived bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, ok := roomID(w, r)
 		if !ok {
 			return
 		}
-		rm, err := s.Rooms.SetArchived(r.Context(), id, archived)
+		rm, err := s.Hub.SetArchived(r.Context(), id, archived)
 		writeRoom(w, "archive room", rm, err)
 	}
 }
@@ -99,6 +117,7 @@ func (s *server) deleteRoom(w http.ResponseWriter, r *http.Request) {
 		roomError(w, "delete room", err)
 		return
 	}
+	s.Hub.Deleted(id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -130,6 +149,8 @@ func roomError(w http.ResponseWriter, what string, err error) {
 		writeError(w, http.StatusBadRequest, errBadName)
 	case errors.Is(err, room.ErrArchived):
 		writeError(w, http.StatusConflict, errArchived)
+	case errors.Is(err, room.ErrWatching):
+		writeError(w, http.StatusConflict, errWatching)
 	default:
 		internalError(w, what, err)
 	}

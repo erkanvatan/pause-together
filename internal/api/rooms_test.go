@@ -41,12 +41,12 @@ func TestRooms(t *testing.T) {
 		want         string // the whole body; "" = not checked
 	}{
 		{"create", guest, http.MethodPost, "/api/rooms", `{"videoId":7,"audio":1,"subtitle":null}`, http.StatusCreated,
-			`{"id":1,"name":"",` + heat + `,"audio":1,"subtitle":null,"positionMs":0,"archived":false}`},
+			`{"id":1,"name":"",` + heat + `,"audio":1,"subtitle":null,"positionMs":0,"subtitleOffsetMs":0,"archived":false}`},
 		{"create, bad pick", guest, http.MethodPost, "/api/rooms", `{"videoId":7,"audio":2}`, http.StatusBadRequest,
 			`{"error":"bad-pick"}`},
 		{"create, bad JSON", guest, http.MethodPost, "/api/rooms", `{`, http.StatusBadRequest, `{"error":"bad-request"}`},
 		{"list", guest, http.MethodGet, "/api/rooms", "", http.StatusOK,
-			`[{"id":1,"name":"",` + heat + `,"audio":1,"subtitle":null,"positionMs":0,"archived":false}]`},
+			`[{"id":1,"name":"",` + heat + `,"audio":1,"subtitle":null,"positionMs":0,"subtitleOffsetMs":0,"archived":false,"watching":[]}]`},
 		{"open", guest, http.MethodGet, "/api/rooms/1", "", http.StatusOK, ""},
 		{"open unknown", guest, http.MethodGet, "/api/rooms/2", "", http.StatusNotFound, `{"error":"not-found"}`},
 		{"open malformed", guest, http.MethodGet, "/api/rooms/x", "", http.StatusNotFound, `{"error":"not-found"}`},
@@ -59,7 +59,7 @@ func TestRooms(t *testing.T) {
 			http.StatusBadRequest, `{"error":"bad-pick"}`},
 		{"switch unknown", guest, http.MethodPut, "/api/rooms/2/video", `{"videoId":7,"audio":1}`, http.StatusNotFound, `{"error":"not-found"}`},
 		{"archive", guest, http.MethodPost, "/api/rooms/1/archive", "", http.StatusOK,
-			`{"id":1,"name":"Movie night",` + heat + `,"audio":1,"subtitle":null,"positionMs":0,"archived":true}`},
+			`{"id":1,"name":"Movie night",` + heat + `,"audio":1,"subtitle":null,"positionMs":0,"subtitleOffsetMs":0,"archived":true}`},
 		{"switch archived", guest, http.MethodPut, "/api/rooms/1/video", `{"videoId":7,"audio":1}`,
 			http.StatusConflict, `{"error":"archived"}`},
 		{"unarchive", guest, http.MethodPost, "/api/rooms/1/unarchive", "", http.StatusOK, ""},

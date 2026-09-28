@@ -355,6 +355,31 @@ func TestJobsPlaceInLine(t *testing.T) {
 	q.started(t) // job 3
 }
 
+func TestJobsStatus(t *testing.T) {
+	q := newTestJobs(t)
+	q.start(t)
+	running, queued, none := testJob(1), testJob(2), testJob(3)
+	q.Add(running)
+	q.started(t)
+	q.Add(queued)
+	for _, tt := range []struct {
+		job  Job
+		want JobStatus
+	}{
+		{running, JobStatus{Key: running.Key(), Name: running.Name, State: JobRunning, Progress: 0.5}},
+		{queued, JobStatus{Key: queued.Key(), Name: queued.Name, State: JobQueued, Place: 1}},
+		{none, JobStatus{Key: none.Key()}},
+	} {
+		if got := q.Status(tt.job.Key()); got != tt.want {
+			t.Errorf("Status(%s) = %+v, want %+v", tt.job.Name, got, tt.want)
+		}
+	}
+	q.prep.finish <- nil
+	waitFor(t, "job 1 to be ready", func() bool { return q.Status(running.Key()).State == JobReady })
+	q.started(t) // job 2
+	q.cancel(queued)
+}
+
 func TestJobsAddDone(t *testing.T) {
 	q := newTestJobs(t)
 	job := testJob(1)

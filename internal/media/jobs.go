@@ -18,6 +18,7 @@ import (
 
 // Job states for JobStatus.
 const (
+	JobReady   = "ready" // Status only: the copy is in the cache
 	JobRunning = "running"
 	JobQueued  = "queued"
 	JobFailed  = "failed"
@@ -155,6 +156,20 @@ func (q *Jobs) List() []JobStatus {
 		list = append(list, f.status)
 	}
 	return list
+}
+
+// Status returns where key's copy stands: JobReady once it is in the cache, else its job as List shows
+// it, else a JobStatus with no State: no job.
+func (q *Jobs) Status(key string) JobStatus {
+	if q.ready(key) {
+		return JobStatus{Key: key, State: JobReady}
+	}
+	for _, j := range q.List() {
+		if j.Key == key {
+			return j
+		}
+	}
+	return JobStatus{Key: key}
 }
 
 // Open opens a file of key's copy in the cache: a prepared video, one of its subtitle tracks, or a

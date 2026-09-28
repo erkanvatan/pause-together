@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -33,14 +34,18 @@ type config struct {
 	// tokenCookie names the user cookie. Dev sets its own: cookies ignore the port, so dev and prod
 	// on localhost would otherwise overwrite each other's.
 	tokenCookie string
+	// buildID tells open pages from another build to reload. Dev sets one fixed ID for Go and Vite,
+	// or its pages would reload forever.
+	buildID string
 }
 
-func loadConfig() config {
+func loadConfig(build fs.FS) config {
 	return config{
 		guestAddr:   envOr("GUEST_ADDR", ":8080"),
 		adminAddr:   envOr("ADMIN_ADDR", ":8081"),
 		dataDir:     envOr("DATA_DIR", "/data"),
 		tokenCookie: envOr("TOKEN_COOKIE", "pt_token"),
+		buildID:     envOr("BUILD_ID", web.BuildID(build)),
 	}
 }
 
@@ -60,7 +65,11 @@ func main() {
 }
 
 func run() error {
-	cfg := loadConfig()
+	build := web.Build()
+	cfg := loadConfig(build)
+	if cfg.buildID == "" {
+		return errors.New("no build ID: set BUILD_ID, or embed a web build")
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -107,11 +116,16 @@ func run() error {
 	if watcher != nil {
 		wg.Go(func() { watcher.Run(bgCtx) })
 	}
-	// Runs before db.Close: the backup loop, the scans and the watcher must stop before the database
-	// closes. It also waits for a running prepare job to stop and delete its half-written copy.
+	libraries := &library.Libraries{DB: db, Root: mediaDir}
+	rooms := &room.Rooms{DB: db, Library: libraries, Jobs: jobs}
+	hub := room.NewHub(bgCtx, rooms, cfg.buildID)
+	// Runs before db.Close: the backup loop, the scans, the watcher and the room loops must stop before
+	// the database closes. It also waits for a running prepare job to stop and delete its half-written
+	// copy.
 	defer func() {
 		stopBackground()
 		wg.Wait()
+		hub.Wait()
 	}()
 	// Every library is scanned once at startup. If that can't start, the server still serves; the
 	// admin page can rescan.
@@ -119,15 +133,14 @@ func run() error {
 		slog.Error("startup scan", "err", err)
 	}
 
-	build := web.Build()
-	libraries := &library.Libraries{DB: db, Root: mediaDir}
 	deps := api.Deps{
 		Users:       &user.Store{DB: db},
 		TokenCookie: cfg.tokenCookie,
 		Libraries:   libraries,
 		Scans:       scans,
 		Jobs:        jobs,
-		Rooms:       &room.Rooms{DB: db, Library: libraries, Jobs: jobs},
+		Rooms:       rooms,
+		Hub:         hub,
 	}
 	servers := []*http.Server{
 		newServer(cfg.guestAddr, api.Guest(build, deps)),

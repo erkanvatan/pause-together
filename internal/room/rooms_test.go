@@ -424,3 +424,73 @@ func TestDeletedIDNotReused(t *testing.T) {
 		t.Errorf("new room got deleted room's id %d", last.ID)
 	}
 }
+
+func TestSaveState(t *testing.T) {
+	ctx := context.Background()
+	r := newTestRooms(t)
+	sidecar := int64(1)
+	rm := mustCreate(t, r, Pick{VideoID: 1, Audio: stream(1)})
+
+	st := State{VideoID: 1, PositionMs: 90_000, Subtitle: &Subtitle{Sidecar: &sidecar}, SubtitleOffsetMs: -1500}
+	if err := r.SaveState(ctx, rm.ID, st); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.Open(ctx, rm.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.PositionMs != 90_000 || got.SubtitleOffsetMs != -1500 || got.Subtitle == nil ||
+		got.Subtitle.Sidecar == nil || *got.Subtitle.Sidecar != 1 {
+		t.Errorf("saved %+v", got)
+	}
+
+	// A save for the video the room played before a switch changes nothing.
+	if err := r.SaveState(ctx, rm.ID, State{VideoID: 2, PositionMs: 5000}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := r.Open(ctx, rm.ID); got.PositionMs != 90_000 {
+		t.Errorf("save for another video: position = %d, want 90000", got.PositionMs)
+	}
+
+	// A sidecar the scan deleted is saved as off.
+	if _, err := r.DB.Exec("DELETE FROM sidecar_subtitles WHERE id = 1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.SaveState(ctx, rm.ID, st); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := r.Open(ctx, rm.ID); got.Subtitle != nil {
+		t.Errorf("deleted sidecar: subtitle = %+v, want off", got.Subtitle)
+	}
+}
+
+func TestVisitors(t *testing.T) {
+	ctx := context.Background()
+	r := newTestRooms(t)
+	if _, err := r.DB.Exec(`INSERT INTO users (id, token_hash, name) VALUES (1, x'01', 'Bob'), (2, x'02', 'Alice')`); err != nil {
+		t.Fatal(err)
+	}
+	a := mustCreate(t, r, pick(1, stream(1)))
+	b := mustCreate(t, r, pick(2, stream(1)))
+	for _, v := range []struct{ room, user int64 }{{a.ID, 1}, {a.ID, 2}, {a.ID, 1}, {b.ID, 2}} {
+		if err := r.Visit(ctx, v.room, v.user); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := r.Visitors(ctx, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []Who{{UserID: 2, Name: "Alice"}, {UserID: 1, Name: "Bob"}}; !slices.Equal(got, want) {
+		t.Errorf("visitors = %v, want %v", got, want)
+	}
+
+	// Deleting a room deletes its visitors, not the users.
+	if err := r.Delete(ctx, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := r.DB.QueryRow("SELECT count(*) FROM room_visitors").Scan(&n); err != nil || n != 1 {
+		t.Errorf("visitor rows after delete = %d (err %v), want 1", n, err)
+	}
+}

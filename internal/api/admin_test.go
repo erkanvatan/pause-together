@@ -14,7 +14,10 @@ import (
 	"github.com/erkanvatan/pause-together/internal/room"
 )
 
-// adminDeps adds Libraries, Scans, Jobs and Rooms over a media folder holding two empty folders, Movies and TV.
+// testBuildID is the build ID the hub sends in tests.
+const testBuildID = "test-build"
+
+// adminDeps adds Libraries, Scans, Jobs, Rooms and a Hub over a media folder holding two empty folders, Movies and TV.
 // No scan worker runs, so requested scans stay queued. The cache folder is empty.
 func adminDeps(t *testing.T) Deps {
 	t.Helper()
@@ -30,6 +33,8 @@ func adminDeps(t *testing.T) Deps {
 	d.Scans = library.NewScans(&library.Scanner{DB: users.DB, Root: root})
 	d.Jobs = media.NewJobs(t.TempDir(), media.FFmpeg{})
 	d.Rooms = &room.Rooms{DB: users.DB, Library: d.Libraries, Jobs: d.Jobs}
+	d.Hub = room.NewHub(t.Context(), d.Rooms, testBuildID)
+	t.Cleanup(d.Hub.Wait) // before the database closes: cleanups run last-in first-out
 	return d
 }
 

@@ -8,7 +8,7 @@ export function roomTitle(r: Room): string {
 }
 
 // splitArchived splits rooms into the ones in use and the archived ones, each in the order given.
-export function splitArchived(rooms: Room[]): { active: Room[]; archived: Room[] } {
+export function splitArchived<R extends Room>(rooms: R[]): { active: R[]; archived: R[] } {
 	return {
 		active: rooms.filter((r) => !r.archived),
 		archived: rooms.filter((r) => r.archived)

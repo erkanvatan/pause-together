@@ -95,6 +95,7 @@ func NewSync(r Room, now int64) *Sync {
 	s := &Sync{atMs: now}
 	s.load(r)
 	s.positionMs = clamp(r.PositionMs, s.durationMs)
+	s.subtitleOffsetMs = r.SubtitleOffsetMs
 	s.sent = s.State(now)
 	return s
 }

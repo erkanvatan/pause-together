@@ -71,8 +71,15 @@ export type Room = {
 	audio: number | null; // stream; null = the video has none
 	subtitle: SubtitleChoice | null; // null = off
 	positionMs: number;
+	subtitleOffsetMs: number; // positive shows the subtitle later
 	archived: boolean;
 };
+
+// A user as rooms show them.
+export type Who = { userId: number; name: string };
+
+// A room on the homepage, with who's watching it now.
+export type RoomCard = Room & { watching: Who[] };
 
 // The server's error code, or 'failed' for no connection, a server error, or an unexpected body.
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -106,7 +113,7 @@ export const getVideo = (id: number) => call<VideoDetail>('GET', `/api/videos/${
 
 export const getLanguages = () => call<Languages>('GET', '/api/languages');
 
-export const listRooms = () => call<Room[]>('GET', '/api/rooms');
+export const listRooms = () => call<RoomCard[]>('GET', '/api/rooms');
 
 export const createRoom = (p: Pick) => call<Room>('POST', '/api/rooms', p);
 

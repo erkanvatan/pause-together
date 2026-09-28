@@ -91,6 +91,9 @@ Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env`
 - Go reads `GUEST_ADDR`, `ADMIN_ADDR`, `DATA_DIR` and `TOKEN_COOKIE` (defaults `:8080`, `:8081`,
   `/data`, `pt_token`). Dev sets `TOKEN_COOKIE=pt_token_dev`: cookies ignore the port, so dev
   (`localhost:5173`) and prod (`localhost:8421`) would otherwise overwrite each other's user.
+- Go also reads `BUILD_ID`; without it, the ID comes from the embedded web build. Dev sets
+  `BUILD_ID=dev` on both containers (`svelte.config.js` reads it too), or Vite's pages would never
+  match Go's ID and would reload forever.
 - `kill_delay` in `.air.toml` (6 s) must stay longer than `main.go`'s 5 s shutdown timeout, or reloads
   skip the clean shutdown.
 - Vite proxies only `/api` and `/stream` (and paths under them), and `/ws` (exactly, plus a query
@@ -107,7 +110,8 @@ cmd/pausetogether/   main: config, wiring, both HTTP listeners
 internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only), SPA serving
 internal/room/       rooms (create, switch, rename, archive, delete) and the prepare jobs they need;
                      sync.go: one room's sync rules, pure (clock passed in); timing.go: its timing constants;
-                     (planned) room loop, presence, chat, WebSocket hub
+                     hub.go (sockets, one loop per room with people in it), loop.go (a room's goroutine),
+                     presence.go (pure), protocol.go (socket messages); (planned) chat
 internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks,
                      scan queue with progress, add/remove libraries, folder picker, file watching; the picker's
                      video list and details, language codes (normalized to 2 letters), language defaults;
@@ -121,7 +125,8 @@ docs/plan.md         build order in slices, and how to work one
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
 web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle), Picker.svelte,
-                     FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts;
+                     FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts,
+                     protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID);
                      sync/ (pure): clock.ts (server clock offset), drift.ts, state.ts (target position,
                      local intents), timing.ts (its timing constants)
 web/src/routes/      homepage (room list), rooms/[id] (room page), admin
@@ -140,7 +145,8 @@ container mount for source files, and one name for two things gets mixed up in c
 - Unknown `/api/*` and `/stream/*` paths return 404. Only other paths fall back to `index.html`.
 - `index.html` is served with `Cache-Control: no-cache`, `_app/immutable/*` as immutable.
 - The server sends its build ID when a socket connects. If it doesn't match the page's, the page
-  reloads. So after a deploy, open tabs never run old JS against the new server.
+  reloads. So after a deploy, open tabs never run old JS against the new server. The ID is SvelteKit's
+  `version`: the page has it from `$app/environment`, Go reads it from `_app/version.json` in the build.
 
 ## Access and networking
 

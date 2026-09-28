@@ -42,7 +42,9 @@ type Room struct {
 	Audio      *int             `json:"audio"`
 	Subtitle   *Subtitle        `json:"subtitle"`
 	PositionMs int64            `json:"positionMs"`
-	Archived   bool             `json:"archived"`
+	// SubtitleOffsetMs shifts the subtitle: positive shows it later.
+	SubtitleOffsetMs int64 `json:"subtitleOffsetMs"`
+	Archived         bool  `json:"archived"`
 }
 
 // Rooms keeps rooms in the database, and asks Jobs for the prepared copies they need.
@@ -56,7 +58,7 @@ type Rooms struct {
 	mu sync.Mutex
 }
 
-const roomColumns = "id, name, video_id, audio_stream, subtitle_stream, subtitle_sidecar, position_ms, archived"
+const roomColumns = "id, name, video_id, audio_stream, subtitle_stream, subtitle_sidecar, position_ms, subtitle_offset_ms, archived"
 
 // row is a room as stored: Room without its video's details.
 type row struct {
@@ -68,7 +70,7 @@ func scanRow(r interface{ Scan(...any) error }) (row, error) {
 	var rw row
 	var subStream *int
 	var subSidecar *int64
-	err := r.Scan(&rw.ID, &rw.Name, &rw.videoID, &rw.Audio, &subStream, &subSidecar, &rw.PositionMs, &rw.Archived)
+	err := r.Scan(&rw.ID, &rw.Name, &rw.videoID, &rw.Audio, &subStream, &subSidecar, &rw.PositionMs, &rw.SubtitleOffsetMs, &rw.Archived)
 	if subStream != nil || subSidecar != nil {
 		rw.Subtitle = &Subtitle{Stream: subStream, Sidecar: subSidecar}
 	}
@@ -226,6 +228,44 @@ func (r *Rooms) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 	return r.release(ctx, rw.videoID, rw.Audio)
+}
+
+// SaveState stores the room state the loop keeps: position (st.PositionMs, as is), subtitle and offset.
+// It writes only while the room still plays st's video, so a save that lands after a switch can't
+// carry the old video's position over. A sidecar the scan has deleted since is saved as off.
+func (r *Rooms) SaveState(ctx context.Context, id int64, st State) error {
+	stream, sidecar := Pick{Subtitle: st.Subtitle}.subtitle()
+	_, err := r.DB.ExecContext(ctx, `
+		UPDATE rooms SET position_ms = ?, subtitle_stream = ?,
+			subtitle_sidecar = (SELECT id FROM sidecar_subtitles WHERE id = ?), subtitle_offset_ms = ?
+		WHERE id = ? AND video_id = ?`, st.PositionMs, stream, sidecar, st.SubtitleOffsetMs, id, st.VideoID)
+	return err
+}
+
+// Visit records that a user joined a room, for its "was here" list.
+func (r *Rooms) Visit(ctx context.Context, roomID, userID int64) error {
+	_, err := r.DB.ExecContext(ctx, "INSERT OR IGNORE INTO room_visitors (room_id, user_id) VALUES (?, ?)", roomID, userID)
+	return err
+}
+
+// Visitors returns everyone who ever joined a room, with their current names.
+func (r *Rooms) Visitors(ctx context.Context, roomID int64) ([]Who, error) {
+	rows, err := r.DB.QueryContext(ctx, `
+		SELECT u.id, u.name FROM room_visitors v JOIN users u ON u.id = v.user_id
+		WHERE v.room_id = ? ORDER BY u.name, u.id`, roomID)
+	if err != nil {
+		return nil, err
+	}
+	var who []Who
+	for rows.Next() {
+		var w Who
+		if err := rows.Scan(&w.UserID, &w.Name); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		who = append(who, w)
+	}
+	return who, errors.Join(rows.Err(), rows.Close())
 }
 
 // opened reads a room back after a change.

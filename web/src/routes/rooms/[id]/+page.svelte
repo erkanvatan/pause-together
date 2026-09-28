@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import Picker from '$lib/Picker.svelte';
 	import {
@@ -8,10 +9,13 @@
 		switchVideo,
 		type Pick,
 		type Result,
-		type Room
+		type Room,
+		type Who
 	} from '$lib/api';
 	import { videoName } from '$lib/picker';
+	import type { Prepare, ServerMessage } from '$lib/protocol';
 	import { roomTitle } from '$lib/rooms';
+	import { RoomSocket } from '$lib/socket';
 	import { strings } from '$lib/strings';
 
 	// How soon a failed load tries again.
@@ -26,32 +30,77 @@
 	let picking = $state(false);
 	let renaming = $state(false);
 	let name = $state('');
+	let watching = $state<Who[]>([]);
+	let wasHere = $state<Who[]>([]);
+	let prepare = $state<Prepare | null>(null);
 
-	// Opening the room starts preparing its video. It runs again when a link leads to another room,
-	// since that reuses this page.
+	// Opening the room starts preparing its video, then the socket joins it. It runs again when a link
+	// leads to another room, since that reuses this page.
 	$effect(() => {
 		const roomId = id;
 		let stopped = false;
 		let timer: ReturnType<typeof setTimeout>;
+		let socket: RoomSocket | null = null;
 		room = null;
 		notFound = false;
 		error = '';
 		picking = false;
 		renaming = false;
+		watching = [];
+		wasHere = [];
+		prepare = null;
 		const load = async () => {
 			const r = await openRoom(roomId);
 			if (stopped) return;
 			loadFailed = !r.ok && r.error !== 'not-found';
-			if (r.ok) room = r.value;
-			else if (r.error === 'not-found') notFound = true;
+			if (r.ok) {
+				room = r.value;
+				socket = new RoomSocket(roomId, received);
+			} else if (r.error === 'not-found') notFound = true;
 			else timer = setTimeout(load, loadRetryMs);
 		};
 		load();
 		return () => {
 			stopped = true;
 			clearTimeout(timer);
+			socket?.close();
 		};
 	});
+
+	// received applies a message from the room. Playback state is the player's (not built yet).
+	function received(m: ServerMessage) {
+		switch (m.type) {
+			case 'room':
+				room = m.room;
+				break;
+			case 'presence':
+				watching = m.watching;
+				wasHere = m.wasHere;
+				break;
+			case 'prepare':
+				prepare = m.prepare;
+				break;
+			case 'deleted':
+				goto('/', { state: { roomDeleted: true } });
+				break;
+		}
+	}
+
+	// prepareText says where the room's prepared copy stands; '' when there's nothing to say.
+	function prepareText(p: Prepare | null): string {
+		switch (p?.state) {
+			case 'ready':
+				return strings.prepareReady;
+			case 'running':
+				return strings.jobRunning(Math.round(p.progress * 100));
+			case 'queued':
+				return strings.jobQueued(p.place);
+			case 'failed':
+				return strings.jobErrors[p.error] ?? strings.jobErrors.failed;
+			default:
+				return '';
+		}
+	}
 
 	// apply shows a changed room, or why the change failed.
 	function apply(r: Result<Room>) {
@@ -143,6 +192,10 @@
 		{/if}
 		{#if room.video.missing}
 			<p class="text-amber-400">{strings.videoMissing}</p>
+		{:else if !room.archived && prepareText(prepare)}
+			<p class={prepare?.state === 'failed' ? 'text-red-400' : 'text-neutral-300'}>
+				{prepareText(prepare)}
+			</p>
 		{/if}
 
 		{#if error}
@@ -165,6 +218,19 @@
 				{strings.switchVideo}
 			</button>
 		{/if}
+
+		{#each [{ title: strings.watchingNow, people: watching }, { title: strings.wasHere, people: wasHere }] as list (list.title)}
+			{#if list.people.length > 0}
+				<section class="flex flex-col gap-1">
+					<h2 class="text-sm text-neutral-400">{list.title}</h2>
+					<ul class="flex flex-wrap gap-2">
+						{#each list.people as p (p.userId)}
+							<li class="rounded-full bg-neutral-800 px-3 py-1 text-sm break-all">{p.name}</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
+		{/each}
 	{:else if loadFailed}
 		<p class="pt-24 text-center text-neutral-400">{strings.loadFailed}</p>
 	{/if}

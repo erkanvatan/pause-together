@@ -21,6 +21,7 @@ type Deps struct {
 	Scans       *library.Scans // admin API only
 	Jobs        *media.Jobs    // prepared videos and subtitles, served under /stream
 	Rooms       *room.Rooms
+	Hub         *room.Hub // room sockets, and who's watching
 }
 
 // Guest returns the handler for the guest port: the whole app except the admin API.
@@ -60,6 +61,7 @@ func (s *server) mux(web fs.FS) *http.ServeMux {
 	mux.HandleFunc("POST /api/rooms/{id}/archive", s.setArchived(true))
 	mux.HandleFunc("POST /api/rooms/{id}/unarchive", s.setArchived(false))
 	mux.HandleFunc("GET /stream/{key}/{name}", s.streamFile)
+	mux.HandleFunc("GET /ws", s.roomSocket)
 	if s.admin {
 		s.adminRoutes(mux)
 	}

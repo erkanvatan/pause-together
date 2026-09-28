@@ -27,6 +27,7 @@ function room(id: number, over: Partial<Room> = {}): Room {
 		audio: 1,
 		subtitle: null,
 		positionMs: 0,
+		subtitleOffsetMs: 0,
 		archived: false,
 		...over
 	};

@@ -114,8 +114,14 @@ export const strings = {
 	roomErrors: {
 		'bad-pick': "That video can't be picked any more. Try another.",
 		'bad-name': nameInvalid,
-		archived: 'This room is archived.'
+		archived: 'This room is archived.',
+		watching: 'Someone is in this room. Archive it once it is empty.'
 	} as Record<string, string>,
+	roomDeleted: 'That room was deleted.',
+	watchingNow: 'Watching now',
+	wasHere: 'Was here',
+	watchingList: (names: string) => `Watching: ${names}`,
+	prepareReady: 'Ready to play',
 	pickVideo: 'Pick a video',
 	close: 'Close',
 	back: 'Back',

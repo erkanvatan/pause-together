@@ -11,3 +11,13 @@ export const NUDGE_BIG = 0.1;
 export const NUDGE_BIG_FROM_MS = 500;
 // The clock offset comes from the lowest-RTT ping of this many recent ones.
 export const CLOCK_SAMPLES = 10;
+
+// The socket pings this often: the heartbeat, and a clock sample. The server drops a socket silent
+// for 10 s (HeartbeatTimeoutMs in internal/room/timing.go).
+export const PING_EVERY_MS = 3000;
+// No pong for this long: the connection is dead, even if the browser hasn't noticed.
+export const PONG_TIMEOUT_MS = 10000;
+// Reconnect backoff: the first retry waits RECONNECT_MIN_MS, each next one twice as long, at most
+// RECONNECT_MAX_MS.
+export const RECONNECT_MIN_MS = 500;
+export const RECONNECT_MAX_MS = 10000;

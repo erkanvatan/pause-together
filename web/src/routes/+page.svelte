@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import Picker from '$lib/Picker.svelte';
 	import { deleteRoom } from '$lib/admin';
-	import { createRoom, listRooms, setArchived, type Pick, type Room } from '$lib/api';
+	import { createRoom, listRooms, setArchived, type Pick, type Result, type RoomCard } from '$lib/api';
 	import { me } from '$lib/me.svelte';
 	import { videoName } from '$lib/picker';
 	import { roomTitle, splitArchived } from '$lib/rooms';
@@ -13,9 +14,9 @@
 	// delete rooms.
 	const pollMs = 5000;
 
-	let rooms = $state<Room[] | null>(null); // null until the first load
+	let rooms = $state<RoomCard[] | null>(null); // null until the first load
 	let loadFailed = $state(false);
-	let actionFailed = $state(false);
+	let actionError = $state(''); // why the last action failed
 	let visible = $state(true);
 	let picking = $state(false);
 	let confirming = $state<number | null>(null); // room whose Delete waits for a yes
@@ -56,15 +57,16 @@
 		};
 	});
 
-	async function act(result: Promise<{ ok: boolean }>) {
-		actionFailed = !(await result).ok;
+	async function act(result: Promise<Result<unknown>>) {
+		const r = await result;
+		actionError = r.ok ? '' : (strings.roomErrors[r.error] ?? strings.actionFailed);
 		await refresh();
 	}
 
 	async function create(p: Pick) {
 		picking = false;
 		const r = await createRoom(p);
-		actionFailed = !r.ok;
+		actionError = r.ok ? '' : strings.actionFailed;
 		if (r.ok) goto(`/rooms/${r.value.id}`);
 	}
 </script>
@@ -75,7 +77,7 @@
 	<title>{strings.appName}</title>
 </svelte:head>
 
-{#snippet card(r: Room)}
+{#snippet card(r: RoomCard)}
 	<li class="flex flex-col gap-2 rounded-md border border-neutral-800 p-3">
 		<div class="flex flex-wrap items-center justify-between gap-2">
 			<a href="/rooms/{r.id}" class="min-w-0 flex-1 hover:underline">
@@ -86,14 +88,22 @@
 				{#if r.video.missing}
 					<span class="block text-sm text-amber-400">{strings.videoMissing}</span>
 				{/if}
+				{#if r.watching.length > 0}
+					<span class="block text-sm break-words text-emerald-400">
+						{strings.watchingList(r.watching.map((w) => w.name).join(', '))}
+					</span>
+				{/if}
 			</a>
 			<div class="flex gap-2 text-sm">
-				<button
-					onclick={() => act(setArchived(r.id, !r.archived))}
-					class="rounded-md border border-neutral-700 px-2.5 py-1 hover:bg-neutral-800"
-				>
-					{r.archived ? strings.unarchive : strings.archive}
-				</button>
+				<!-- Archive only an empty room. The server checks too: someone may just have joined. -->
+				{#if r.archived || r.watching.length === 0}
+					<button
+						onclick={() => act(setArchived(r.id, !r.archived))}
+						class="rounded-md border border-neutral-700 px-2.5 py-1 hover:bg-neutral-800"
+					>
+						{r.archived ? strings.unarchive : strings.archive}
+					</button>
+				{/if}
 				{#if me.isAdmin}
 					<button
 						onclick={() => (confirming = r.id)}
@@ -139,9 +149,13 @@
 		</button>
 	</div>
 
-	{#if loadFailed || actionFailed}
+	{#if page.state.roomDeleted}
+		<p class="text-sm text-neutral-300" role="status">{strings.roomDeleted}</p>
+	{/if}
+
+	{#if loadFailed || actionError}
 		<p class="text-sm text-red-400" role="alert">
-			{loadFailed ? strings.loadFailed : strings.actionFailed}
+			{loadFailed ? strings.loadFailed : actionError}
 		</p>
 	{/if}
 

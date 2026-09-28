@@ -3,6 +3,7 @@ package web
 
 import (
 	"embed"
+	"encoding/json"
 	"io/fs"
 )
 
@@ -18,4 +19,20 @@ func Build() fs.FS {
 		panic(err) // only on an invalid path, which "build" is not
 	}
 	return sub
+}
+
+// BuildID returns the build's version from _app/version.json, the same value the page gets from
+// SvelteKit's $app/environment. "" when there is none: a Go build before any web build.
+func BuildID(build fs.FS) string {
+	b, err := fs.ReadFile(build, "_app/version.json")
+	if err != nil {
+		return ""
+	}
+	var v struct {
+		Version string `json:"version"`
+	}
+	if json.Unmarshal(b, &v) != nil {
+		return ""
+	}
+	return v.Version
 }

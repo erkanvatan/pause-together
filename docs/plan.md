@@ -283,7 +283,7 @@ quiet skip, or skip with a reason.
 
 **Not here:** sockets, `<video>`.
 
-### [ ] 13. WebSocket and room loop
+### [x] 13. WebSocket and room loop
 
 **Goal:** browsers join a room over a socket and see the same state.
 
