@@ -387,7 +387,38 @@ Clear deletes every copy but sidecars and `.tmp` folders.
 comes back by itself and a guest can reach it. "Clear cache" asks first, then the cache size drops to
 the sidecars.
 
-### [ ] 18. Field test
+### [ ] 18. UI refinement
+
+**Goal:** the app looks designed, not like bare Tailwind. Same behaviour, new look.
+
+- Work it with the `frontend-design` skill. In plan mode, write the design plan first: a palette of 4–6
+  named colors, the typefaces and their roles, and ASCII wireframes for the homepage, the room page
+  (wide screen and portrait phone) and the admin page. Check the plan against the skill's list of
+  generic defaults, and revise what reads like one. Wait for approval before any code.
+- Design tokens live in `web/src/app.css` under `@theme`. Components use the tokens, not loose hex
+  values or one-off sizes.
+- Fonts are bundled into the build (e.g. `@fontsource`), never loaded from Google Fonts or another CDN.
+  The app is self-hosted, and guests may have no route to the internet.
+- Every page and part: name form, homepage room cards, room page (player, controls, "Tap to join",
+  waiting and paused notes, subtitle panel, chat panel, bottom sheet, toasts), picker, folder picker,
+  admin page. The area around the video stays dark.
+- Quality floor: works at 360 px wide, portrait and landscape. Touch targets at least 44 px on phones.
+  Visible keyboard focus. `prefers-reduced-motion` respected. Text contrast at least WCAG AA.
+- Copy may be reworded, but only in `web/src/lib/strings.ts`. Plain words, sentence case.
+- No behaviour change. No new features, API or socket messages. The player rules still hold: one
+  `<video playsinline>`, no native controls, subtitles clear of toasts and controls, chat works in
+  fullscreen. User text is still rendered as text, never `{@html}`.
+
+**Done when (tests):** the existing tests pass unchanged. A test that breaks means behaviour changed:
+fix the UI, not the test. New logic in `web/src/lib`, if any, gets Vitest tests. `task lint` passes.
+
+**By hand:** screenshots of every page in dev, before and after, at 360×800, a phone in landscape and a
+desktop width. Room page with subtitles on, chat open and closed (toasts), and fullscreen. Then a
+real phone on the guest port.
+
+**Not here:** new features, Turkish strings, artwork or posters (the spec rules out online lookups).
+
+### [ ] 19. Field test
 
 **Goal:** real devices, real network.
 

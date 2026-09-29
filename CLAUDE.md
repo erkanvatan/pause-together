@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 serves its local video library. Guests reach it over Tailscale and watch in sync from PCs, tablets and
 phones. Same show. Same second. Different places.
 
-**Status: slices 1–17 are built; the field test is next (`docs/plan.md`).** This file is the spec. When
+**Status: slices 1–17 are built; UI refinement is next (`docs/plan.md`).** This file is the spec. When
 code changes, update the layout and commands below to match reality. The rules here are decided: flag problems,
 but don't quietly change them. Work each slice by the steps under "How to work a slice" in
 `docs/plan.md`.
