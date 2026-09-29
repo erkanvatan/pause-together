@@ -1,1 +1,249 @@
 @import 'tailwindcss';
+/* Bundled into the build, never from a CDN: guests may have no route to the internet. Both include
+latin-ext, which Turkish needs. */
+@import '@fontsource-variable/big-shoulders';
+@import '@fontsource-variable/atkinson-hyperlegible-next';
+@import '@fontsource-variable/atkinson-hyperlegible-next/wght-italic.css';
+
+/* A living room at night, lit by the TV and one lamp. Only these colors exist: Tailwind's own
+palette is cleared, so a stray neutral-700 builds to nothing. */
+@theme {
+	--color-*: initial;
+	--color-midnight: #16122b; /* the page */
+	--color-dusk: #231d40; /* raised surfaces: panels, sheets, fields, the control bar */
+	--color-haze: #a69dcb; /* quiet text */
+	--color-moonlight: #eee9ff; /* text */
+	--color-lamp: #ffc15e; /* the accent, and "someone is here" */
+	--color-ember: #ff7a6b; /* delete, errors */
+	--color-line: color-mix(in oklab, var(--color-haze) 28%, transparent); /* borders */
+	--color-black: #000; /* the video box and subtitle backing */
+	--color-white: #fff; /* subtitle text */
+
+	--font-sans: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif;
+	/* Condensed, so long film titles fit a phone. Titles and headings only. */
+	--font-display: 'Big Shoulders Variable', 'Arial Narrow', sans-serif;
+
+	--text-*: initial;
+	--text-sm: 0.8125rem;
+	--text-sm--line-height: 1.4;
+	--text-base: 1rem;
+	--text-base--line-height: 1.5;
+	--text-lg: 1.25rem;
+	--text-lg--line-height: 1.3;
+	--text-xl: 1.75rem;
+	--text-xl--line-height: 1.05;
+	--text-2xl: 2.5rem;
+	--text-2xl--line-height: 1;
+	--text-3xl: 3.5rem;
+	--text-3xl--line-height: 0.95;
+
+	--radius-control: 0.5rem; /* buttons, fields */
+	--radius-panel: 1rem; /* the player, sheets, dialogs */
+
+	--animate-sheet-up: sheet-up 180ms ease-out;
+	@keyframes sheet-up {
+		from {
+			transform: translateY(100%);
+		}
+	}
+}
+
+@layer base {
+	html {
+		color-scheme: dark; /* native selects and scrollbars */
+		background-color: var(--color-midnight);
+		color: var(--color-moonlight);
+		accent-color: var(--color-lamp);
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--color-lamp);
+		outline-offset: 2px;
+	}
+
+	::selection {
+		background-color: color-mix(in oklab, var(--color-lamp) 40%, transparent);
+	}
+
+	::placeholder {
+		color: var(--color-haze);
+		opacity: 1;
+	}
+}
+
+@layer components {
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		min-height: 2.5rem;
+		padding-inline: 1rem;
+		border-radius: var(--radius-control);
+		font-weight: 600;
+		line-height: 1.2;
+		transition-property: background-color, border-color, color;
+		transition-duration: 150ms;
+	}
+	.btn:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	.btn-small {
+		min-height: 2rem;
+		padding-inline: 0.75rem;
+		font-size: var(--text-sm);
+	}
+	.btn-primary {
+		background-color: var(--color-lamp);
+		color: var(--color-midnight);
+	}
+	.btn-primary:not(:disabled):hover {
+		background-color: color-mix(in oklab, var(--color-lamp) 82%, white);
+	}
+	.btn-quiet {
+		border: 1px solid var(--color-line);
+		color: var(--color-moonlight);
+	}
+	.btn-quiet:not(:disabled):hover {
+		background-color: var(--color-dusk);
+		border-color: var(--color-haze);
+	}
+	.btn-danger {
+		background-color: var(--color-ember);
+		color: var(--color-midnight);
+	}
+	.btn-danger:not(:disabled):hover {
+		background-color: color-mix(in oklab, var(--color-ember) 82%, white);
+	}
+	/* A filled button that can't be pressed yet goes out, rather than dimming to brown. */
+	.btn-primary:disabled,
+	.btn-danger:disabled {
+		opacity: 1;
+		background-color: var(--color-dusk);
+		color: var(--color-haze);
+	}
+
+	/* A square button holding one Icon, 44 px on every screen. */
+	.icon-btn {
+		display: inline-flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		width: 2.75rem;
+		height: 2.75rem;
+		border-radius: var(--radius-control);
+		color: var(--color-moonlight);
+		transition-property: background-color, color;
+		transition-duration: 150ms;
+	}
+	.icon-btn:not(:disabled):hover {
+		background-color: color-mix(in oklab, var(--color-moonlight) 10%, transparent);
+	}
+	.icon-btn:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	/* A toggle that's on: its panel is open. */
+	.icon-btn[aria-pressed='true'] {
+		background-color: color-mix(in oklab, var(--color-moonlight) 12%, transparent);
+	}
+
+	.field {
+		min-height: 2.5rem;
+		padding: 0.5rem 0.75rem;
+		border: 1px solid var(--color-line);
+		border-radius: var(--radius-control);
+		background-color: var(--color-dusk);
+		color: var(--color-moonlight);
+	}
+	.field:focus-visible {
+		border-color: var(--color-lamp);
+	}
+	.field:disabled {
+		opacity: 0.45;
+	}
+
+	/* A row that is one big button: picker videos, shows, folders, menu items. */
+	.row {
+		display: flex;
+		width: 100%;
+		min-height: 2.75rem;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem 0.75rem;
+		border-radius: var(--radius-control);
+		text-align: left;
+	}
+	.row:not(:disabled):hover {
+		background-color: color-mix(in oklab, var(--color-moonlight) 7%, transparent);
+	}
+	.row:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+
+	/* The round buttons in the middle of the video: back, play or pause, forward. */
+	.transport {
+		display: inline-flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		border-radius: 9999px;
+		background-color: color-mix(in oklab, var(--color-midnight) 55%, transparent);
+		color: var(--color-moonlight);
+		backdrop-filter: blur(6px);
+		transition-property: background-color, transform;
+		transition-duration: 150ms;
+	}
+	.transport:not(:disabled):hover {
+		background-color: color-mix(in oklab, var(--color-midnight) 80%, transparent);
+	}
+	.transport:not(:disabled):active {
+		transform: scale(0.92);
+	}
+	.transport:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	/* Play and pause: the lamp in the room. */
+	.transport-main {
+		background-color: var(--color-lamp);
+		color: var(--color-midnight);
+	}
+	.transport-main:not(:disabled):hover {
+		background-color: color-mix(in oklab, var(--color-lamp) 82%, white);
+	}
+	.transport-main:disabled {
+		opacity: 1;
+		background-color: var(--color-dusk);
+		color: var(--color-haze);
+	}
+
+	/* A short line over the video: "Alice paused", a toast. */
+	.pill {
+		border-radius: var(--radius-control);
+		background-color: color-mix(in oklab, var(--color-midnight) 82%, transparent);
+		padding: 0.25rem 0.625rem;
+	}
+
+	/* Fingers need 44 px. */
+	@media (pointer: coarse) {
+		.btn,
+		.btn-small,
+		.field {
+			min-height: 2.75rem;
+		}
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	::before,
+	::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}

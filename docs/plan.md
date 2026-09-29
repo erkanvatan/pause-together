@@ -387,7 +387,7 @@ Clear deletes every copy but sidecars and `.tmp` folders.
 comes back by itself and a guest can reach it. "Clear cache" asks first, then the cache size drops to
 the sidecars.
 
-### [ ] 18. UI refinement
+### [x] 18. UI refinement
 
 **Goal:** the app looks designed, not like bare Tailwind. Same behaviour, new look.
 
@@ -405,9 +405,16 @@ the sidecars.
 - Quality floor: works at 360 px wide, portrait and landscape. Touch targets at least 44 px on phones.
   Visible keyboard focus. `prefers-reduced-motion` respected. Text contrast at least WCAG AA.
 - Copy may be reworded, but only in `web/src/lib/strings.ts`. Plain words, sentence case.
-- No behaviour change. No new features, API or socket messages. The player rules still hold: one
-  `<video playsinline>`, no native controls, subtitles clear of toasts and controls, chat works in
-  fullscreen. User text is still rendered as text, never `{@html}`.
+- No behaviour change beyond the player additions below. No new API or socket messages. The player
+  rules still hold: one `<video playsinline>`, no native controls, subtitles clear of toasts and
+  controls, chat works in fullscreen. User text is still rendered as text, never `{@html}`.
+- Player additions, all client side (the rules are in CLAUDE.md under "Player"):
+  - Over the video's middle: back 10 s, play or pause, forward 10 s. They send the existing seek, play
+    and pause intents.
+  - Controls fade after 3 s without a mouse move, touch or key while the video plays; in fullscreen
+    the control bar lies over the video and fades too. A tap on bare video hides them.
+  - A progress bar under "Preparing… 42%".
+  - Sending a chat message on a touch screen closes the keyboard.
 
 **Done when (tests):** the existing tests pass unchanged. A test that breaks means behaviour changed:
 fix the UI, not the test. New logic in `web/src/lib`, if any, gets Vitest tests. `task lint` passes.
@@ -416,7 +423,7 @@ fix the UI, not the test. New logic in `web/src/lib`, if any, gets Vitest tests.
 desktop width. Room page with subtitles on, chat open and closed (toasts), and fullscreen. Then a
 real phone on the guest port.
 
-**Not here:** new features, Turkish strings, artwork or posters (the spec rules out online lookups).
+**Not here:** other new features, Turkish strings, artwork or posters (the spec rules out online lookups).
 
 ### [ ] 19. Field test
 

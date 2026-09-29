@@ -5,6 +5,8 @@
 	// fullscreen.
 	import { onMount, untrack, type Snippet } from 'svelte';
 	import type { Room, SubtitleChoice, VideoDetail, VideoSummary } from '$lib/api';
+	import { jobText } from '$lib/admin';
+	import Icon from '$lib/Icon.svelte';
 	import {
 		codecName,
 		episodeCode,
@@ -55,6 +57,10 @@
 
 	// One press of the subtitle timing buttons.
 	const offsetStepMs = 250;
+	// One press of the skip buttons.
+	const skipMs = 10_000;
+	// The controls fade after this long without a touch, mouse move or key, while the video plays.
+	const controlsHideMs = 3000;
 
 	let wrapper: HTMLDivElement;
 	let video: HTMLVideoElement;
@@ -103,9 +109,30 @@
 	let filled = $state(false); // the CSS fill
 	const full = $derived(native || filled);
 
+	// The controls step aside while the video plays and nobody touches them: the buttons over the video
+	// always, the bar in fullscreen only. Never while paused, the subtitle panel is open, or the seek
+	// bar is held.
+	let stage: HTMLDivElement; // the layer over the video; a tap on it, not on a button, hides the controls
+	let idle = $state(false);
+	let idleTimer: ReturnType<typeof setTimeout> | undefined;
+	let overBar = $state(false);
+	let barHeight = $state(0);
+	const canFade = $derived(joined && !!playState?.playing && !subtitlesOpen && dragMs === null);
+	const faded = $derived(idle && canFade && !overBar);
+	const fade = $derived(faded ? 'invisible opacity-0' : '');
+
+	// Where the room's prepared copy stands, shown in the video box; '' when there's nothing to say, or
+	// it's ready.
+	const preparing = $derived(prepare ? jobText(prepare) : '');
+
 	// At the end the room pauses; a TV episode then offers the next one.
 	const atEnd = $derived(
 		playState !== null && !playState.playing && durationMs > 0 && playState.positionMs >= durationMs
+	);
+
+	// Back, play or pause, forward, over the video; not while something else holds its middle.
+	const transport = $derived(
+		src !== '' && joined && !blocked && !cantPlay && !(atEnd && next) && !playState?.waiting.length
 	);
 
 	// Only src changes, never the element: a new one may need a fresh tap on iOS.
@@ -123,6 +150,12 @@
 			}
 			tick();
 		});
+	});
+
+	// The controls get their full time again whenever they start to be allowed to fade: play starts,
+	// the subtitle panel closes, the seek bar is let go.
+	$effect.pre(() => {
+		if (canFade) untrack(wake);
 	});
 
 	// The server forgets a socket's status when it drops, so a new connection hears it again.
@@ -155,6 +188,7 @@
 		return () => {
 			clearInterval(timer);
 			clearTimeout(retryTimer);
+			clearTimeout(idleTimer);
 			document.removeEventListener('visibilitychange', visibility);
 			document.removeEventListener('fullscreenchange', fullscreen);
 		};
@@ -247,6 +281,29 @@
 		socket.send({ type: 'offset', ms });
 	}
 
+	function wake() {
+		idle = false;
+		clearTimeout(idleTimer);
+		idleTimer = setTimeout(() => (idle = true), controlsHideMs);
+	}
+
+	function rest() {
+		clearTimeout(idleTimer);
+		idle = true;
+	}
+
+	// A finger on the bare video toggles the controls, like a phone's own player; anything else shows them.
+	function pointerDown(e: PointerEvent) {
+		const t = e.target as Element;
+		const bare = stage.contains(t) && !t.closest('button, a, input, select');
+		if (e.pointerType !== 'mouse' && bare && !faded) rest();
+		else wake();
+	}
+
+	function skip(ms: number) {
+		intent({ type: 'seek', positionMs: Math.min(Math.max(shownMs + ms, 0), durationMs) });
+	}
+
 	function toggleFullscreen() {
 		if (full) exitFullscreen();
 		else if (document.fullscreenEnabled) wrapper.requestFullscreen().catch(() => (filled = true));
@@ -305,17 +362,40 @@
 	}
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && filled && (filled = false)} />
+<svelte:window
+	onkeydown={(e) => {
+		// Typing in chat or a search box isn't asking for the controls. A slider is: it's one of them.
+		const t = e.target as HTMLElement;
+		if (!t.closest('input:not([type=range]), textarea, select, [contenteditable]')) wake();
+		if (e.key === 'Escape') filled = false;
+	}}
+/>
 
 <div
 	bind:this={wrapper}
-	class="flex overflow-hidden bg-black {full ? 'fixed inset-0 z-30 h-dvh' : 'rounded-md'}"
+	class="flex overflow-hidden bg-black {full ? 'fixed inset-0 z-30 h-dvh' : 'max-sm:-mx-4 sm:rounded-panel'}"
 >
-	<!-- In portrait fullscreen, the video and controls move up out of the chat sheet's way. -->
-	<div class="flex min-w-0 flex-1 flex-col {full && chatOpen ? 'portrait:pb-[50dvh]' : ''}">
+	<!-- In portrait fullscreen, the video and controls move up out of the chat sheet's way. The pointer
+	handlers only show and hide the controls; the buttons inside do the rest. -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		onpointerdown={pointerDown}
+		onpointermove={(e) => e.pointerType === 'mouse' && wake()}
+		onpointerleave={(e) => e.pointerType === 'mouse' && rest()}
+		class="relative flex min-w-0 flex-1 flex-col {full && chatOpen ? 'portrait:pb-[50dvh]' : ''}"
+	>
 		<!-- The container for the subtitles' cqi sizes. Not the wrapper: a container is the box its fixed
 		children position in, which would hold the chat's bottom sheet inside the player. -->
-		<div class="@container relative {full ? 'min-h-0 flex-1' : ''}">
+		<!-- On a tall enough window the video box stops growing where the control bar still fits on screen,
+		and sits between black bars. The box narrows with it, not just the picture, so subtitles size and
+		wrap to the picture. -->
+		<div
+			class="@container relative {full
+				? 'min-h-0 flex-1'
+				: 'mx-auto w-full [@media(min-height:40rem)]:max-w-[calc((100dvh-13rem)*16/9)]'} {faded
+				? 'cursor-none'
+				: ''}"
+		>
 			<video
 				bind:this={video}
 				bind:volume
@@ -341,37 +421,74 @@
 					{offsetMs}
 					size={subtitleSize}
 					videoMs={() => video.currentTime * 1000}
+					lift={full && !faded ? barHeight : 0}
 				/>
 			{/if}
 
-			<div class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
-				{#if cantPlay}
-					<p class="rounded-md bg-black/70 px-3 py-2">
-						{unplayable}
-					</p>
-				{:else if src && (!joined || blocked)}
-					<button
-						onclick={join}
-						class="rounded-full bg-neutral-100 px-6 py-3 text-lg font-medium text-neutral-950"
+			<div
+				bind:this={stage}
+				class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center"
+			>
+				{#if transport}
+					<div
+						class="flex items-center gap-6 transition-[opacity,visibility] duration-300 sm:gap-10 {fade}"
 					>
+						<button
+							onclick={() => skip(-skipMs)}
+							disabled={!online || durationMs === 0}
+							aria-label={strings.skipBack(skipMs / 1000)}
+							class="transport size-12 sm:size-14"
+						>
+							<Icon name="skip-back" step={skipMs / 1000} class="size-7 sm:size-8" />
+						</button>
+						<button
+							onclick={() => intent({ type: playState?.playing ? 'pause' : 'play' })}
+							disabled={!online || !playState}
+							aria-label={playState?.playing ? strings.pause : strings.play}
+							class="transport transport-main size-16 sm:size-20"
+						>
+							<Icon name={playState?.playing ? 'pause' : 'play'} class="size-8 sm:size-10" />
+						</button>
+						<button
+							onclick={() => skip(skipMs)}
+							disabled={!online || durationMs === 0}
+							aria-label={strings.skipForward(skipMs / 1000)}
+							class="transport size-12 sm:size-14"
+						>
+							<Icon name="skip-forward" step={skipMs / 1000} class="size-7 sm:size-8" />
+						</button>
+					</div>
+				{/if}
+				{#if cantPlay}
+					<p class="pill px-4 py-2">{unplayable}</p>
+				{:else if src && (!joined || blocked)}
+					<button onclick={join} class="btn btn-primary min-h-14 rounded-full px-7 text-lg">
+						<Icon name="play" class="size-6" />
 						{strings.tapToJoin}
 					</button>
 				{/if}
+				{#if preparing}
+					<div class="flex w-full max-w-64 flex-col items-center gap-3">
+						<p class="pill {prepare?.state === 'failed' ? 'text-ember' : ''}">{preparing}</p>
+						{#if prepare?.state === 'running'}
+							<div class="h-1 w-full overflow-hidden rounded-full bg-dusk">
+								<div class="h-full bg-lamp" style:width="{prepare.progress * 100}%"></div>
+							</div>
+						{/if}
+					</div>
+				{/if}
 				{#if atEnd && next}
-					<button
-						onclick={nextEpisode}
-						class="max-w-full rounded-md bg-neutral-100 px-4 py-2 font-medium break-words text-neutral-950"
-					>
-						{strings.nextEpisodeNamed([episodeCode(next), next.episodeTitle].filter(Boolean).join(' · '))}
+					<button onclick={nextEpisode} class="btn btn-primary max-w-full break-words">
+						{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
 					</button>
 				{/if}
 				{#if playState && playState.waiting.length > 0}
-					<div class="flex flex-col items-center gap-2 rounded-md bg-black/70 px-3 py-2">
+					<div class="flex flex-col items-center gap-3 rounded-panel bg-dusk/90 px-5 py-4">
 						<p class="break-words">{strings.waitingFor(playState.waiting.map((w) => w.name))}</p>
 						<button
 							onclick={() => socket?.send({ type: 'playAnyway' })}
 							disabled={!online}
-							class="rounded-md border border-neutral-500 px-3 py-1 text-sm hover:bg-neutral-800 disabled:opacity-50"
+							class="btn btn-quiet btn-small"
 						>
 							{strings.playAnyway}
 						</button>
@@ -383,10 +500,12 @@
 				class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1 text-sm"
 			>
 				{#if note}
-					<p class="rounded-md bg-black/70 px-2 py-1 break-words">{note}</p>
+					<p class="pill flex items-center gap-1.5 break-words">
+						<Icon name="pause" class="size-3.5 shrink-0 text-lamp" />{note}
+					</p>
 				{/if}
 				{#each playState?.behind ?? [] as b (b.userId)}
-					<p class="rounded-md bg-black/70 px-2 py-1 break-words">{strings.behind(b.name, b.ms)}</p>
+					<p class="pill break-words">{strings.behind(b.name, b.ms)}</p>
 				{/each}
 				{#if !chatOpen}
 					{@render overlay()}
@@ -394,150 +513,159 @@
 			</div>
 		</div>
 
-		{#if subtitlesOpen}
+		<!-- In fullscreen the controls lie over the video's foot on a dark fade, so hiding them never
+		resizes the video. -->
+		<div
+			class={full
+				? `pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent pt-12 transition-[opacity,visibility] duration-300 ${chatOpen ? 'portrait:bottom-[50dvh]' : ''} ${fade}`
+				: ''}
+		>
+			<!-- svelte-ignore a11y_no_static_element_interactions (keeps the controls up under the mouse) -->
 			<div
-				class="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-800 bg-neutral-900 px-3 py-2 text-sm"
+				bind:clientHeight={barHeight}
+				onpointerenter={() => (overBar = true)}
+				onpointerleave={() => (overBar = false)}
+				class="pointer-events-auto"
 			>
-				<select
-					aria-label={strings.subtitle}
-					value={subtitleKey}
-					disabled={!online || !playState}
-					onchange={(e) =>
-						setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
-					class="max-w-full min-w-0 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1"
-				>
-					<option value="">{strings.subtitleOff}</option>
-					{#each options as o (o.key)}
-						{@const missing =
-							'stream' in o.choice &&
-							prepare?.state === 'ready' &&
-							!prepare.subtitles.includes(o.choice.stream)}
-						<option value={o.key} disabled={o.unavailable !== '' || missing}>
-							{subtitleLabel(o)}{missing ? ` — ${strings.notInCopy}` : ''}
-						</option>
-					{/each}
-				</select>
-				<div class="flex items-center gap-1">
-					<span class="text-neutral-400">{strings.subtitleTiming}</span>
-					<button
-						onclick={() => setOffset(offsetMs - offsetStepMs)}
-						disabled={!online || !playState}
-						aria-label={strings.subtitleSooner}
-						class="w-8 rounded-md border border-neutral-700 py-0.5 hover:bg-neutral-800 disabled:opacity-50"
+				{#if subtitlesOpen}
+					<div
+						class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm"
 					>
-						−
-					</button>
-					<span class="w-16 text-center tabular-nums">{strings.subtitleOffset(offsetMs)}</span>
-					<button
-						onclick={() => setOffset(offsetMs + offsetStepMs)}
-						disabled={!online || !playState}
-						aria-label={strings.subtitleLater}
-						class="w-8 rounded-md border border-neutral-700 py-0.5 hover:bg-neutral-800 disabled:opacity-50"
-					>
-						+
-					</button>
-					{#if offsetMs !== 0}
-						<button
-							onclick={() => setOffset(0)}
+						<select
+							aria-label={strings.subtitle}
+							value={subtitleKey}
 							disabled={!online || !playState}
-							class="rounded-md px-2 py-0.5 text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+							onchange={(e) =>
+								setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
+							class="field max-w-full min-w-0 py-1"
 						>
-							{strings.reset}
-						</button>
-					{/if}
-				</div>
-				<label class="flex items-center gap-2">
-					<span class="text-neutral-400">{strings.subtitleSize}</span>
-					<select
-						bind:value={subtitleSize}
-						class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1"
-					>
-						{#each SUBTITLE_SIZES as size (size)}
-							<option value={size}>{strings.subtitleSizes[size]}</option>
-						{/each}
-					</select>
-				</label>
-			</div>
-		{/if}
+							<option value="">{strings.subtitleOff}</option>
+							{#each options as o (o.key)}
+								{@const missing =
+									'stream' in o.choice &&
+									prepare?.state === 'ready' &&
+									!prepare.subtitles.includes(o.choice.stream)}
+								<option value={o.key} disabled={o.unavailable !== '' || missing}>
+									{missing ? strings.withNote(subtitleLabel(o), strings.notInCopy) : subtitleLabel(o)}
+								</option>
+							{/each}
+						</select>
+						<div class="flex items-center gap-1">
+							<span class="mr-1 text-haze">{strings.subtitleTiming}</span>
+							<button
+								onclick={() => setOffset(offsetMs - offsetStepMs)}
+								disabled={!online || !playState}
+								aria-label={strings.subtitleSooner}
+								class="btn btn-quiet btn-small w-11 px-0"
+							>
+								−
+							</button>
+							<span class="w-16 text-center tabular-nums">{strings.subtitleOffset(offsetMs)}</span>
+							<button
+								onclick={() => setOffset(offsetMs + offsetStepMs)}
+								disabled={!online || !playState}
+								aria-label={strings.subtitleLater}
+								class="btn btn-quiet btn-small w-11 px-0"
+							>
+								+
+							</button>
+							{#if offsetMs !== 0}
+								<button
+									onclick={() => setOffset(0)}
+									disabled={!online || !playState}
+									class="btn btn-small px-2 font-normal text-haze hover:text-moonlight"
+								>
+									{strings.reset}
+								</button>
+							{/if}
+						</div>
+						<label class="flex items-center gap-2">
+							<span class="text-haze">{strings.subtitleSize}</span>
+							<select bind:value={subtitleSize} class="field py-1">
+								{#each SUBTITLE_SIZES as size (size)}
+									<option value={size}>{strings.subtitleSizes[size]}</option>
+								{/each}
+							</select>
+						</label>
+					</div>
+				{/if}
 
-		<!-- On a narrow screen the seek bar and time take a row of their own, above the buttons. -->
-		<div class="flex flex-wrap items-center gap-x-2 gap-y-2 bg-neutral-900 px-3 py-2 text-sm sm:gap-x-3">
-			<button
-				onclick={() => intent({ type: playState?.playing ? 'pause' : 'play' })}
-				disabled={!online || !playState}
-				class="w-14 rounded-md border border-neutral-700 py-1 hover:bg-neutral-800 disabled:opacity-50"
-			>
-				{playState?.playing ? strings.pause : strings.play}
-			</button>
-			<div class="flex min-w-0 flex-1 items-center gap-3 max-sm:order-first max-sm:basis-full">
-				<input
-					type="range"
-					aria-label={strings.position}
-					min="0"
-					max={durationMs}
-					step="1000"
-					value={dragMs ?? shownMs}
-					disabled={!online || durationMs === 0}
-					oninput={(e) => (dragMs = Number(e.currentTarget.value))}
-					onchange={(e) => {
-						dragMs = null;
-						intent({ type: 'seek', positionMs: Number(e.currentTarget.value) });
-					}}
-					class="min-w-0 flex-1 accent-neutral-100"
-				/>
-				<span class="text-neutral-300 tabular-nums">
-					{formatTime(dragMs ?? shownMs)} / {formatTime(durationMs)}
-				</span>
+				<!-- Laid out by the bar's own width, not the screen's: the chat panel takes part of a wide one.
+				A narrow bar puts the seek bar and time on a row of their own, above the buttons. -->
+				<div class="@container/bar {full ? '' : 'bg-dusk'}">
+					<div class="flex flex-wrap items-center gap-x-1 px-1 py-1 @xl/bar:gap-x-2 @xl/bar:px-2">
+						<button
+							onclick={() => intent({ type: playState?.playing ? 'pause' : 'play' })}
+							disabled={!online || !playState}
+							aria-label={playState?.playing ? strings.pause : strings.play}
+							class="icon-btn"
+						>
+							<Icon name={playState?.playing ? 'pause' : 'play'} />
+						</button>
+						<div class="flex min-w-0 flex-1 items-center gap-3 px-2 @max-xl/bar:order-first @max-xl/bar:basis-full">
+							<input
+								type="range"
+								aria-label={strings.position}
+								min="0"
+								max={durationMs}
+								step="1000"
+								value={dragMs ?? shownMs}
+								disabled={!online || durationMs === 0}
+								oninput={(e) => (dragMs = Number(e.currentTarget.value))}
+								onchange={(e) => {
+									dragMs = null;
+									intent({ type: 'seek', positionMs: Number(e.currentTarget.value) });
+								}}
+								class="h-11 min-w-0 flex-1"
+							/>
+							<span class="text-sm whitespace-nowrap text-haze tabular-nums">
+								{formatTime(dragMs ?? shownMs)} / {formatTime(durationMs)}
+							</span>
+						</div>
+						<button
+							onclick={() => (muted = !muted)}
+							aria-label={muted ? strings.unmute : strings.mute}
+							class="icon-btn"
+						>
+							<Icon name={muted ? 'muted' : 'volume'} />
+						</button>
+						{#if volumeWorks}
+							<input
+								type="range"
+								aria-label={strings.volume}
+								min="0"
+								max="1"
+								step="0.05"
+								bind:value={volume}
+								class="hidden h-11 w-20 @xl/bar:block"
+							/>
+						{/if}
+						<button
+							onclick={() => (subtitlesOpen = !subtitlesOpen)}
+							aria-label={strings.subtitle}
+							aria-pressed={subtitlesOpen}
+							class="icon-btn ml-auto {playState?.subtitle ? 'text-lamp' : ''}"
+						>
+							<Icon name="captions" />
+						</button>
+						<button
+							onclick={() => (chatOpen = !chatOpen)}
+							aria-label={strings.chat}
+							aria-pressed={chatOpen}
+							class="icon-btn"
+						>
+							<Icon name="chat" />
+						</button>
+						<button
+							onclick={toggleFullscreen}
+							aria-label={full ? strings.exitFullscreen : strings.fullscreen}
+							class="icon-btn"
+						>
+							<Icon name={full ? 'shrink' : 'expand'} />
+						</button>
+					</div>
+				</div>
 			</div>
-			<button
-				onclick={() => (muted = !muted)}
-				class="rounded-md border border-neutral-700 px-2 py-1 hover:bg-neutral-800"
-			>
-				{muted ? strings.unmute : strings.mute}
-			</button>
-			{#if volumeWorks}
-				<input
-					type="range"
-					aria-label={strings.volume}
-					min="0"
-					max="1"
-					step="0.05"
-					bind:value={volume}
-					class="hidden w-20 accent-neutral-100 sm:block"
-				/>
-			{/if}
-			<button
-				onclick={() => (subtitlesOpen = !subtitlesOpen)}
-				aria-label={strings.subtitle}
-				aria-pressed={subtitlesOpen}
-				class="rounded-md border px-2 py-1 font-semibold hover:bg-neutral-800 {playState?.subtitle
-					? 'border-neutral-300'
-					: 'border-neutral-700 text-neutral-400'}"
-			>
-				{strings.subtitlesButton}
-			</button>
-			<button
-				onclick={() => (chatOpen = !chatOpen)}
-				aria-pressed={chatOpen}
-				class="rounded-md border px-2 py-1 hover:bg-neutral-800 {chatOpen
-					? 'border-neutral-300'
-					: 'border-neutral-700 text-neutral-400'}"
-			>
-				{strings.chat}
-			</button>
-			<button
-				onclick={toggleFullscreen}
-				aria-label={full ? strings.exitFullscreen : strings.fullscreen}
-				class="rounded-md border border-neutral-700 px-2 py-1 hover:bg-neutral-800"
-			>
-				<svg viewBox="0 0 16 16" class="size-4" fill="none" stroke="currentColor" stroke-width="1.5">
-					{#if full}
-						<path d="M6 1v5H1M10 1v5h5M6 15v-5H1M10 15v-5h5" />
-					{:else}
-						<path d="M1 6V1h5M15 6V1h-5M1 10v5h5M15 10v5h-5" />
-					{/if}
-				</svg>
-			</button>
 		</div>
 	</div>
 
@@ -545,7 +673,7 @@
 		<!-- Landscape: the panel takes the row's height; absolute, so its messages never make the row
 		taller. Portrait: a sheet over the page's lower part, or over the video in fullscreen. -->
 		<aside
-			class="z-10 border-neutral-800 landscape:relative landscape:w-80 landscape:shrink-0 landscape:border-l portrait:fixed portrait:inset-x-0 portrait:bottom-0 portrait:h-[50dvh] portrait:overflow-hidden portrait:rounded-t-xl portrait:border-t"
+			class="z-10 border-line landscape:relative landscape:w-72 landscape:shrink-0 landscape:border-l lg:landscape:w-80 portrait:fixed portrait:inset-x-0 portrait:bottom-0 portrait:h-[50dvh] portrait:animate-sheet-up portrait:overflow-hidden portrait:rounded-t-panel portrait:border-t"
 		>
 			<div class="h-full landscape:absolute landscape:inset-0">
 				{@render side()}

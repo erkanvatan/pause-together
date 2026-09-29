@@ -43,6 +43,9 @@
 	// How soon a failed load tries again.
 	const loadRetryMs = 2000;
 
+	// Toasts leave at once for people who asked for less motion.
+	const toastFadeMs = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 400;
+
 	const id = $derived(Number(page.params.id));
 
 	let room = $state<Room | null>(null);
@@ -236,21 +239,6 @@
 		return r.ok;
 	}
 
-	// prepareText says where the room's prepared copy stands; '' when there's nothing to say, or the
-	// player shows it: ready.
-	function prepareText(p: Prepare | null): string {
-		switch (p?.state) {
-			case 'running':
-				return strings.jobRunning(Math.round(p.progress * 100));
-			case 'queued':
-				return strings.jobQueued(p.place);
-			case 'failed':
-				return strings.jobErrors[p.error] ?? strings.jobErrors.failed;
-			default:
-				return '';
-		}
-	}
-
 	// apply shows a changed room, or why the change failed.
 	function apply(r: Result<Room>) {
 		if (r.ok) {
@@ -325,11 +313,13 @@
 	{#each toasts as t (t.id)}
 		<button
 			onclick={() => replyFromToast(t)}
-			out:fade
-			class="pointer-events-auto line-clamp-2 rounded-md bg-black/70 px-2 py-1 text-left break-words"
+			out:fade={{ duration: toastFadeMs }}
+			class="pill pointer-events-auto flex text-left pointer-coarse:min-h-11 pointer-coarse:items-center"
 		>
-			<span class="font-semibold">{t.from.name}</span>
-			{t.text}
+			<span class="line-clamp-2 break-words">
+				<span class="font-semibold">{t.from.name}</span>
+				{t.text}
+			</span>
 		</button>
 	{/each}
 {/snippet}
@@ -340,24 +330,24 @@
 
 <!-- A portrait chat sheet covers the page's lower part: room to scroll the rest above it. -->
 <main
-	class="mx-auto flex max-w-6xl flex-col gap-4 p-4 pb-16 {chatOpen && room && !room.archived
+	class="flex w-full flex-col gap-4 px-4 pt-2 pb-16 {chatOpen && room && !room.archived
 		? 'portrait:pb-[50dvh]'
 		: ''}"
 >
 	{#if offline}
-		<p class="rounded-md bg-amber-900/60 px-3 py-2 text-amber-200" role="status">
+		<p class="rounded-control bg-lamp/15 px-3 py-2 text-lamp" role="status">
 			{strings.hostOffline}
 		</p>
 	{/if}
 	{#if notFound}
-		<div class="flex flex-col items-center gap-3 pt-24">
-			<p class="text-neutral-400">{strings.roomNotFound}</p>
-			<a href="/" class="underline">{strings.backHome}</a>
+		<div class="flex flex-col items-start gap-6 pt-16">
+			<p class="font-display text-2xl font-bold">{strings.roomNotFound}</p>
+			<a href="/" class="btn btn-quiet">{strings.backHome}</a>
 		</div>
 	{:else if room}
 		{#if renaming}
 			<form onsubmit={saveName} class="flex max-w-md flex-col gap-2">
-				<label for="room-name" class="text-sm text-neutral-400">{strings.roomName}</label>
+				<label for="room-name" class="text-sm text-haze">{strings.roomName}</label>
 				<!-- No maxlength: it counts UTF-16 units, not runes. The server decides. -->
 				<!-- svelte-ignore a11y_autofocus -->
 				<input
@@ -365,49 +355,45 @@
 					bind:value={name}
 					placeholder={videoName(room.video)}
 					autofocus
-					class="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 outline-none focus:border-neutral-400"
+					class="field"
 				/>
-				<p class="text-sm text-neutral-400">{strings.roomNameHint}</p>
+				<p class="text-sm text-haze">{strings.roomNameHint}</p>
 				<div class="flex gap-2">
-					<button
-						type="submit"
-						class="rounded-md bg-neutral-100 px-3 py-1.5 font-medium text-neutral-950"
-					>
-						{strings.save}
-					</button>
-					<button
-						type="button"
-						onclick={() => (renaming = false)}
-						class="rounded-md border border-neutral-700 px-3 py-1.5 text-neutral-300"
-					>
+					<button type="submit" class="btn btn-primary">{strings.save}</button>
+					<button type="button" onclick={() => (renaming = false)} class="btn btn-quiet">
 						{strings.cancel}
 					</button>
 				</div>
 			</form>
 		{:else}
-			<div class="flex flex-wrap items-baseline gap-3">
-				<h1 class="min-w-0 text-2xl font-bold break-words">{roomTitle(room)}</h1>
-				<button
-					onclick={startRename}
-					class="rounded-md border border-neutral-700 px-2.5 py-1 text-sm hover:bg-neutral-800"
-				>
-					{strings.renameRoom}
-				</button>
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+				<h1 class="min-w-0 font-display text-2xl font-bold break-words">{roomTitle(room)}</h1>
+				<div class="flex flex-wrap gap-2">
+					<button onclick={startRename} class="btn btn-quiet btn-small">
+						{strings.renameRoom}
+					</button>
+					{#if !room.archived}
+						<button onclick={() => openPicker()} class="btn btn-quiet btn-small">
+							{missing ? strings.pickAnother : strings.switchVideo}
+						</button>
+						{#if next && !missing}
+							<button onclick={() => openPicker(next ?? undefined)} class="btn btn-quiet btn-small">
+								{strings.nextEpisode}
+							</button>
+						{/if}
+					{/if}
+				</div>
 			</div>
 		{/if}
-		{#if room.name}
-			<p class="break-words text-neutral-400">{videoName(room.video)}</p>
+		{#if room.name && !renaming}
+			<p class="-mt-3 break-words text-haze">{videoName(room.video)}</p>
 		{/if}
 		{#if missing}
-			<p class="text-amber-400">{strings.videoMissing}</p>
-		{:else if !room.archived && prepareText(prepare)}
-			<p class={prepare?.state === 'failed' ? 'text-red-400' : 'text-neutral-300'}>
-				{prepareText(prepare)}
-			</p>
+			<p class="text-ember">{strings.videoMissing}</p>
 		{/if}
 
 		{#if error}
-			<p class="text-sm text-red-400" role="alert">{error}</p>
+			<p class="text-ember" role="alert">{error}</p>
 		{/if}
 
 		{#if !room.archived}
@@ -433,49 +419,37 @@
 		{/if}
 
 		{#if room.archived}
-			<p class="text-neutral-300">{strings.roomArchived}</p>
-			<button
-				onclick={unarchive}
-				class="self-start rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950"
-			>
+			<p>{strings.roomArchived}</p>
+			<button onclick={unarchive} class="btn btn-primary self-start">
 				{strings.unarchive}
 			</button>
-			<div class="h-96 overflow-hidden rounded-md border border-neutral-800">
+			<div class="h-96 overflow-hidden rounded-panel border border-line">
 				{@render chatPanel(true)}
-			</div>
-		{:else}
-			<div class="flex flex-wrap gap-2">
-				<button
-					onclick={() => openPicker()}
-					class="rounded-md border border-neutral-700 px-4 py-2 hover:bg-neutral-800"
-				>
-					{missing ? strings.pickAnother : strings.switchVideo}
-				</button>
-				{#if next && !missing}
-					<button
-						onclick={() => openPicker(next ?? undefined)}
-						class="rounded-md border border-neutral-700 px-4 py-2 hover:bg-neutral-800"
-					>
-						{strings.nextEpisode}
-					</button>
-				{/if}
 			</div>
 		{/if}
 
-		{#each [{ title: strings.watchingNow, people: watching }, { title: strings.wasHere, people: wasHere }] as list (list.title)}
-			{#if list.people.length > 0}
-				<section class="flex flex-col gap-1">
-					<h2 class="text-sm text-neutral-400">{list.title}</h2>
-					<ul class="flex flex-wrap gap-2">
-						{#each list.people as p (p.userId)}
-							<li class="rounded-full bg-neutral-800 px-3 py-1 text-sm break-all">{p.name}</li>
-						{/each}
-					</ul>
-				</section>
-			{/if}
-		{/each}
+		<div class="flex flex-col gap-2 pt-2">
+			{#each [{ title: strings.watchingNow, people: watching, here: true }, { title: strings.wasHere, people: wasHere, here: false }] as list (list.title)}
+				{#if list.people.length > 0}
+					<section class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+						<h2 class="flex items-center gap-2 text-sm text-haze">
+							<span
+								class="size-2 rounded-full {list.here ? 'bg-lamp' : 'border border-haze'}"
+								aria-hidden="true"
+							></span>
+							{list.title}
+						</h2>
+						<ul class="flex min-w-0 flex-wrap gap-x-4 gap-y-1">
+							{#each list.people as p (p.userId)}
+								<li class="break-all">{p.name}</li>
+							{/each}
+						</ul>
+					</section>
+				{/if}
+			{/each}
+		</div>
 	{:else if loadFailed}
-		<p class="pt-24 text-center text-neutral-400">{strings.loadFailed}</p>
+		<p class="pt-16 text-haze">{strings.loadFailed}</p>
 	{/if}
 </main>
 
@@ -486,23 +460,17 @@
 {#if confirming}
 	{@const c = confirming}
 	<div
-		class="fixed inset-0 z-20 flex items-center justify-center bg-black/70 p-4"
+		class="fixed inset-0 z-20 flex items-center justify-center bg-midnight/80 p-4"
 		role="dialog"
 		aria-modal="true"
 	>
-		<div class="flex max-w-md flex-col gap-4 rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-			<p class="break-words">{c.text}</p>
+		<div class="flex max-w-md flex-col gap-5 rounded-panel border border-line bg-dusk p-5">
+			<p class="text-lg break-words">{c.text}</p>
 			<div class="flex gap-2">
-				<button
-					onclick={() => doSwitch(c.pick)}
-					class="rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950"
-				>
+				<button onclick={() => doSwitch(c.pick)} class="btn btn-primary">
 					{strings.switchAction}
 				</button>
-				<button
-					onclick={() => (confirming = null)}
-					class="rounded-md border border-neutral-700 px-4 py-2 text-neutral-300"
-				>
+				<button onclick={() => (confirming = null)} class="btn btn-quiet">
 					{strings.cancel}
 				</button>
 			</div>

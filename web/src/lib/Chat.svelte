@@ -3,6 +3,7 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import type { ChatMessage } from '$lib/api';
 	import { canSend, MAX_MESSAGE_CHARS, messageLength } from '$lib/chat';
+	import Icon from '$lib/Icon.svelte';
 	import { videoName } from '$lib/picker';
 	import { strings } from '$lib/strings';
 	import { formatTime } from '$lib/time';
@@ -50,6 +51,13 @@
 	onMount(() => {
 		lastId = messages.at(-1)?.id;
 		list.scrollTop = list.scrollHeight;
+		// A shorter list (leaving fullscreen, a rotated phone) keeps its scroll spot, which hides the
+		// last messages. Stay at the bottom when it was there.
+		const resized = new ResizeObserver(() => {
+			if (atBottom) list.scrollTop = list.scrollHeight;
+		});
+		resized.observe(list);
+		return () => resized.disconnect();
 	});
 
 	// A new message at the end: follow it when at the bottom, or when it's our own. Older pages added in
@@ -90,6 +98,8 @@
 		e.preventDefault();
 		if (!online || !canSend(draft)) return;
 		onsend(draft.trim());
+		// On touch screens, close the keyboard so the video shows again.
+		if (matchMedia('(pointer: coarse)').matches) input?.blur();
 	}
 
 	function reply(m: ChatMessage) {
@@ -98,42 +108,41 @@
 	}
 </script>
 
-<section class="flex h-full min-h-0 flex-col bg-neutral-950 text-sm">
-	<header class="flex items-center justify-between border-b border-neutral-800 px-3 py-2">
-		<h2 class="font-semibold">{strings.chat}</h2>
+<section class="flex h-full min-h-0 flex-col bg-dusk">
+	<header class="flex items-center justify-between py-1 pr-1 pl-4">
+		<h2 class="font-display text-lg font-bold">{strings.chat}</h2>
 		{#if onclose}
-			<button
-				onclick={onclose}
-				aria-label={strings.closeChat}
-				class="rounded-md px-2 py-0.5 text-neutral-400 hover:bg-neutral-800"
-			>
-				✕
+			<button onclick={onclose} aria-label={strings.closeChat} class="icon-btn text-haze">
+				<Icon name="close" class="size-5" />
 			</button>
 		{/if}
 	</header>
 
-	<ol bind:this={list} onscroll={scrolled} class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
+	<ol bind:this={list} onscroll={scrolled} class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
 		{#if olderFailed}
-			<li class="px-1 text-red-400">{strings.olderFailed}</li>
+			<li class="px-2 text-sm text-ember">{strings.olderFailed}</li>
 		{/if}
 		{#if messages.length === 0}
-			<li class="m-auto text-neutral-500">{strings.noMessages}</li>
+			<li class="m-auto text-haze">{strings.noMessages}</li>
 		{/if}
 		{#each messages as m (m.id)}
-			<li class="rounded-md {selected === m.id ? 'bg-neutral-900' : ''}">
+			<li class="rounded-control {selected === m.id ? 'bg-midnight/60' : ''}">
 				<button
 					onclick={() => (selected = selected === m.id ? null : m.id)}
 					title={strings.sentAt(m.sentAt)}
-					class="flex w-full flex-col gap-0.5 rounded-md px-2 py-1 text-left hover:bg-neutral-900"
+					class="flex w-full flex-col gap-0.5 rounded-control px-2 py-1.5 text-left hover:bg-midnight/40"
 				>
-					<span class="flex flex-wrap items-baseline gap-x-2">
-						<span class="font-semibold break-all">{m.from.name}</span>
-						<span class="text-xs text-neutral-500 tabular-nums">
-							{formatTime(m.positionMs)}{m.video.id === videoId ? '' : ` · ${videoName(m.video)}`}
+					<span class="flex flex-wrap items-baseline gap-x-2 text-sm">
+						<span class="font-bold break-all {m.from.userId === userId ? 'text-lamp' : ''}">
+							{m.from.name}
 						</span>
+						<span class="text-haze tabular-nums">{formatTime(m.positionMs)}</span>
+						{#if m.video.id !== videoId}
+							<span class="min-w-0 break-words text-haze">{videoName(m.video)}</span>
+						{/if}
 					</span>
 					{#if m.replyTo}
-						<span class="line-clamp-2 border-l-2 border-neutral-600 pl-2 break-words text-neutral-400">
+						<span class="line-clamp-2 border-l-2 border-line pl-2 text-sm break-words text-haze">
 							{#if m.replyTo.deleted}
 								<i>{strings.deletedMessage}</i>
 							{:else}
@@ -144,20 +153,17 @@
 					<span class="break-words whitespace-pre-wrap">{m.text}</span>
 				</button>
 				{#if selected === m.id}
-					<div class="flex flex-wrap items-center gap-2 px-2 pb-1 text-xs">
-						<span class="text-neutral-400">{strings.sentAt(m.sentAt)}</span>
+					<div class="flex flex-wrap items-center gap-2 px-2 pb-2 text-sm">
+						<span class="text-haze">{strings.sentAt(m.sentAt)}</span>
 						{#if !readOnly}
-							<button
-								onclick={() => reply(m)}
-								class="rounded-md border border-neutral-700 px-2 py-0.5 hover:bg-neutral-800"
-							>
+							<button onclick={() => reply(m)} class="btn btn-quiet btn-small">
 								{strings.reply}
 							</button>
 							{#if m.from.userId === userId}
 								<button
 									onclick={() => ondelete(m.id)}
 									disabled={!online}
-									class="rounded-md border border-neutral-700 px-2 py-0.5 text-red-300 hover:bg-neutral-800 disabled:opacity-50"
+									class="btn btn-quiet btn-small text-ember"
 								>
 									{strings.deleteMessage}
 								</button>
@@ -170,22 +176,22 @@
 	</ol>
 
 	{#if readOnly}
-		<p class="border-t border-neutral-800 px-3 py-2 text-neutral-400">{strings.chatReadOnly}</p>
+		<p class="border-t border-line px-4 py-3 text-sm text-haze">{strings.chatReadOnly}</p>
 	{:else}
-		<form onsubmit={submit} class="flex flex-col gap-1 border-t border-neutral-800 p-2">
+		<form onsubmit={submit} class="flex flex-col gap-2 border-t border-line p-2">
 			{#if replyTo}
 				<div class="flex items-start gap-2">
-					<p class="line-clamp-2 min-w-0 flex-1 border-l-2 border-neutral-600 pl-2 break-words text-neutral-400">
-						<span class="font-semibold">{strings.replyingTo(replyTo.from.name)}</span>
+					<p class="line-clamp-2 min-w-0 flex-1 border-l-2 border-lamp pl-2 text-sm break-words text-haze">
+						<span class="font-semibold text-moonlight">{strings.replyingTo(replyTo.from.name)}</span>
 						{#if replyTo.text}{replyTo.text}{:else}<i>{strings.deletedMessage}</i>{/if}
 					</p>
 					<button
 						type="button"
 						onclick={() => (replyTo = null)}
 						aria-label={strings.cancelReply}
-						class="rounded-md px-2 py-0.5 text-neutral-400 hover:bg-neutral-800"
+						class="icon-btn -my-2 text-haze"
 					>
-						✕
+						<Icon name="close" class="size-4" />
 					</button>
 				</div>
 			{/if}
@@ -195,19 +201,16 @@
 					bind:this={input}
 					bind:value={draft}
 					placeholder={strings.messagePlaceholder}
+					enterkeyhint="send"
 					aria-label={strings.messagePlaceholder}
-					class="min-w-0 flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 outline-none focus:border-neutral-400"
+					class="field min-w-0 flex-1 bg-midnight"
 				/>
-				<button
-					type="submit"
-					disabled={!online || !canSend(draft)}
-					class="rounded-md bg-neutral-100 px-3 py-1.5 font-medium text-neutral-950 disabled:opacity-50"
-				>
+				<button type="submit" disabled={!online || !canSend(draft)} class="btn btn-primary">
 					{strings.send}
 				</button>
 			</div>
 			{#if length > MAX_MESSAGE_CHARS - 100}
-				<p class="text-xs tabular-nums {length > MAX_MESSAGE_CHARS ? 'text-red-400' : 'text-neutral-400'}">
+				<p class="text-sm tabular-nums {length > MAX_MESSAGE_CHARS ? 'text-ember' : 'text-haze'}">
 					{length} / {MAX_MESSAGE_CHARS}
 				</p>
 			{/if}

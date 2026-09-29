@@ -109,6 +109,14 @@ describe('jobText', () => {
 		expect(jobText({ ...job, state: 'running', progress: 0.426 })).toBe('Preparing… 42%');
 	});
 
+	it('never shows 100% before the copy is ready', () => {
+		expect(jobText({ ...job, state: 'running', progress: 0.996 })).toBe('Preparing… 99%');
+	});
+
+	it.each(['ready', ''] as const)('says nothing for state %j', (state) => {
+		expect(jobText({ ...job, state })).toBe('');
+	});
+
 	it.each([
 		[1, 'Queued, next in line'],
 		[2, 'Queued, 2nd in line'],

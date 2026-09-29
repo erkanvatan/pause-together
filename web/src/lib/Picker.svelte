@@ -10,6 +10,7 @@
 		type VideoDetail,
 		type VideoSummary
 	} from '$lib/api';
+	import Icon from '$lib/Icon.svelte';
 	import {
 		audioLabel,
 		defaultAudio,
@@ -170,51 +171,55 @@
 
 <svelte:window onkeydown={escape} />
 
-{#snippet videoRow(v: VideoSummary, label: string)}
+{#snippet videoRow(v: VideoSummary, label: string, code = '')}
 	{@const why = whyUnplayable(v, canPlayType)}
 	<li>
-		<button
-			disabled={why !== ''}
-			onclick={() => choose(v)}
-			class="w-full rounded-md px-3 py-2 text-left hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-		>
-			<span class="block break-words">{label}</span>
-			{#if why}
-				<span class="block text-sm text-neutral-400">{why}</span>
-			{:else if v.appleOnly}
-				<span class="block text-sm text-amber-400">{strings.appleOnlyPick}</span>
-			{/if}
+		<button disabled={why !== ''} onclick={() => choose(v)} class="row">
+			<span class="min-w-0 flex-1">
+				<span class="block break-words">
+					{#if code}<span class="mr-2 text-haze tabular-nums">{code}</span>{/if}{label}
+				</span>
+				{#if why}
+					<span class="block text-sm text-haze">{why}</span>
+				{:else if v.appleOnly}
+					<span class="block text-sm text-lamp">{strings.appleOnlyPick}</span>
+				{/if}
+			</span>
 		</button>
 	</li>
 {/snippet}
 
 {#snippet folderRow(label: string, detail: string, open: () => void)}
 	<li>
-		<button onclick={open} class="w-full rounded-md px-3 py-2 text-left hover:bg-neutral-800">
-			<span class="block break-words">{label}</span>
-			{#if detail}
-				<span class="block text-sm text-neutral-400">{detail}</span>
-			{/if}
+		<button onclick={open} class="row">
+			<span class="min-w-0 flex-1">
+				<span class="block break-words">{label}</span>
+				{#if detail}
+					<span class="block text-sm text-haze">{detail}</span>
+				{/if}
+			</span>
+			<Icon name="chevron" class="size-5 shrink-0 text-haze" />
 		</button>
 	</li>
 {/snippet}
 
 <div
-	class="fixed inset-0 z-20 flex items-stretch justify-center bg-black/70 sm:items-center sm:p-6"
+	class="fixed inset-0 z-20 flex items-stretch justify-center bg-midnight/80 sm:items-center sm:p-6"
 	role="dialog"
 	aria-modal="true"
 	aria-label={strings.pickVideo}
 >
 	<div
-		class="flex w-full flex-col bg-neutral-900 sm:h-[85vh] sm:max-w-2xl sm:rounded-lg sm:border sm:border-neutral-800"
+		class="flex w-full flex-col bg-dusk sm:h-[85vh] sm:max-w-2xl sm:rounded-panel sm:border sm:border-line"
 	>
-		<header class="flex items-center gap-2 border-b border-neutral-800 p-3">
+		<header class="flex items-center gap-1 border-b border-line p-1 pl-2">
 			{#if canGoBack}
-				<button onclick={back} class="rounded-md px-2 py-1 text-neutral-300 hover:bg-neutral-800">
-					← {strings.back}
+				<button onclick={back} class="btn gap-1 px-2 font-normal text-haze hover:text-moonlight">
+					<Icon name="back" class="size-5" />
+					{strings.back}
 				</button>
 			{/if}
-			<h2 class="min-w-0 flex-1 truncate font-semibold">
+			<h2 class="min-w-0 flex-1 truncate px-2 font-display text-lg font-bold">
 				{#if picked}
 					{videoName(picked)}
 				{:else if show && !results}
@@ -225,57 +230,43 @@
 					{strings.pickVideo}
 				{/if}
 			</h2>
-			<button
-				onclick={onclose}
-				aria-label={strings.close}
-				class="rounded-md px-2.5 py-1 text-neutral-300 hover:bg-neutral-800"
-			>
-				✕
+			<button onclick={onclose} aria-label={strings.close} class="icon-btn text-haze">
+				<Icon name="close" class="size-5" />
 			</button>
 		</header>
 
 		{#if pickFailed}
-			<p class="px-4 pt-3 text-sm text-red-400" role="alert">{strings.actionFailed}</p>
+			<p class="px-4 pt-3 text-ember" role="alert">{strings.actionFailed}</p>
 		{/if}
 
 		{#if picked}
-			<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-				<label class="flex flex-col gap-1">
-					<span class="text-sm text-neutral-400">{strings.audio}</span>
+			<div class="flex flex-1 flex-col gap-5 overflow-y-auto p-4">
+				<label class="flex flex-col gap-1.5">
+					<span class="text-sm text-haze">{strings.audio}</span>
 					{#if picked.audio.length === 0}
 						<span>{strings.noAudio}</span>
 					{:else}
-						<select
-							bind:value={audio}
-							onchange={audioChanged}
-							class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-2"
-						>
+						<select bind:value={audio} onchange={audioChanged} class="field">
 							{#each picked.audio as t (t.stream)}
 								<option value={t.stream}>{audioLabel(t)}</option>
 							{/each}
 						</select>
 					{/if}
 				</label>
-				<label class="flex flex-col gap-1">
-					<span class="text-sm text-neutral-400">{strings.subtitle}</span>
-					<select
-						bind:value={subtitle}
-						onchange={() => (subtitleTouched = true)}
-						class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-2"
-					>
+				<label class="flex flex-col gap-1.5">
+					<span class="text-sm text-haze">{strings.subtitle}</span>
+					<select bind:value={subtitle} onchange={() => (subtitleTouched = true)} class="field">
 						<option value="">{strings.subtitleOff}</option>
 						{#each options as o (o.key)}
 							{@const why = (strings.subtitleUnavailable as Record<string, string>)[o.unavailable]}
 							<option value={o.key} disabled={o.unavailable !== ''}>
-								{subtitleLabel(o)}{o.unavailable ? ` — ${why ?? o.unavailable}` : ''}
+								{o.unavailable ? strings.withNote(subtitleLabel(o), why ?? o.unavailable) : subtitleLabel(o)}
 							</option>
 						{/each}
 					</select>
 				</label>
-				<button
-					onclick={start}
-					class="self-start rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950"
-				>
+				<button onclick={start} class="btn btn-primary self-start">
+					<Icon name="play" class="size-5" />
 					{strings.start}
 				</button>
 			</div>
@@ -286,26 +277,23 @@
 					bind:value={query}
 					placeholder={strings.search}
 					aria-label={strings.search}
-					class="min-w-0 flex-1 rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2"
+					class="field min-w-0 flex-1 bg-midnight"
 				/>
-				<select
-					bind:value={sort}
-					class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-2 text-sm"
-				>
+				<select bind:value={sort} aria-label={strings.sort} class="field">
 					<option value="title">{strings.sortTitle}</option>
 					<option value="recent">{strings.sortRecent}</option>
 				</select>
 			</div>
 
 			{#if !results && all.length > 1}
-				<nav class="flex gap-1 px-3 pb-2">
+				<nav class="flex gap-5 border-b border-line px-4">
 					{#each all as s (s.type)}
 						<button
 							onclick={() => openTab(s.type)}
 							aria-pressed={s === shelf}
-							class="rounded-md px-3 py-1.5 text-sm {s === shelf
-								? 'bg-neutral-100 text-neutral-950'
-								: 'text-neutral-300 hover:bg-neutral-800'}"
+							class="-mb-px min-h-11 border-b-2 {s === shelf
+								? 'border-lamp text-moonlight'
+								: 'border-transparent text-haze hover:text-moonlight'}"
 						>
 							{strings.libraryTypes[s.type]}
 						</button>
@@ -313,13 +301,13 @@
 				</nav>
 			{/if}
 
-			<div class="flex-1 overflow-y-auto px-1 pb-4">
+			<div class="flex-1 overflow-y-auto p-2 pb-4">
 				{#if videos === null}
 					{#if loadFailed}
-						<p class="p-3 text-neutral-400">{strings.loadFailed}</p>
+						<p class="p-3 text-haze">{strings.loadFailed}</p>
 					{/if}
 				{:else if results?.length === 0}
-					<p class="p-3 text-neutral-400">{strings.noMatches}</p>
+					<p class="p-3 text-haze">{strings.noMatches}</p>
 				{:else if results}
 					<ul>
 						{#each results as v (v.id)}
@@ -327,7 +315,7 @@
 						{/each}
 					</ul>
 				{:else if !shelf}
-					<p class="p-3 text-neutral-400">{strings.noVideos}</p>
+					<p class="p-3 text-haze">{strings.noVideos}</p>
 				{:else if shelf.type === 'movies'}
 					<ul>
 						{#each shelf.movies as v (v.id)}
@@ -337,15 +325,12 @@
 				{:else if shelf.type === 'tv'}
 					{#if show}
 						{#each show.seasons as season (season.number)}
-							<h3 class="px-3 pt-3 pb-1 text-sm font-semibold text-neutral-400">
+							<h3 class="px-3 pt-4 pb-1 font-display text-lg font-bold text-haze">
 								{strings.season(season.number)}
 							</h3>
 							<ul>
 								{#each season.episodes as v (v.id)}
-									{@render videoRow(
-										v,
-										[episodeCode(v), v.episodeTitle].filter(Boolean).join(' · ')
-									)}
+									{@render videoRow(v, v.episodeTitle, episodeCode(v))}
 								{/each}
 							</ul>
 						{/each}

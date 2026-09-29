@@ -1,5 +1,6 @@
 // The admin API. Only the admin port serves it; elsewhere every call fails with 404.
 import { call, type Languages, type LibraryType, type Result } from '$lib/api';
+import type { Prepare } from '$lib/protocol';
 import { reasonText, strings } from '$lib/strings';
 
 export type ScanStatus = {
@@ -90,8 +91,9 @@ export function problemText(p: Problem): string {
 	return p.reason === 'codec' && p.codec ? `${text} (${p.codec})` : text;
 }
 
-// jobText says where a job stands. Unknown failure codes show as they are.
-export function jobText(j: Job): string {
+// jobText says where a job, or a room's prepared copy, stands; '' when it's ready or there's none.
+// Unknown failure codes show as they are.
+export function jobText(j: Pick<Prepare, 'state' | 'place' | 'progress' | 'error'>): string {
 	switch (j.state) {
 		case 'running':
 			return strings.jobRunning(Math.floor(j.progress * 100));
@@ -99,6 +101,8 @@ export function jobText(j: Job): string {
 			return strings.jobQueued(j.place);
 		case 'failed':
 			return strings.jobErrors[j.error] ?? j.error;
+		default:
+			return '';
 	}
 }
 

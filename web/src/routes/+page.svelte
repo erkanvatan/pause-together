@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
+	import Icon from '$lib/Icon.svelte';
 	import Picker from '$lib/Picker.svelte';
 	import { deleteRoom } from '$lib/admin';
 	import { createRoom, listRooms, setArchived, type Pick, type Result, type RoomCard } from '$lib/api';
@@ -78,58 +79,60 @@
 </svelte:head>
 
 {#snippet card(r: RoomCard)}
-	<li class="flex flex-col gap-2 rounded-md border border-neutral-800 p-3">
-		<div class="flex flex-wrap items-center justify-between gap-2">
-			<a href="/rooms/{r.id}" class="min-w-0 flex-1 hover:underline">
-				<span class="block font-medium break-words">{roomTitle(r)}</span>
-				{#if r.name}
-					<span class="block text-sm break-words text-neutral-400">{videoName(r.video)}</span>
-				{/if}
-				{#if r.video.missing}
-					<span class="block text-sm text-amber-400">{strings.videoMissing}</span>
-				{/if}
-				{#if r.watching.length > 0}
-					<span class="block text-sm break-words text-emerald-400">
+	<li class="relative flex flex-col gap-3 py-3 pl-5 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-4">
+		{#if r.watching.length > 0}
+			<!-- The lamp is on: someone is in this room. -->
+			<span class="absolute inset-y-3 left-0 w-1 rounded-full bg-lamp" aria-hidden="true"></span>
+		{/if}
+		<a href="/rooms/{r.id}" class="group min-h-11 min-w-0 flex-1 rounded-control">
+			<span
+				class="block font-display text-xl font-bold break-words decoration-lamp decoration-2 underline-offset-4 group-hover:underline {r.archived
+					? 'text-haze'
+					: ''}"
+			>
+				{roomTitle(r)}
+			</span>
+			{#if r.name}
+				<span class="mt-1 block break-words text-haze">{videoName(r.video)}</span>
+			{/if}
+			{#if r.video.missing}
+				<span class="mt-1 block text-sm text-ember">{strings.videoMissing}</span>
+			{/if}
+			{#if r.watching.length > 0}
+				<span class="mt-1 flex items-center gap-2 text-sm">
+					<span class="size-2 shrink-0 rounded-full bg-lamp" aria-hidden="true"></span>
+					<span class="min-w-0 break-words">
 						{strings.watchingList(r.watching.map((w) => w.name).join(', '))}
 					</span>
-				{/if}
-			</a>
-			<div class="flex gap-2 text-sm">
-				<!-- Archive only an empty room. The server checks too: someone may just have joined. -->
-				{#if r.archived || r.watching.length === 0}
-					<button
-						onclick={() => act(setArchived(r.id, !r.archived))}
-						class="rounded-md border border-neutral-700 px-2.5 py-1 hover:bg-neutral-800"
-					>
-						{r.archived ? strings.unarchive : strings.archive}
-					</button>
-				{/if}
-				{#if me.isAdmin}
-					<button
-						onclick={() => (confirming = r.id)}
-						class="rounded-md border border-neutral-700 px-2.5 py-1 hover:bg-neutral-800"
-					>
-						{strings.deleteRoom}
-					</button>
-				{/if}
-			</div>
+				</span>
+			{/if}
+		</a>
+		<div class="flex flex-wrap gap-2">
+			<!-- Archive only an empty room. The server checks too: someone may just have joined. -->
+			{#if r.archived || r.watching.length === 0}
+				<button onclick={() => act(setArchived(r.id, !r.archived))} class="btn btn-quiet btn-small">
+					{r.archived ? strings.unarchive : strings.archive}
+				</button>
+			{/if}
+			{#if me.isAdmin}
+				<button onclick={() => (confirming = r.id)} class="btn btn-quiet btn-small">
+					{strings.deleteRoom}
+				</button>
+			{/if}
 		</div>
 		{#if confirming === r.id}
-			<div class="flex flex-wrap items-center gap-2 text-sm">
-				<span class="text-neutral-300">{strings.deleteRoomConfirm}</span>
+			<div class="flex basis-full flex-wrap items-center gap-2 text-sm">
+				<span>{strings.deleteRoomConfirm}</span>
 				<button
 					onclick={() => {
 						confirming = null;
 						act(deleteRoom(r.id));
 					}}
-					class="rounded-md bg-red-600 px-2.5 py-1 font-medium text-white"
+					class="btn btn-danger btn-small"
 				>
 					{strings.deleteRoom}
 				</button>
-				<button
-					onclick={() => (confirming = null)}
-					class="rounded-md border border-neutral-700 px-2.5 py-1"
-				>
+				<button onclick={() => (confirming = null)} class="btn btn-quiet btn-small">
 					{strings.cancel}
 				</button>
 			</div>
@@ -137,52 +140,51 @@
 	</li>
 {/snippet}
 
-<main class="mx-auto flex max-w-3xl flex-col gap-10 p-4 pb-16">
-	<div class="flex flex-col items-center gap-2 pt-12">
-		<h1 class="text-4xl font-bold">{strings.appName}</h1>
-		<p class="text-neutral-400">{strings.tagline}</p>
-		<button
-			onclick={() => (picking = true)}
-			class="mt-6 rounded-md bg-neutral-100 px-4 py-2 font-medium text-neutral-950"
-		>
+<main
+	class="mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 px-4 pt-8 pb-16 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-16 lg:pt-16"
+>
+	<div class="flex flex-col items-start gap-6 lg:sticky lg:top-8 lg:self-start">
+		<h1 class="font-display text-3xl font-extrabold text-balance">{strings.tagline}</h1>
+		<button onclick={() => (picking = true)} class="btn btn-primary">
+			<Icon name="play" class="size-5" />
 			{strings.watchSomething}
 		</button>
+		{#if page.state.roomDeleted}
+			<p class="text-haze" role="status">{strings.roomDeleted}</p>
+		{/if}
+		{#if loadFailed || actionError}
+			<p class="text-ember" role="alert">
+				{loadFailed ? strings.loadFailed : actionError}
+			</p>
+		{/if}
 	</div>
 
-	{#if page.state.roomDeleted}
-		<p class="text-sm text-neutral-300" role="status">{strings.roomDeleted}</p>
-	{/if}
-
-	{#if loadFailed || actionError}
-		<p class="text-sm text-red-400" role="alert">
-			{loadFailed ? strings.loadFailed : actionError}
-		</p>
-	{/if}
-
 	{#if rooms}
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{strings.rooms}</h2>
-			{#if parts.active.length === 0}
-				<p class="text-neutral-400">{strings.noRooms}</p>
-			{:else}
-				<ul class="flex flex-col gap-2">
-					{#each parts.active as r (r.id)}
-						{@render card(r)}
-					{/each}
-				</ul>
-			{/if}
-		</section>
-
-		{#if parts.archived.length > 0}
-			<section class="flex flex-col gap-3">
-				<h2 class="text-lg font-semibold">{strings.archivedRooms}</h2>
-				<ul class="flex flex-col gap-2">
-					{#each parts.archived as r (r.id)}
-						{@render card(r)}
-					{/each}
-				</ul>
+		<div class="flex flex-col gap-10">
+			<section class="flex flex-col gap-2">
+				<h2 class="font-display text-xl font-bold text-haze">{strings.rooms}</h2>
+				{#if parts.active.length === 0}
+					<p class="text-haze">{strings.noRooms}</p>
+				{:else}
+					<ul class="flex flex-col gap-2">
+						{#each parts.active as r (r.id)}
+							{@render card(r)}
+						{/each}
+					</ul>
+				{/if}
 			</section>
-		{/if}
+
+			{#if parts.archived.length > 0}
+				<section class="flex flex-col gap-2">
+					<h2 class="font-display text-xl font-bold text-haze">{strings.archivedRooms}</h2>
+					<ul class="flex flex-col gap-2">
+						{#each parts.archived as r (r.id)}
+							{@render card(r)}
+						{/each}
+					</ul>
+				</section>
+			{/if}
+		</div>
 	{/if}
 </main>
 

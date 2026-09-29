@@ -55,6 +55,7 @@ export const strings = {
 	original: 'Original',
 	none: 'None',
 	saved: 'Saved.',
+	readsAs: (what: string) => `Reads as: ${what}`,
 	langErrors: {
 		'bad-lang': 'Use 2- or 3-letter language codes like tr or en, at most 10.',
 		failed: "Couldn't save. Try again."
@@ -75,7 +76,7 @@ export const strings = {
 
 	jobs: 'Prepare jobs',
 	noJobs: 'Nothing to prepare.',
-	diskUsage: (cache: string, free: string) => `Cache ${cache} · ${free} free on its disk`,
+	diskUsage: (cache: string, free: string) => `Cache ${cache}, with ${free} free on its disk`,
 	clearCache: 'Clear cache',
 	clearCacheConfirm:
 		'Delete every prepared copy? Anyone watching now is cut off, and each room prepares its video again when opened.',
@@ -135,6 +136,8 @@ export const strings = {
 	tapToJoin: 'Tap to join',
 	play: 'Play',
 	pause: 'Pause',
+	skipBack: (s: number) => `Back ${s} seconds`,
+	skipForward: (s: number) => `Forward ${s} seconds`,
 	mute: 'Mute',
 	unmute: 'Unmute',
 	volume: 'Volume',
@@ -154,12 +157,14 @@ export const strings = {
 	reset: 'Reset',
 	subtitleSize: 'Size',
 	subtitleSizes: { small: 'Small', medium: 'Medium', large: 'Large' },
-	subtitlesButton: 'CC',
 	subtitleFailed: "Couldn't load the subtitles.",
 	subtitleRetrying: "Couldn't load the subtitles. Retrying…",
 	notInCopy: 'not in the prepared copy',
+	// A subtitle choice with why it can't be picked.
+	withNote: (label: string, note: string) => `${label} (${note})`,
 	nextEpisode: 'Next episode',
-	nextEpisodeNamed: (name: string) => `Next episode: ${name}`,
+	nextEpisodeNamed: (code: string, title: string) =>
+		title ? `Next episode: ${code} ${title}` : `Next episode: ${code}`,
 	chat: 'Chat',
 	closeChat: 'Close chat',
 	noMessages: 'No messages yet.',
@@ -182,6 +187,7 @@ export const strings = {
 	close: 'Close',
 	back: 'Back',
 	search: 'Search',
+	sort: 'Sort',
 	sortTitle: 'A–Z',
 	sortRecent: 'Recently added',
 	noVideos: 'No videos yet. The host adds libraries on the admin page.',

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { listFolders } from '$lib/admin';
+	import Icon from '$lib/Icon.svelte';
 	import { strings } from '$lib/strings';
 
 	// path is the folder the picker is in, relative to the media folder ('' is the media folder).
@@ -31,39 +32,37 @@
 	}
 </script>
 
-<div class="rounded-md border border-neutral-800">
-	<nav class="flex flex-wrap items-center gap-1 border-b border-neutral-800 px-2 py-1.5 text-sm">
-		<button type="button" onclick={() => up(0)} class="rounded px-1.5 py-0.5 hover:bg-neutral-800">
+<div class="overflow-hidden rounded-panel border border-line bg-dusk">
+	<nav class="flex flex-wrap items-center gap-0.5 border-b border-line px-2 py-1 text-sm">
+		<button type="button" onclick={() => up(0)} class="btn btn-small px-2 font-normal text-haze hover:text-moonlight">
 			{strings.mediaFolder}
 		</button>
 		{#each parts as part, i (i)}
-			<span class="text-neutral-600">/</span>
+			<span class="text-haze" aria-hidden="true">/</span>
 			<button
 				type="button"
 				onclick={() => up(i + 1)}
-				class="rounded px-1.5 py-0.5 hover:bg-neutral-800"
+				class="btn btn-small px-2 font-normal break-all {i === parts.length - 1
+					? 'text-moonlight'
+					: 'text-haze hover:text-moonlight'}"
 			>
 				{part}
 			</button>
 		{/each}
 	</nav>
-	<ul class="max-h-64 overflow-y-auto py-1">
+	<ul class="max-h-64 overflow-y-auto p-1">
 		{#if failed}
-			<li class="px-3 py-2 text-sm text-red-400">{strings.foldersFailed}</li>
+			<li class="px-3 py-2 text-sm text-ember">{strings.foldersFailed}</li>
 		{:else}
 			{#each folders as folder (folder)}
 				<li>
-					<button
-						type="button"
-						onclick={() => open(folder)}
-						class="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-neutral-800"
-					>
-						<span class="truncate">{folder}</span>
-						<span class="text-neutral-500">›</span>
+					<button type="button" onclick={() => open(folder)} class="row">
+						<span class="min-w-0 flex-1 truncate">{folder}</span>
+						<Icon name="chevron" class="size-5 shrink-0 text-haze" />
 					</button>
 				</li>
 			{:else}
-				<li class="px-3 py-2 text-sm text-neutral-500">{strings.noFolders}</li>
+				<li class="px-3 py-2 text-sm text-haze">{strings.noFolders}</li>
 			{/each}
 		{/if}
 	</ul>

@@ -11,12 +11,14 @@
 		url,
 		offsetMs,
 		size,
-		videoMs
+		videoMs,
+		lift = 0
 	}: {
 		url: string; // '' = none
 		offsetMs: number; // positive shows the text later
 		size: SubtitleSize;
 		videoMs: () => number; // where the video is now
+		lift?: number; // px of controls over the video's bottom edge; the text sits above them
 	} = $props();
 
 	// Relative to the player's width, so fullscreen makes the text bigger; never below a readable size.
@@ -72,13 +74,14 @@
 </script>
 
 {#if failed}
-	<p class="pointer-events-none absolute top-2 right-2 rounded-md bg-black/70 px-2 py-1 text-sm">
+	<p class="pill pointer-events-none absolute top-2 right-2 text-sm">
 		{failed === 'gone' ? strings.subtitleFailed : strings.subtitleRetrying}
 	</p>
 {/if}
 
 <div
-	class="pointer-events-none absolute inset-x-0 bottom-[6%] flex flex-col items-center gap-0.5 px-[5%] text-center leading-snug {sizes[
+	style:bottom={lift ? `calc(${lift}px + 2%)` : undefined}
+	class="pointer-events-none absolute inset-x-0 bottom-[6%] flex transition-[bottom] duration-300 flex-col items-center gap-0.5 px-[5%] text-center leading-snug {sizes[
 		size
 	]}"
 >

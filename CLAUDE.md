@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 serves its local video library. Guests reach it over Tailscale and watch in sync from PCs, tablets and
 phones. Same show. Same second. Different places.
 
-**Status: slices 1–17 are built; UI refinement is next (`docs/plan.md`).** This file is the spec. When
+**Status: slices 1–18 are built; the field test is next (`docs/plan.md`).** This file is the spec. When
 code changes, update the layout and commands below to match reality. The rules here are decided: flag problems,
 but don't quietly change them. Work each slice by the steps under "How to work a slice" in
 `docs/plan.md`.
@@ -25,6 +25,16 @@ but don't quietly change them. Work each slice by the steps under "How to work a
   the root layout), Svelte 5 runes, Tailwind v4 (config lives in CSS via `@theme`; there is no
   `tailwind.config.js`). Go serves real files and falls back to `index.html` for app routes like
   `/rooms/{id}`.
+- **Look:** design tokens live in `web/src/app.css` under `@theme`: six named colors (`midnight` page,
+  `dusk` raised surfaces, `haze` quiet text, `moonlight` text, `lamp` accent, `ember` delete and errors),
+  plus `line` (borders) and plain `black` and `white` (the video box, subtitles). Tailwind's own colors
+  and text sizes are cleared, so only these exist: `text-sm` to `text-3xl`, and a `text-xs` or
+  `neutral-700` silently builds to nothing. Radii add `rounded-control` and `rounded-panel` to
+  Tailwind's own; `font-display` is for titles. Shared classes there too (`.btn` with `-primary`,
+  `-quiet`, `-danger`, `-small`; `.field`, `.icon-btn`, `.row`, `.pill`). Components use the tokens, never loose hex values. Fonts are
+  bundled with `@fontsource-variable` (Big Shoulders for titles, Atkinson Hyperlegible Next for the
+  rest), never loaded from a CDN: guests may have no route to the internet. Controls are at least
+  44 px on touch screens.
 - **Embedding:** the web build is embedded into the Go binary with `//go:embed all:build`. Plain
   `build` would skip `build/_app`, where all the JS lives: `go:embed` leaves out names starting with `_`
   or `.`. `web/build/.gitkeep` is committed so Go compiles before any web build exists. SvelteKit empties
@@ -128,20 +138,23 @@ testdata/make.sh     makes the test clips in testdata/media (git-ignored)
 docs/plan.md         build order in slices, and how to work one
 .claude/skills/      git-commit, fix-comments (used by the slice steps in docs/plan.md)
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
+web/src/app.css      design tokens (@theme), shared classes, font imports
 web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode),
                      Picker.svelte,
                      FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts,
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID),
-                     Player.svelte (the <video>, "Tap to join", controls, the follow loop, subtitle panel,
+                     Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
                      fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
                      Subtitles.svelte (the subtitle overlay), prefs.ts (per-device player settings in
                      localStorage), time.ts (1:40:00), chat.ts (pure: message length, the message list),
-                     Chat.svelte (the chat panel);
+                     Chat.svelte (the chat panel), Icon.svelte (inline SVG icons);
                      sync/ (pure): clock.ts (server clock offset), drift.ts (drift fix, follow step), state.ts
                      (target position, local intents), status.ts (what the player reports, and when),
                      timing.ts (its timing constants)
 web/src/routes/      homepage (room list), rooms/[id] (room page), admin
+web/static/          favicon.svg
+README.md            for users: setup (Tailscale, ip_nonlocal_bind, Docker at boot), file naming
 Dockerfile           web build → Go build → runtime image with Debian's ffmpeg; go-dev stage (also ffmpeg) for dev and tests
 compose.yml          production
 compose.dev.yml      development
@@ -446,8 +459,15 @@ So each room's video is **prepared once**, then served as a plain file.
   Chromecast and Picture-in-Picture take the video out of the page, away from our subtitles, controls
   and sync. Not in v1.
 - Browsers block autoplay with sound, so entering a room shows a "Tap to join" button first.
+- While the copy is prepared, the player shows "Preparing… 42%" with a progress bar, or its place in line.
 - Fullscreen the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   `document.fullscreenEnabled` is false (iPhone Safari), fill the window with CSS instead.
+- Controls fade after 3 s with no mouse move, touch or key while the video plays: the round buttons
+  over the video always, the control bar in fullscreen only (there it lies over the video, so hiding it
+  never resizes the video, and subtitles move up while it shows). Never while paused, the subtitle panel
+  is open or the seek bar is held. On touch screens, a tap on bare video hides them.
+- Over the video's middle: back 10 s, play or pause, forward 10 s. Hidden while "Tap to join", "Waiting
+  for …" or "Next episode" hold the middle.
 - No playback speed control. `playbackRate` belongs to the drift fix.
 - Per device, in `localStorage`: volume, mute, subtitle size. Everything in room state is shared.
 - Subtitle cues: `<i>` and `<b>` become real elements. Everything else (`{\an8}`, ASS tags, other
@@ -460,6 +480,7 @@ So each room's video is **prepared once**, then served as a plain file.
 - One chat per room, kept forever, deleted with the room (foreign-key cascade).
 - Plain text, at most 1000 characters. Emoji are ordinary Unicode typed on the device keyboard; each
   device draws its own.
+- Sending a message on a touch screen closes the keyboard, so the video shows again.
 - Live messages go both ways on the room socket. Opening the room loads the last 100; older ones load
   on scroll up (`GET` with a cursor).
 - A message can reply to one earlier message and shows a short quote of it.

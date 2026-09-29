@@ -170,299 +170,287 @@
 	<title>{strings.admin} · {strings.appName}</title>
 </svelte:head>
 
+{#snippet heading(text: string)}
+	<h2 class="font-display text-xl font-bold">{text}</h2>
+{/snippet}
+
 {#if !me.isAdmin}
-	<main class="flex flex-col items-center gap-3 pt-24">
-		<p class="text-neutral-400">{strings.hostOnly}</p>
-		<a href="/" class="underline">{strings.backHome}</a>
+	<main class="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-4 pt-16">
+		<p class="font-display text-2xl font-bold">{strings.hostOnly}</p>
+		<a href="/" class="btn btn-quiet">{strings.backHome}</a>
 	</main>
 {:else}
-	<main class="mx-auto flex max-w-3xl flex-col gap-10 p-4 pb-16">
-		<h1 class="text-2xl font-bold">{strings.admin}</h1>
+	<main class="mx-auto w-full max-w-6xl px-4 pt-2 pb-16">
+		<div class="flex max-w-3xl flex-col gap-12">
+			<h1 class="font-display text-2xl font-bold">{strings.admin}</h1>
 
-		{#if loadFailed || actionFailed}
-			<p class="text-sm text-red-400" role="alert">
-				{loadFailed ? strings.loadFailed : strings.actionFailed}
-			</p>
-		{/if}
+			{#if loadFailed || actionFailed}
+				<p class="text-ember" role="alert">
+					{loadFailed ? strings.loadFailed : strings.actionFailed}
+				</p>
+			{/if}
 
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{strings.libraries}</h2>
-			{#each libraries as lib (lib.id)}
-				<div class="flex flex-col gap-2 rounded-md border border-neutral-800 p-3">
-					<div class="flex flex-wrap items-baseline justify-between gap-2">
-						<div class="min-w-0">
-							<span class="font-medium break-all">{lib.path}</span>
-							<span class="ml-2 text-sm text-neutral-400">
-								{strings.libraryTypes[lib.type]} · {strings.videoCount(lib.videos)}
-							</span>
+			<section class="flex flex-col gap-3">
+				{@render heading(strings.libraries)}
+				{#each libraries as lib (lib.id)}
+					<div class="flex flex-col gap-2 py-1">
+						<div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+							<div class="min-w-0">
+								<p class="font-semibold break-all">{lib.path}</p>
+								<p class="text-sm text-haze">
+									{strings.libraryTypes[lib.type]}, {strings.videoCount(lib.videos)}
+								</p>
+							</div>
+							<div class="flex gap-2">
+								<button
+									onclick={() => act(rescanLibrary(lib.id))}
+									disabled={lib.scan.state !== ''}
+									class="btn btn-quiet btn-small"
+								>
+									{strings.rescan}
+								</button>
+								<button onclick={() => (confirming = lib.id)} class="btn btn-quiet btn-small">
+									{strings.remove}
+								</button>
+							</div>
 						</div>
-						<div class="flex gap-2 text-sm">
-							<button
-								onclick={() => act(rescanLibrary(lib.id))}
-								disabled={lib.scan.state !== ''}
-								class="rounded-md border border-neutral-700 px-2.5 py-1 hover:bg-neutral-800 disabled:opacity-40"
-							>
-								{strings.rescan}
-							</button>
-							<button
-								onclick={() => (confirming = lib.id)}
-								class="rounded-md border border-neutral-700 px-2.5 py-1 hover:bg-neutral-800"
-							>
-								{strings.remove}
-							</button>
-						</div>
+						{#if lib.scan.state === 'queued'}
+							<p class="text-sm text-haze">{strings.scanQueued}</p>
+						{:else if lib.scan.state === 'scanning'}
+							<div class="flex flex-col gap-1.5">
+								<p class="text-sm text-haze">
+									{lib.scan.total > 0
+										? strings.scanProgress(lib.scan.done, lib.scan.total)
+										: strings.scanLooking}
+								</p>
+								{#if lib.scan.total > 0}
+									<div class="h-1 max-w-80 overflow-hidden rounded-full bg-dusk">
+										<div
+											class="h-full bg-lamp"
+											style:width="{(lib.scan.done / lib.scan.total) * 100}%"
+										></div>
+									</div>
+								{/if}
+							</div>
+						{/if}
+						{#if lib.scan.error}
+							<p class="text-sm text-ember">
+								{strings.scanFailed} <span class="font-mono break-all">{lib.scan.error}</span>
+							</p>
+						{/if}
+						{#if confirming === lib.id}
+							<div class="flex flex-wrap items-center gap-2 text-sm">
+								<span>{strings.removeConfirm}</span>
+								<button
+									onclick={() => {
+										confirming = null;
+										act(removeLibrary(lib.id));
+									}}
+									class="btn btn-danger btn-small"
+								>
+									{strings.remove}
+								</button>
+								<button onclick={() => (confirming = null)} class="btn btn-quiet btn-small">
+									{strings.cancel}
+								</button>
+							</div>
+						{/if}
 					</div>
-					{#if lib.scan.state === 'queued'}
-						<p class="text-sm text-neutral-400">{strings.scanQueued}</p>
-					{:else if lib.scan.state === 'scanning'}
-						<p class="text-sm text-neutral-400">
-							{lib.scan.total > 0
-								? strings.scanProgress(lib.scan.done, lib.scan.total)
-								: strings.scanLooking}
-						</p>
+				{:else}
+					{#if loaded}
+						<p class="text-haze">{strings.noLibraries}</p>
 					{/if}
-					{#if lib.scan.error}
-						<p class="text-sm text-red-400">
-							{strings.scanFailed} <span class="font-mono break-all">{lib.scan.error}</span>
-						</p>
+				{/each}
+			</section>
+
+			<section class="flex flex-col gap-3">
+				{@render heading(strings.addLibrary)}
+				<form onsubmit={add} class="flex flex-col gap-3">
+					<FolderPicker bind:path />
+					<div class="flex flex-wrap items-center gap-3">
+						<label class="flex items-center gap-2">
+							<span class="text-haze">{strings.libraryType}</span>
+							<select bind:value={type} class="field">
+								{#each Object.entries(strings.libraryTypes) as [value, label] (value)}
+									<option {value}>{label}</option>
+								{/each}
+							</select>
+						</label>
+						<button type="submit" disabled={adding || path === ''} class="btn btn-primary">
+							{strings.add}
+						</button>
+						<span class="text-sm break-all text-haze">/{path}</span>
+					</div>
+					{#if addError}
+						<p class="text-sm text-ember" role="alert">{addError}</p>
 					{/if}
-					{#if confirming === lib.id}
-						<div class="flex flex-wrap items-center gap-2 text-sm">
-							<span class="text-neutral-300">{strings.removeConfirm}</span>
+				</form>
+			</section>
+
+			<div class="grid gap-12 md:grid-cols-2">
+				{#if langsLoaded}
+					<section class="flex flex-col gap-3">
+						{@render heading(strings.languageDefaults)}
+						<p class="text-sm text-haze">{strings.languageDefaultsNote}</p>
+						<form
+							onsubmit={saveLanguages}
+							oninput={() => (langsSaved = false)}
+							class="flex flex-col gap-4"
+						>
+							<label class="flex flex-col gap-1.5">
+								<span>{strings.audioLanguage}</span>
+								<input bind:value={audioLang} placeholder={strings.original} class="field max-w-xs" />
+								<span class="text-sm text-haze">{strings.audioLanguageHint}</span>
+								<span class="text-sm">
+									{strings.readsAs(audioLang.trim() ? langName(audioLang.trim()) : strings.original)}
+								</span>
+							</label>
+							<label class="flex flex-col gap-1.5">
+								<span>{strings.subtitleLanguages}</span>
+								<input bind:value={subtitleLangs} placeholder="tr, en" class="field max-w-xs" />
+								<span class="text-sm text-haze">{strings.subtitleLanguagesHint}</span>
+								<span class="text-sm">
+									{strings.readsAs(
+										subtitleCodes.length > 0 ? subtitleCodes.map(langName).join(', ') : strings.none
+									)}
+								</span>
+							</label>
+							<div class="flex items-center gap-3">
+								<button type="submit" disabled={savingLangs} class="btn btn-primary">
+									{strings.save}
+								</button>
+								{#if langsSaved}
+									<span class="text-sm text-haze">{strings.saved}</span>
+								{/if}
+							</div>
+							{#if langsError}
+								<p class="text-sm text-ember" role="alert">{langsError}</p>
+							{/if}
+						</form>
+					</section>
+				{/if}
+
+				{#if cacheLoaded}
+					<section class="flex flex-col gap-3">
+						{@render heading(strings.cacheCleanup)}
+						<form
+							onsubmit={saveCache}
+							oninput={() => (cacheSaved = false)}
+							class="flex flex-col gap-4"
+						>
+							<label class="flex flex-col gap-1.5">
+								<span>{strings.unusedDays}</span>
+								<input
+									type="number"
+									bind:value={unusedDays}
+									min={minUnusedDays}
+									max={maxUnusedDays}
+									step="1"
+									required
+									class="field w-24"
+								/>
+								<span class="text-sm text-haze">{strings.unusedDaysHint}</span>
+							</label>
+							<div class="flex items-center gap-3">
+								<button type="submit" disabled={savingCache} class="btn btn-primary">
+									{strings.save}
+								</button>
+								{#if cacheSaved}
+									<span class="text-sm text-haze">{strings.saved}</span>
+								{/if}
+							</div>
+							{#if cacheError}
+								<p class="text-sm text-ember" role="alert">{cacheError}</p>
+							{/if}
+						</form>
+					</section>
+				{/if}
+			</div>
+
+			{#if libraries.length > 0}
+				<section class="flex flex-col gap-3">
+					{@render heading(strings.cantUse)}
+					{#if problemCount === 0}
+						<p class="text-haze">{strings.allUsable}</p>
+					{:else}
+						<ul class="flex flex-col gap-3">
+							{#each [...problems.skipped, ...problems.unplayable] as p (`${p.libraryId}/${p.path}`)}
+								<li class="flex flex-col">
+									<span class="break-all">{fullPath(p)}</span>
+									<span class="text-sm text-haze">{problemText(p)}</span>
+									{#if p.probeError}
+										<span class="font-mono text-sm break-all text-haze">{p.probeError}</span>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</section>
+			{/if}
+
+			{#if jobs}
+				<section class="flex flex-col gap-3">
+					{@render heading(strings.jobs)}
+					<div class="flex flex-col items-start gap-3">
+						<p class="text-sm text-haze">
+							{strings.diskUsage(formatBytes(jobs.cacheBytes), formatBytes(jobs.freeBytes))}
+						</p>
+						{#if !confirmingClear}
+							<button onclick={() => (confirmingClear = true)} class="btn btn-danger btn-small">
+								{strings.clearCache}
+							</button>
+						{/if}
+					</div>
+					{#if confirmingClear}
+						<div class="flex flex-wrap items-center gap-2 text-sm" role="alert">
+							<span>{strings.clearCacheConfirm}</span>
 							<button
 								onclick={() => {
-									confirming = null;
-									act(removeLibrary(lib.id));
+									confirmingClear = false;
+									act(clearCache());
 								}}
-								class="rounded-md bg-red-600 px-2.5 py-1 font-medium text-white"
+								class="btn btn-danger btn-small"
 							>
-								{strings.remove}
+								{strings.clearCache}
 							</button>
-							<button
-								onclick={() => (confirming = null)}
-								class="rounded-md border border-neutral-700 px-2.5 py-1"
-							>
+							<button onclick={() => (confirmingClear = false)} class="btn btn-quiet btn-small">
 								{strings.cancel}
 							</button>
 						</div>
 					{/if}
-				</div>
-			{:else}
-				{#if loaded}
-					<p class="text-neutral-400">{strings.noLibraries}</p>
-				{/if}
-			{/each}
-		</section>
-
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{strings.addLibrary}</h2>
-			<form onsubmit={add} class="flex flex-col gap-3">
-				<FolderPicker bind:path />
-				<div class="flex flex-wrap items-center gap-3">
-					<label class="flex items-center gap-2">
-						<span class="text-neutral-400">{strings.libraryType}</span>
-						<select
-							bind:value={type}
-							class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1.5"
-						>
-							{#each Object.entries(strings.libraryTypes) as [value, label] (value)}
-								<option {value}>{label}</option>
-							{/each}
-						</select>
-					</label>
-					<button
-						type="submit"
-						disabled={adding || path === ''}
-						class="rounded-md bg-neutral-100 px-3 py-1.5 font-medium text-neutral-950 disabled:opacity-40"
-					>
-						{strings.add}
-					</button>
-					<span class="text-sm break-all text-neutral-400">/{path}</span>
-				</div>
-				{#if addError}
-					<p class="text-sm text-red-400" role="alert">{addError}</p>
-				{/if}
-			</form>
-		</section>
-
-		{#if langsLoaded}
-			<section class="flex flex-col gap-3">
-				<h2 class="text-lg font-semibold">{strings.languageDefaults}</h2>
-				<p class="text-sm text-neutral-400">{strings.languageDefaultsNote}</p>
-				<form
-					onsubmit={saveLanguages}
-					oninput={() => (langsSaved = false)}
-					class="flex flex-col gap-3"
-				>
-					<label class="flex flex-col gap-1">
-						<span>{strings.audioLanguage}</span>
-						<input
-							bind:value={audioLang}
-							placeholder={strings.original}
-							class="max-w-xs rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5"
-						/>
-						<span class="text-sm text-neutral-400">
-							{strings.audioLanguageHint}
-							→ {audioLang.trim() ? langName(audioLang.trim()) : strings.original}
-						</span>
-					</label>
-					<label class="flex flex-col gap-1">
-						<span>{strings.subtitleLanguages}</span>
-						<input
-							bind:value={subtitleLangs}
-							placeholder="tr, en"
-							class="max-w-xs rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5"
-						/>
-						<span class="text-sm text-neutral-400">
-							{strings.subtitleLanguagesHint}
-							→ {subtitleCodes.length > 0 ? subtitleCodes.map(langName).join(', ') : strings.none}
-						</span>
-					</label>
-					<div class="flex items-center gap-3">
-						<button
-							type="submit"
-							disabled={savingLangs}
-							class="rounded-md bg-neutral-100 px-3 py-1.5 font-medium text-neutral-950 disabled:opacity-40"
-						>
-							{strings.save}
-						</button>
-						{#if langsSaved}
-							<span class="text-sm text-neutral-400">{strings.saved}</span>
-						{/if}
-					</div>
-					{#if langsError}
-						<p class="text-sm text-red-400" role="alert">{langsError}</p>
-					{/if}
-				</form>
-			</section>
-		{/if}
-
-		{#if cacheLoaded}
-			<section class="flex flex-col gap-3">
-				<h2 class="text-lg font-semibold">{strings.cacheCleanup}</h2>
-				<form
-					onsubmit={saveCache}
-					oninput={() => (cacheSaved = false)}
-					class="flex flex-col gap-3"
-				>
-					<label class="flex flex-col gap-1">
-						<span>{strings.unusedDays}</span>
-						<input
-							type="number"
-							bind:value={unusedDays}
-							min={minUnusedDays}
-							max={maxUnusedDays}
-							step="1"
-							required
-							class="w-24 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5"
-						/>
-						<span class="text-sm text-neutral-400">{strings.unusedDaysHint}</span>
-					</label>
-					<div class="flex items-center gap-3">
-						<button
-							type="submit"
-							disabled={savingCache}
-							class="rounded-md bg-neutral-100 px-3 py-1.5 font-medium text-neutral-950 disabled:opacity-40"
-						>
-							{strings.save}
-						</button>
-						{#if cacheSaved}
-							<span class="text-sm text-neutral-400">{strings.saved}</span>
-						{/if}
-					</div>
-					{#if cacheError}
-						<p class="text-sm text-red-400" role="alert">{cacheError}</p>
-					{/if}
-				</form>
-			</section>
-		{/if}
-
-		{#if libraries.length > 0}
-			<section class="flex flex-col gap-3">
-				<h2 class="text-lg font-semibold">{strings.cantUse}</h2>
-				{#if problemCount === 0}
-					<p class="text-neutral-400">{strings.allUsable}</p>
-				{:else}
-					<ul class="flex flex-col gap-2">
-						{#each [...problems.skipped, ...problems.unplayable] as p (`${p.libraryId}/${p.path}`)}
-							<li class="flex flex-col">
-								<span class="break-all">{fullPath(p)}</span>
-								<span class="text-sm text-neutral-400">{problemText(p)}</span>
-								{#if p.probeError}
-									<span class="font-mono text-xs break-all text-neutral-500">{p.probeError}</span>
-								{/if}
-							</li>
-						{/each}
-					</ul>
-				{/if}
-			</section>
-		{/if}
-
-		{#if jobs}
-			<section class="flex flex-col gap-3">
-				<h2 class="text-lg font-semibold">{strings.jobs}</h2>
-				<p class="text-sm text-neutral-400">
-					{strings.diskUsage(formatBytes(jobs.cacheBytes), formatBytes(jobs.freeBytes))}
-				</p>
-				{#if confirmingClear}
-					<div class="flex flex-wrap items-center gap-2 text-sm" role="alert">
-						<span class="text-neutral-300">{strings.clearCacheConfirm}</span>
-						<button
-							onclick={() => {
-								confirmingClear = false;
-								act(clearCache());
-							}}
-							class="rounded-md bg-red-600 px-2.5 py-1 font-medium text-white"
-						>
-							{strings.clearCache}
-						</button>
-						<button
-							onclick={() => (confirmingClear = false)}
-							class="rounded-md border border-neutral-700 px-2.5 py-1"
-						>
-							{strings.cancel}
-						</button>
-					</div>
-				{:else}
-					<button
-						onclick={() => (confirmingClear = true)}
-						class="self-start rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-500"
-					>
-						{strings.clearCache}
-					</button>
-				{/if}
-				{#if jobs.jobs.length === 0}
-					<p class="text-neutral-400">{strings.noJobs}</p>
-				{:else}
-					<ul class="flex flex-col gap-2">
-						{#each jobs.jobs as j (j.key)}
-							<li class="flex flex-col">
-								<span class="break-all">{j.name}</span>
-								<span class="text-sm {j.state === 'failed' ? 'text-red-400' : 'text-neutral-400'}">
-									{jobText(j)}
-								</span>
-								{#if j.detail}
-									<span class="font-mono text-xs break-all whitespace-pre-wrap text-neutral-500">
-										{j.detail}
+					{#if jobs.jobs.length === 0}
+						<p class="text-haze">{strings.noJobs}</p>
+					{:else}
+						<ul class="flex flex-col gap-3">
+							{#each jobs.jobs as j (j.key)}
+								<li class="flex flex-col">
+									<span class="break-all">{j.name}</span>
+									<span class="text-sm {j.state === 'failed' ? 'text-ember' : 'text-haze'}">
+										{jobText(j)}
 									</span>
-								{/if}
-							</li>
+									{#if j.detail}
+										<span class="font-mono text-sm break-all whitespace-pre-wrap text-haze">
+											{j.detail}
+										</span>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</section>
+			{/if}
+
+			{#if problems.appleOnly.length > 0}
+				<section class="flex flex-col gap-3">
+					{@render heading(strings.appleOnly)}
+					<p class="text-sm text-haze">{strings.appleOnlyNote}</p>
+					<ul class="flex flex-col gap-1">
+						{#each problems.appleOnly as p (`${p.libraryId}/${p.path}`)}
+							<li class="break-all">{fullPath(p)}</li>
 						{/each}
 					</ul>
-				{/if}
-			</section>
-		{/if}
-
-		{#if problems.appleOnly.length > 0}
-			<section class="flex flex-col gap-3">
-				<h2 class="text-lg font-semibold">{strings.appleOnly}</h2>
-				<p class="text-sm text-neutral-400">{strings.appleOnlyNote}</p>
-				<ul class="flex flex-col gap-1">
-					{#each problems.appleOnly as p (`${p.libraryId}/${p.path}`)}
-						<li class="break-all">{fullPath(p)}</li>
-					{/each}
-				</ul>
-			</section>
-		{/if}
+				</section>
+			{/if}
+		</div>
 	</main>
 {/if}
