@@ -1,8 +1,9 @@
 <script lang="ts">
 	// The room's player: one <video> for the page's life, "Tap to join", our own controls, and the loop
 	// that keeps the video with the room. <video> events are status only; only the controls send intents.
-	// Subtitles, fullscreen and "Next episode" at the end live here too, so they work in fullscreen.
-	import { onMount, untrack } from 'svelte';
+	// Subtitles, fullscreen, "Next episode" at the end and the chat live here too, so they work in
+	// fullscreen.
+	import { onMount, untrack, type Snippet } from 'svelte';
 	import type { Room, SubtitleChoice, VideoDetail, VideoSummary } from '$lib/api';
 	import {
 		codecName,
@@ -32,7 +33,10 @@
 		online,
 		note,
 		next,
-		onnext
+		onnext,
+		chatOpen = $bindable(),
+		side,
+		overlay
 	}: {
 		room: Room;
 		detail: VideoDetail | null; // the room's video with its tracks; null until loaded
@@ -43,6 +47,10 @@
 		note: string; // "Alice paused"
 		next: VideoSummary | null; // the next episode, offered at the end
 		onnext: () => void;
+		chatOpen: boolean;
+		// The chat panel: beside the video in landscape, a bottom sheet in portrait.
+		side: Snippet;
+		overlay: Snippet; // new chat messages over the video, while the chat is closed
 	} = $props();
 
 	// One press of the subtitle timing buttons.
@@ -301,215 +309,247 @@
 
 <div
 	bind:this={wrapper}
-	class="@container flex flex-col overflow-hidden bg-black {full
-		? 'fixed inset-0 z-30 h-dvh'
-		: 'rounded-md'}"
+	class="flex overflow-hidden bg-black {full ? 'fixed inset-0 z-30 h-dvh' : 'rounded-md'}"
 >
-	<div class="relative {full ? 'min-h-0 flex-1' : ''}">
-		<video
-			bind:this={video}
-			bind:volume
-			bind:muted
-			playsinline
-			preload="metadata"
-			disablepictureinpicture
-			disableremoteplayback
-			onerror={failed}
-			onwaiting={tick}
-			onplaying={tick}
-			onseeking={tick}
-			onseeked={tick}
-			oncanplay={tick}
-			onpause={tick}
-			onloadedmetadata={tick}
-			class={full ? 'h-full w-full object-contain' : 'aspect-video w-full'}
-		></video>
+	<!-- In portrait fullscreen, the video and controls move up out of the chat sheet's way. -->
+	<div class="flex min-w-0 flex-1 flex-col {full && chatOpen ? 'portrait:pb-[50dvh]' : ''}">
+		<!-- The container for the subtitles' cqi sizes. Not the wrapper: a container is the box its fixed
+		children position in, which would hold the chat's bottom sheet inside the player. -->
+		<div class="@container relative {full ? 'min-h-0 flex-1' : ''}">
+			<video
+				bind:this={video}
+				bind:volume
+				bind:muted
+				playsinline
+				preload="metadata"
+				disablepictureinpicture
+				disableremoteplayback
+				onerror={failed}
+				onwaiting={tick}
+				onplaying={tick}
+				onseeking={tick}
+				onseeked={tick}
+				oncanplay={tick}
+				onpause={tick}
+				onloadedmetadata={tick}
+				class={full ? 'h-full w-full object-contain' : 'aspect-video w-full'}
+			></video>
 
-		{#if src && !cantPlay}
-			<Subtitles
-				url={subUrl}
-				{offsetMs}
-				size={subtitleSize}
-				videoMs={() => video.currentTime * 1000}
-			/>
-		{/if}
+			{#if src && !cantPlay}
+				<Subtitles
+					url={subUrl}
+					{offsetMs}
+					size={subtitleSize}
+					videoMs={() => video.currentTime * 1000}
+				/>
+			{/if}
 
-		<div class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
-			{#if cantPlay}
-				<p class="rounded-md bg-black/70 px-3 py-2">
-					{unplayable}
-				</p>
-			{:else if src && (!joined || blocked)}
-				<button
-					onclick={join}
-					class="rounded-full bg-neutral-100 px-6 py-3 text-lg font-medium text-neutral-950"
-				>
-					{strings.tapToJoin}
-				</button>
-			{/if}
-			{#if atEnd && next}
-				<button
-					onclick={nextEpisode}
-					class="max-w-full rounded-md bg-neutral-100 px-4 py-2 font-medium break-words text-neutral-950"
-				>
-					{strings.nextEpisodeNamed([episodeCode(next), next.episodeTitle].filter(Boolean).join(' · '))}
-				</button>
-			{/if}
-			{#if playState && playState.waiting.length > 0}
-				<div class="flex flex-col items-center gap-2 rounded-md bg-black/70 px-3 py-2">
-					<p class="break-words">{strings.waitingFor(playState.waiting.map((w) => w.name))}</p>
+			<div class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
+				{#if cantPlay}
+					<p class="rounded-md bg-black/70 px-3 py-2">
+						{unplayable}
+					</p>
+				{:else if src && (!joined || blocked)}
 					<button
-						onclick={() => socket?.send({ type: 'playAnyway' })}
-						disabled={!online}
-						class="rounded-md border border-neutral-500 px-3 py-1 text-sm hover:bg-neutral-800 disabled:opacity-50"
+						onclick={join}
+						class="rounded-full bg-neutral-100 px-6 py-3 text-lg font-medium text-neutral-950"
 					>
-						{strings.playAnyway}
+						{strings.tapToJoin}
 					</button>
-				</div>
-			{/if}
-		</div>
-
-		<div class="pointer-events-none absolute top-2 left-2 flex flex-col items-start gap-1 text-sm">
-			{#if note}
-				<p class="rounded-md bg-black/70 px-2 py-1 break-words">{note}</p>
-			{/if}
-			{#each playState?.behind ?? [] as b (b.userId)}
-				<p class="rounded-md bg-black/70 px-2 py-1 break-words">{strings.behind(b.name, b.ms)}</p>
-			{/each}
-		</div>
-	</div>
-
-	{#if subtitlesOpen}
-		<div
-			class="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-800 bg-neutral-900 px-3 py-2 text-sm"
-		>
-			<select
-				aria-label={strings.subtitle}
-				value={subtitleKey}
-				disabled={!online || !playState}
-				onchange={(e) =>
-					setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
-				class="max-w-full min-w-0 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1"
-			>
-				<option value="">{strings.subtitleOff}</option>
-				{#each options as o (o.key)}
-					{@const missing =
-						'stream' in o.choice &&
-						prepare?.state === 'ready' &&
-						!prepare.subtitles.includes(o.choice.stream)}
-					<option value={o.key} disabled={o.unavailable !== '' || missing}>
-						{subtitleLabel(o)}{missing ? ` — ${strings.notInCopy}` : ''}
-					</option>
-				{/each}
-			</select>
-			<div class="flex items-center gap-1">
-				<span class="text-neutral-400">{strings.subtitleTiming}</span>
-				<button
-					onclick={() => setOffset(offsetMs - offsetStepMs)}
-					disabled={!online || !playState}
-					aria-label={strings.subtitleSooner}
-					class="w-8 rounded-md border border-neutral-700 py-0.5 hover:bg-neutral-800 disabled:opacity-50"
-				>
-					−
-				</button>
-				<span class="w-16 text-center tabular-nums">{strings.subtitleOffset(offsetMs)}</span>
-				<button
-					onclick={() => setOffset(offsetMs + offsetStepMs)}
-					disabled={!online || !playState}
-					aria-label={strings.subtitleLater}
-					class="w-8 rounded-md border border-neutral-700 py-0.5 hover:bg-neutral-800 disabled:opacity-50"
-				>
-					+
-				</button>
-				{#if offsetMs !== 0}
+				{/if}
+				{#if atEnd && next}
 					<button
-						onclick={() => setOffset(0)}
-						disabled={!online || !playState}
-						class="rounded-md px-2 py-0.5 text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+						onclick={nextEpisode}
+						class="max-w-full rounded-md bg-neutral-100 px-4 py-2 font-medium break-words text-neutral-950"
 					>
-						{strings.reset}
+						{strings.nextEpisodeNamed([episodeCode(next), next.episodeTitle].filter(Boolean).join(' · '))}
 					</button>
+				{/if}
+				{#if playState && playState.waiting.length > 0}
+					<div class="flex flex-col items-center gap-2 rounded-md bg-black/70 px-3 py-2">
+						<p class="break-words">{strings.waitingFor(playState.waiting.map((w) => w.name))}</p>
+						<button
+							onclick={() => socket?.send({ type: 'playAnyway' })}
+							disabled={!online}
+							class="rounded-md border border-neutral-500 px-3 py-1 text-sm hover:bg-neutral-800 disabled:opacity-50"
+						>
+							{strings.playAnyway}
+						</button>
+					</div>
 				{/if}
 			</div>
-			<label class="flex items-center gap-2">
-				<span class="text-neutral-400">{strings.subtitleSize}</span>
+
+			<div
+				class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1 text-sm"
+			>
+				{#if note}
+					<p class="rounded-md bg-black/70 px-2 py-1 break-words">{note}</p>
+				{/if}
+				{#each playState?.behind ?? [] as b (b.userId)}
+					<p class="rounded-md bg-black/70 px-2 py-1 break-words">{strings.behind(b.name, b.ms)}</p>
+				{/each}
+				{#if !chatOpen}
+					{@render overlay()}
+				{/if}
+			</div>
+		</div>
+
+		{#if subtitlesOpen}
+			<div
+				class="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-800 bg-neutral-900 px-3 py-2 text-sm"
+			>
 				<select
-					bind:value={subtitleSize}
-					class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1"
+					aria-label={strings.subtitle}
+					value={subtitleKey}
+					disabled={!online || !playState}
+					onchange={(e) =>
+						setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
+					class="max-w-full min-w-0 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1"
 				>
-					{#each SUBTITLE_SIZES as size (size)}
-						<option value={size}>{strings.subtitleSizes[size]}</option>
+					<option value="">{strings.subtitleOff}</option>
+					{#each options as o (o.key)}
+						{@const missing =
+							'stream' in o.choice &&
+							prepare?.state === 'ready' &&
+							!prepare.subtitles.includes(o.choice.stream)}
+						<option value={o.key} disabled={o.unavailable !== '' || missing}>
+							{subtitleLabel(o)}{missing ? ` — ${strings.notInCopy}` : ''}
+						</option>
 					{/each}
 				</select>
-			</label>
-		</div>
-	{/if}
-
-	<div class="flex items-center gap-3 bg-neutral-900 px-3 py-2 text-sm">
-		<button
-			onclick={() => intent({ type: playState?.playing ? 'pause' : 'play' })}
-			disabled={!online || !playState}
-			class="w-14 rounded-md border border-neutral-700 py-1 hover:bg-neutral-800 disabled:opacity-50"
-		>
-			{playState?.playing ? strings.pause : strings.play}
-		</button>
-		<input
-			type="range"
-			aria-label={strings.position}
-			min="0"
-			max={durationMs}
-			step="1000"
-			value={dragMs ?? shownMs}
-			disabled={!online || durationMs === 0}
-			oninput={(e) => (dragMs = Number(e.currentTarget.value))}
-			onchange={(e) => {
-				dragMs = null;
-				intent({ type: 'seek', positionMs: Number(e.currentTarget.value) });
-			}}
-			class="min-w-0 flex-1 accent-neutral-100"
-		/>
-		<span class="text-neutral-300 tabular-nums">
-			{formatTime(dragMs ?? shownMs)} / {formatTime(durationMs)}
-		</span>
-		<button
-			onclick={() => (muted = !muted)}
-			class="rounded-md border border-neutral-700 px-2 py-1 hover:bg-neutral-800"
-		>
-			{muted ? strings.unmute : strings.mute}
-		</button>
-		{#if volumeWorks}
-			<input
-				type="range"
-				aria-label={strings.volume}
-				min="0"
-				max="1"
-				step="0.05"
-				bind:value={volume}
-				class="hidden w-20 accent-neutral-100 sm:block"
-			/>
+				<div class="flex items-center gap-1">
+					<span class="text-neutral-400">{strings.subtitleTiming}</span>
+					<button
+						onclick={() => setOffset(offsetMs - offsetStepMs)}
+						disabled={!online || !playState}
+						aria-label={strings.subtitleSooner}
+						class="w-8 rounded-md border border-neutral-700 py-0.5 hover:bg-neutral-800 disabled:opacity-50"
+					>
+						−
+					</button>
+					<span class="w-16 text-center tabular-nums">{strings.subtitleOffset(offsetMs)}</span>
+					<button
+						onclick={() => setOffset(offsetMs + offsetStepMs)}
+						disabled={!online || !playState}
+						aria-label={strings.subtitleLater}
+						class="w-8 rounded-md border border-neutral-700 py-0.5 hover:bg-neutral-800 disabled:opacity-50"
+					>
+						+
+					</button>
+					{#if offsetMs !== 0}
+						<button
+							onclick={() => setOffset(0)}
+							disabled={!online || !playState}
+							class="rounded-md px-2 py-0.5 text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+						>
+							{strings.reset}
+						</button>
+					{/if}
+				</div>
+				<label class="flex items-center gap-2">
+					<span class="text-neutral-400">{strings.subtitleSize}</span>
+					<select
+						bind:value={subtitleSize}
+						class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1"
+					>
+						{#each SUBTITLE_SIZES as size (size)}
+							<option value={size}>{strings.subtitleSizes[size]}</option>
+						{/each}
+					</select>
+				</label>
+			</div>
 		{/if}
-		<button
-			onclick={() => (subtitlesOpen = !subtitlesOpen)}
-			aria-label={strings.subtitle}
-			aria-pressed={subtitlesOpen}
-			class="rounded-md border px-2 py-1 font-semibold hover:bg-neutral-800 {playState?.subtitle
-				? 'border-neutral-300'
-				: 'border-neutral-700 text-neutral-400'}"
-		>
-			{strings.subtitlesButton}
-		</button>
-		<button
-			onclick={toggleFullscreen}
-			aria-label={full ? strings.exitFullscreen : strings.fullscreen}
-			class="rounded-md border border-neutral-700 px-2 py-1 hover:bg-neutral-800"
-		>
-			<svg viewBox="0 0 16 16" class="size-4" fill="none" stroke="currentColor" stroke-width="1.5">
-				{#if full}
-					<path d="M6 1v5H1M10 1v5h5M6 15v-5H1M10 15v-5h5" />
-				{:else}
-					<path d="M1 6V1h5M15 6V1h-5M1 10v5h5M15 10v5h-5" />
-				{/if}
-			</svg>
-		</button>
+
+		<!-- On a narrow screen the seek bar and time take a row of their own, above the buttons. -->
+		<div class="flex flex-wrap items-center gap-x-2 gap-y-2 bg-neutral-900 px-3 py-2 text-sm sm:gap-x-3">
+			<button
+				onclick={() => intent({ type: playState?.playing ? 'pause' : 'play' })}
+				disabled={!online || !playState}
+				class="w-14 rounded-md border border-neutral-700 py-1 hover:bg-neutral-800 disabled:opacity-50"
+			>
+				{playState?.playing ? strings.pause : strings.play}
+			</button>
+			<div class="flex min-w-0 flex-1 items-center gap-3 max-sm:order-first max-sm:basis-full">
+				<input
+					type="range"
+					aria-label={strings.position}
+					min="0"
+					max={durationMs}
+					step="1000"
+					value={dragMs ?? shownMs}
+					disabled={!online || durationMs === 0}
+					oninput={(e) => (dragMs = Number(e.currentTarget.value))}
+					onchange={(e) => {
+						dragMs = null;
+						intent({ type: 'seek', positionMs: Number(e.currentTarget.value) });
+					}}
+					class="min-w-0 flex-1 accent-neutral-100"
+				/>
+				<span class="text-neutral-300 tabular-nums">
+					{formatTime(dragMs ?? shownMs)} / {formatTime(durationMs)}
+				</span>
+			</div>
+			<button
+				onclick={() => (muted = !muted)}
+				class="rounded-md border border-neutral-700 px-2 py-1 hover:bg-neutral-800"
+			>
+				{muted ? strings.unmute : strings.mute}
+			</button>
+			{#if volumeWorks}
+				<input
+					type="range"
+					aria-label={strings.volume}
+					min="0"
+					max="1"
+					step="0.05"
+					bind:value={volume}
+					class="hidden w-20 accent-neutral-100 sm:block"
+				/>
+			{/if}
+			<button
+				onclick={() => (subtitlesOpen = !subtitlesOpen)}
+				aria-label={strings.subtitle}
+				aria-pressed={subtitlesOpen}
+				class="rounded-md border px-2 py-1 font-semibold hover:bg-neutral-800 {playState?.subtitle
+					? 'border-neutral-300'
+					: 'border-neutral-700 text-neutral-400'}"
+			>
+				{strings.subtitlesButton}
+			</button>
+			<button
+				onclick={() => (chatOpen = !chatOpen)}
+				aria-pressed={chatOpen}
+				class="rounded-md border px-2 py-1 hover:bg-neutral-800 {chatOpen
+					? 'border-neutral-300'
+					: 'border-neutral-700 text-neutral-400'}"
+			>
+				{strings.chat}
+			</button>
+			<button
+				onclick={toggleFullscreen}
+				aria-label={full ? strings.exitFullscreen : strings.fullscreen}
+				class="rounded-md border border-neutral-700 px-2 py-1 hover:bg-neutral-800"
+			>
+				<svg viewBox="0 0 16 16" class="size-4" fill="none" stroke="currentColor" stroke-width="1.5">
+					{#if full}
+						<path d="M6 1v5H1M10 1v5h5M6 15v-5H1M10 15v-5h5" />
+					{:else}
+						<path d="M1 6V1h5M15 6V1h-5M1 10v5h5M15 10v5h-5" />
+					{/if}
+				</svg>
+			</button>
+		</div>
 	</div>
+
+	{#if chatOpen}
+		<!-- Landscape: the panel takes the row's height; absolute, so its messages never make the row
+		taller. Portrait: a sheet over the page's lower part, or over the video in fullscreen. -->
+		<aside
+			class="z-10 border-neutral-800 landscape:relative landscape:w-80 landscape:shrink-0 landscape:border-l portrait:fixed portrait:inset-x-0 portrait:bottom-0 portrait:h-[50dvh] portrait:overflow-hidden portrait:rounded-t-xl portrait:border-t"
+		>
+			<div class="h-full landscape:absolute landscape:inset-0">
+				{@render side()}
+			</div>
+		</aside>
+	{/if}
 </div>

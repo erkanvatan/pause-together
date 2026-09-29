@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/erkanvatan/pause-together/internal/room"
 )
@@ -105,6 +106,29 @@ func (s *server) setArchived(archived bool) http.HandlerFunc {
 		rm, err := s.Hub.SetArchived(r.Context(), id, archived)
 		writeRoom(w, "archive room", rm, err)
 	}
+}
+
+// roomMessages returns a page of a room's chat, going back from ?before={id}; without it, the newest.
+// The room page gets the newest over its socket, and pages further back from here.
+func (s *server) roomMessages(w http.ResponseWriter, r *http.Request) {
+	id, ok := roomID(w, r)
+	if !ok {
+		return
+	}
+	var before int64
+	if b := r.URL.Query().Get("before"); b != "" {
+		var err error
+		if before, err = strconv.ParseInt(b, 10, 64); err != nil || before <= 0 {
+			writeError(w, http.StatusBadRequest, errBadRequest)
+			return
+		}
+	}
+	ms, err := s.Rooms.Messages(r.Context(), id, before)
+	if err != nil {
+		roomError(w, "list chat messages", err)
+		return
+	}
+	writeJSON(w, ms)
 }
 
 // deleteRoom is on the admin API: only the host deletes rooms.

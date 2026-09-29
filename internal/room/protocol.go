@@ -19,7 +19,11 @@ const (
 	MsgSubtitle   = "subtitle"
 	MsgOffset     = "offset"
 	MsgStatus     = "status"
+	MsgDeleteChat = "deleteChat"
 )
+
+// MsgChat is a chat message: sent by a client, then by the server to everyone in the room.
+const MsgChat = "chat"
 
 // Messages the server sends.
 const (
@@ -31,6 +35,9 @@ const (
 	MsgPaused   = "paused" // for the "Alice paused" note
 	MsgPong     = "pong"
 	MsgDeleted  = "deleted"
+	// MsgChatHistory carries the newest messages on join, so a reconnect also fills in what it missed.
+	MsgChatHistory = "chatHistory"
+	MsgChatDeleted = "chatDeleted"
 )
 
 // ClientMsg is any message a client sends. Only its type's fields are set.
@@ -43,6 +50,9 @@ type ClientMsg struct {
 	Subtitle   *Subtitle `json:"subtitle,omitempty"`   // subtitle: nil = off
 	Ms         float64   `json:"ms,omitempty"`         // offset
 	Status     string    `json:"status,omitempty"`     // status: a statusNames key
+	Text       string    `json:"text,omitempty"`       // chat
+	ReplyTo    *int64    `json:"replyTo,omitempty"`    // chat: the message it answers; nil = none
+	ID         int64     `json:"id,omitempty"`         // deleteChat: the message
 }
 
 // statusNames are the status values on the wire.
@@ -104,6 +114,21 @@ type PongMsg struct {
 	Type     string  `json:"type"`
 	T        float64 `json:"t"`        // the ping's
 	ServerMs int64   `json:"serverMs"` // server time when it answered
+}
+
+type ChatHistoryMsg struct {
+	Type     string    `json:"type"`
+	Messages []Message `json:"messages"` // oldest first; never nil
+}
+
+type ChatMsg struct {
+	Type    string  `json:"type"`
+	Message Message `json:"message"`
+}
+
+type ChatDeletedMsg struct {
+	Type string `json:"type"`
+	ID   int64  `json:"id"`
 }
 
 // TypeMsg is a message with nothing but its type: deleted.

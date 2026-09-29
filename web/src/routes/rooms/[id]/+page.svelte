@@ -2,15 +2,28 @@
 	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { fade } from 'svelte/transition';
+	import Chat from '$lib/Chat.svelte';
+	import {
+		CHAT_PAGE_SIZE,
+		TOAST_MS,
+		withDeleted,
+		withHistory,
+		withMessage,
+		withOlder,
+		withToast
+	} from '$lib/chat';
 	import Picker from '$lib/Picker.svelte';
 	import Player from '$lib/Player.svelte';
 	import {
 		getVideo,
 		listVideos,
+		olderMessages,
 		openRoom,
 		renameRoom,
 		setArchived,
 		switchVideo,
+		type ChatMessage,
 		type Pick,
 		type Result,
 		type Room,
@@ -48,11 +61,18 @@
 	let prepare = $state<Prepare | null>(null);
 	let socket = $state<RoomSocket | null>(null);
 	let playState = $state<RoomState | null>(null);
-	let userId = 0; // this user's, from hello
+	let userId = $state(0); // this user's, from hello
 	let online = $state(false); // said hello, not dropped since
 	let offline = $state(false); // dropped; the first connect doesn't count
 	let note = $state(''); // "Alice paused"
 	let noteTimer: ReturnType<typeof setTimeout>;
+	let messages = $state<ChatMessage[]>([]); // the chat, oldest first
+	let more = $state(false); // older messages may be on the server
+	let replyTo = $state<ChatMessage | null>(null);
+	let draft = $state('');
+	// The chat starts open beside the video on wide screens, and closed as a sheet on portrait phones.
+	let chatOpen = $state(matchMedia('(orientation: landscape)').matches);
+	let toasts = $state<ChatMessage[]>([]);
 
 	// Opening the room starts preparing its video, then the socket joins it. It runs again when a link
 	// leads to another room, since that reuses this page.
@@ -73,6 +93,11 @@
 		playState = null;
 		online = offline = false;
 		note = '';
+		messages = [];
+		more = false;
+		replyTo = null;
+		draft = '';
+		toasts = [];
 		const load = async () => {
 			const r = await openRoom(roomId);
 			if (stopped) return;
@@ -158,7 +183,57 @@
 			case 'deleted':
 				goto('/', { state: { roomDeleted: true } });
 				break;
+			case 'chatHistory': {
+				const h = withHistory(messages, m.messages);
+				messages = h.list;
+				if (!h.keptOlder) more = m.messages.length === CHAT_PAGE_SIZE;
+				break;
+			}
+			case 'chat':
+				messages = withMessage(messages, m.message);
+				if (!chatOpen && m.message.from.userId !== userId) toast(m.message);
+				break;
+			case 'chatDeleted':
+				messages = withDeleted(messages, m.id);
+				toasts = toasts.filter((t) => t.id !== m.id);
+				// The reply may still go out; it quotes "deleted message" then, and so does the reply bar.
+				if (replyTo?.id === m.id) replyTo = { ...replyTo, text: '' };
+				break;
 		}
+	}
+
+	function toast(m: ChatMessage) {
+		toasts = withToast(toasts, m);
+		setTimeout(() => (toasts = toasts.filter((t) => t.id !== m.id)), TOAST_MS);
+	}
+
+	// Tapping a toast answers it.
+	function replyFromToast(m: ChatMessage) {
+		toasts = [];
+		replyTo = m;
+		chatOpen = true;
+	}
+
+	// sendChat keeps the draft when the socket can't take it.
+	function sendChat(text: string) {
+		if (!socket?.send({ type: 'chat', text, replyTo: replyTo?.id ?? null })) return;
+		replyTo = null;
+		draft = '';
+	}
+
+	// olderChat loads the page of messages before the oldest shown.
+	async function olderChat(): Promise<boolean> {
+		const roomId = id;
+		const first = messages[0];
+		if (!first) return true;
+		const r = await olderMessages(roomId, first.id);
+		// Another room, or a reconnect's history replaced the list: this page no longer fits in front.
+		if (roomId !== id || messages[0]?.id !== first.id) return true;
+		if (r.ok) {
+			messages = withOlder(messages, r.value);
+			more = r.value.length === CHAT_PAGE_SIZE;
+		}
+		return r.ok;
 	}
 
 	// prepareText says where the room's prepared copy stands; '' when there's nothing to say, or the
@@ -229,11 +304,46 @@
 	}
 </script>
 
+{#snippet chatPanel(readOnly: boolean)}
+	<Chat
+		{messages}
+		{more}
+		{userId}
+		videoId={room?.video.id ?? 0}
+		{readOnly}
+		{online}
+		bind:replyTo
+		bind:draft
+		onsend={sendChat}
+		ondelete={(chatId) => socket?.send({ type: 'deleteChat', id: chatId })}
+		onolder={olderChat}
+		onclose={readOnly ? undefined : () => (chatOpen = false)}
+	/>
+{/snippet}
+
+{#snippet chatToasts()}
+	{#each toasts as t (t.id)}
+		<button
+			onclick={() => replyFromToast(t)}
+			out:fade
+			class="pointer-events-auto line-clamp-2 rounded-md bg-black/70 px-2 py-1 text-left break-words"
+		>
+			<span class="font-semibold">{t.from.name}</span>
+			{t.text}
+		</button>
+	{/each}
+{/snippet}
+
 <svelte:head>
 	<title>{room ? `${roomTitle(room)} · ` : ''}{strings.appName}</title>
 </svelte:head>
 
-<main class="mx-auto flex max-w-5xl flex-col gap-4 p-4 pb-16">
+<!-- A portrait chat sheet covers the page's lower part: room to scroll the rest above it. -->
+<main
+	class="mx-auto flex max-w-6xl flex-col gap-4 p-4 pb-16 {chatOpen && room && !room.archived
+		? 'portrait:pb-[50dvh]'
+		: ''}"
+>
 	{#if offline}
 		<p class="rounded-md bg-amber-900/60 px-3 py-2 text-amber-200" role="status">
 			{strings.hostOffline}
@@ -311,7 +421,15 @@
 				{note}
 				{next}
 				onnext={() => openPicker(next ?? undefined)}
-			/>
+				bind:chatOpen
+			>
+				{#snippet side()}
+					{@render chatPanel(false)}
+				{/snippet}
+				{#snippet overlay()}
+					{@render chatToasts()}
+				{/snippet}
+			</Player>
 		{/if}
 
 		{#if room.archived}
@@ -322,6 +440,9 @@
 			>
 				{strings.unarchive}
 			</button>
+			<div class="h-96 overflow-hidden rounded-md border border-neutral-800">
+				{@render chatPanel(true)}
+			</div>
 		{:else}
 			<div class="flex flex-wrap gap-2">
 				<button

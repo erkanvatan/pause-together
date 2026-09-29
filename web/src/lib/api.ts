@@ -80,6 +80,20 @@ export type Room = {
 // A user as rooms show them.
 export type Who = { userId: number; name: string };
 
+// A chat message. Deleted ones are never sent.
+export type ChatMessage = {
+	id: number;
+	from: Who; // the sender's current name
+	text: string;
+	sentAt: number; // wall clock, Unix ms
+	video: VideoSummary; // what the room played when it was sent
+	positionMs: number; // and where
+	replyTo: Quote | null;
+};
+
+// The message a reply answers.
+export type Quote = { id: number; from: Who; text: string; deleted: boolean }; // text '' once deleted
+
 // A room on the homepage, with who's watching it now.
 export type RoomCard = Room & { watching: Who[] };
 
@@ -127,6 +141,10 @@ export const switchVideo = (id: number, p: Pick) => call<Room>('PUT', `/api/room
 // renameRoom sets a room's name; '' clears it.
 export const renameRoom = (id: number, name: string) =>
 	call<Room>('PUT', `/api/rooms/${id}/name`, { name });
+
+// olderMessages loads the chat messages sent before the one with id before, oldest first.
+export const olderMessages = (roomId: number, before: number) =>
+	call<ChatMessage[]>('GET', `/api/rooms/${roomId}/messages?before=${before}`);
 
 export const setArchived = (id: number, archived: boolean) =>
 	call<Room>('POST', `/api/rooms/${id}/${archived ? 'archive' : 'unarchive'}`);

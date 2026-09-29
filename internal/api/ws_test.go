@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -135,7 +136,7 @@ func TestSocketJoin(t *testing.T) {
 
 	// hello first, then the whole picture.
 	var types []string
-	for range 5 {
+	for range 6 {
 		m, err := read(t, c)
 		if err != nil {
 			t.Fatal(err)
@@ -162,7 +163,7 @@ func TestSocketJoin(t *testing.T) {
 			}
 		}
 	}
-	if want := "hello room state prepare presence"; strings.Join(types, " ") != want {
+	if want := "hello room state prepare chatHistory presence"; strings.Join(types, " ") != want {
 		t.Errorf("messages = %v, want %s", types, want)
 	}
 }
@@ -338,5 +339,90 @@ func TestSocketArchived(t *testing.T) {
 	m := until(t, c, room.MsgState, nil)
 	if m["state"].(map[string]any)["playing"] != false {
 		t.Errorf("archived room plays: %v", m)
+	}
+}
+
+// chatText returns a chat message's text, and its id.
+func chatText(m msg) (string, float64) {
+	c := m["message"].(map[string]any)
+	return c["text"].(string), c["id"].(float64)
+}
+
+// A message reaches everyone in the room, with the room's video and position. Only its sender can
+// delete it, and a new joiner gets the chat so far.
+func TestSocketChat(t *testing.T) {
+	w := newWSTest(t)
+	a := w.join(t, w.alice)
+	until(t, a, room.MsgPresence, nil)
+	b := w.join(t, w.bob)
+	until(t, b, room.MsgPresence, nil)
+
+	send(t, a, `{"type":"seek","positionMs":90000}`)
+	send(t, a, `{"type":"chat","text":"Hello","replyTo":null}`)
+	var hello float64
+	for _, c := range []*websocket.Conn{a, b} {
+		m := until(t, c, room.MsgChat, nil)["message"].(map[string]any)
+		if m["text"] != "Hello" || m["from"].(map[string]any)["name"] != "Alice" ||
+			m["video"].(map[string]any)["id"] != float64(7) || m["positionMs"] != float64(90000) || m["replyTo"] != nil {
+			t.Errorf("chat = %v", m)
+		}
+		hello = m["id"].(float64)
+	}
+
+	send(t, b, fmt.Sprintf(`{"type":"chat","text":"Hi","replyTo":%v}`, hello))
+	reply := until(t, a, room.MsgChat, nil)["message"].(map[string]any)
+	if q, _ := reply["replyTo"].(map[string]any); q == nil || q["text"] != "Hello" {
+		t.Errorf("reply = %v, want it to quote Hello", reply)
+	}
+
+	// Bob can't delete Alice's message. His next message shows the loop is past his delete.
+	send(t, b, fmt.Sprintf(`{"type":"deleteChat","id":%v}`, hello))
+	send(t, b, `{"type":"chat","text":"after","replyTo":null}`)
+	for {
+		m, err := read(t, a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m["type"] == room.MsgChatDeleted {
+			t.Fatal("Bob deleted Alice's message")
+		}
+		if m["type"] == room.MsgChat {
+			if text, _ := chatText(m); text == "after" {
+				break
+			}
+		}
+	}
+
+	send(t, a, fmt.Sprintf(`{"type":"deleteChat","id":%v}`, hello))
+	for _, c := range []*websocket.Conn{a, b} {
+		if m := until(t, c, room.MsgChatDeleted, nil); m["id"] != hello {
+			t.Errorf("chatDeleted = %v, want id %v", m, hello)
+		}
+	}
+
+	// Alice's second tab gets the chat without the deleted message. The reply now quotes it as deleted.
+	c := w.join(t, w.alice)
+	history := until(t, c, room.MsgChatHistory, nil)["messages"].([]any)
+	var texts []string
+	for _, h := range history {
+		texts = append(texts, h.(map[string]any)["text"].(string))
+	}
+	if strings.Join(texts, ",") != "Hi,after" {
+		t.Errorf("history = %v, want Hi,after", texts)
+	}
+	if q := history[0].(map[string]any)["replyTo"].(map[string]any); q["deleted"] != true || q["text"] != "" {
+		t.Errorf("reply quotes %v, want a deleted message", q)
+	}
+}
+
+// The longest message fits the socket's read limit, even with JSON escaping every character: a
+// control character takes 6 bytes, like \u0001.
+func TestSocketLongChat(t *testing.T) {
+	w := newWSTest(t)
+	a := w.join(t, w.alice)
+	until(t, a, room.MsgPresence, nil)
+	send(t, a, `{"type":"chat","text":"`+strings.Repeat(`\u0001`, room.MaxMessageRunes)+`","replyTo":null}`)
+	if text, _ := chatText(until(t, a, room.MsgChat, nil)); text != strings.Repeat("\x01", room.MaxMessageRunes) {
+		t.Errorf("got %d runes back, want the %d sent", len([]rune(text)), room.MaxMessageRunes)
 	}
 }

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import type { VideoSummary } from './api';
 import type { ClientMessage, ServerMessage } from './protocol';
 
 // The fixture Go's protocol test checks too: what one side sends is what the other reads.
@@ -9,6 +10,24 @@ const fixture = JSON.parse(
 
 const alice = { userId: 1, name: 'Alice' };
 const bob = { userId: 2, name: 'Bob' };
+
+const heat: VideoSummary = {
+	id: 7,
+	type: 'movies',
+	title: 'Heat',
+	year: 1995,
+	edition: '',
+	version: '',
+	season: 0,
+	episode: 0,
+	episodeEnd: 0,
+	episodeTitle: '',
+	group: '',
+	durationMs: 3600000,
+	codecString: 'avc1.640028',
+	unplayable: '',
+	appleOnly: false
+};
 
 const client: ClientMessage[] = [
 	{ type: 'ping', t: 1234.5 },
@@ -23,7 +42,10 @@ const client: ClientMessage[] = [
 	{ type: 'status', status: 'ready', positionMs: 12345.678 },
 	{ type: 'status', status: 'buffering', positionMs: 0 },
 	{ type: 'status', status: 'away', positionMs: 5000 },
-	{ type: 'status', status: 'cantPlay', positionMs: 0 }
+	{ type: 'status', status: 'cantPlay', positionMs: 0 },
+	{ type: 'chat', text: 'Hello', replyTo: null },
+	{ type: 'chat', text: 'Right?', replyTo: 12 },
+	{ type: 'deleteChat', id: 12 }
 ];
 
 const server: ServerMessage[] = [
@@ -48,24 +70,7 @@ const server: ServerMessage[] = [
 		room: {
 			id: 1,
 			name: 'Movie night',
-			video: {
-				id: 7,
-				type: 'movies',
-				title: 'Heat',
-				year: 1995,
-				edition: '',
-				version: '',
-				season: 0,
-				episode: 0,
-				episodeEnd: 0,
-				episodeTitle: '',
-				group: '',
-				durationMs: 3600000,
-				codecString: 'avc1.640028',
-				unplayable: '',
-				appleOnly: false,
-				missing: false
-			},
+			video: { ...heat, missing: false },
 			audio: null,
 			subtitle: { sidecar: 7 },
 			positionMs: 0,
@@ -91,7 +96,34 @@ const server: ServerMessage[] = [
 	},
 	{ type: 'paused', by: bob },
 	{ type: 'pong', t: 1234.5, serverMs: 98765 },
-	{ type: 'deleted' }
+	{ type: 'deleted' },
+	{
+		type: 'chatHistory',
+		messages: [
+			{
+				id: 12,
+				from: alice,
+				text: 'Hello',
+				sentAt: 1727000000000,
+				video: heat,
+				positionMs: 90000,
+				replyTo: null
+			}
+		]
+	},
+	{
+		type: 'chat',
+		message: {
+			id: 13,
+			from: bob,
+			text: 'Right?',
+			sentAt: 1727000005000,
+			video: heat,
+			positionMs: 95000,
+			replyTo: { id: 12, from: alice, text: 'Hello', deleted: false }
+		}
+	},
+	{ type: 'chatDeleted', id: 12 }
 ];
 
 describe('protocol', () => {

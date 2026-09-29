@@ -113,7 +113,7 @@ internal/api/        HTTP handlers, guest vs admin routes (admin API registered 
 internal/room/       rooms (create, switch, rename, archive, delete) and the prepare jobs they need;
                      sync.go: one room's sync rules, pure (clock passed in); timing.go: its timing constants;
                      hub.go (sockets, one loop per room with people in it), loop.go (a room's goroutine),
-                     presence.go (pure), protocol.go (socket messages); (planned) chat
+                     presence.go (pure), protocol.go (socket messages); chat.go (messages: add, delete, pages)
 internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out), scanning into videos and tracks,
                      scan queue with progress, add/remove libraries, folder picker, file watching; the picker's
                      video list and details, language codes (normalized to 2 letters), language defaults;
@@ -131,9 +131,10 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts,
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID),
                      Player.svelte (the <video>, "Tap to join", controls, the follow loop, subtitle panel,
-                     fullscreen), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
+                     fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
                      Subtitles.svelte (the subtitle overlay), prefs.ts (per-device player settings in
-                     localStorage), time.ts (1:40:00);
+                     localStorage), time.ts (1:40:00), chat.ts (pure: message length, the message list),
+                     Chat.svelte (the chat panel);
                      sync/ (pure): clock.ts (server clock offset), drift.ts (drift fix, follow step), state.ts
                      (target position, local intents), status.ts (what the player reports, and when),
                      timing.ts (its timing constants)
@@ -442,7 +443,7 @@ So each room's video is **prepared once**, then served as a plain file.
 - Library picker: a search box, show → season → episode grouping, and a "recently added" sort. Videos
   this device can't play are greyed out.
 
-## Chat (planned)
+## Chat
 
 - One chat per room, kept forever, deleted with the room (foreign-key cascade).
 - Plain text, at most 1000 characters. Emoji are ordinary Unicode typed on the device keyboard; each
@@ -450,8 +451,8 @@ So each room's video is **prepared once**, then served as a plain file.
 - Live messages go both ways on the room socket. Opening the room loads the last 100; older ones load
   on scroll up (`GET` with a cursor).
 - A message can reply to one earlier message and shows a short quote of it.
-- People can delete their own messages, not edit them. A reply to a deleted message quotes "deleted
-  message".
+- People can delete their own messages, not edit them. A deleted message disappears from the list.
+  Its row stays with the text wiped, so a reply to it quotes "deleted message".
 - Each message stores the video and the room position when it was sent (from the server's room clock)
   and shows that as a timestamp, plus the video's name if it isn't the one playing now. The send time
   (wall clock) shows on tap or hover.

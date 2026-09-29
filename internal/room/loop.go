@@ -109,6 +109,11 @@ func (l *loop) join(s *socket) {
 	s.send(encode(RoomMsg{Type: MsgRoom, Room: l.room}))
 	s.send(encode(StateMsg{Type: MsgState, State: l.sync.State(now)}))
 	s.send(encode(PrepareMsg{Type: MsgPrepare, Prepare: l.prepare}))
+	if ms, err := l.hub.Rooms.Messages(l.hub.ctx, l.id, 0); err != nil {
+		slog.Error("load chat", "room", l.id, "err", err)
+	} else {
+		s.send(encode(ChatHistoryMsg{Type: MsgChatHistory, Messages: ms}))
+	}
 	s.send(encode(PresenceMsg{Type: MsgPresence, Watching: l.watching, WasHere: l.wasHere}))
 	l.sockets = append(l.sockets, s)
 }
@@ -130,10 +135,23 @@ func (l *loop) leave(s *socket, left bool) {
 // state back, so the sender snaps to it.
 func (l *loop) intent(s *socket, m ClientMsg) {
 	now := l.hub.now()
-	if m.Type == MsgStatus {
+	switch m.Type {
+	case MsgStatus:
 		if st, ok := statusNames[m.Status]; ok {
 			l.apply(l.sync.Status(s.id, st, ms(m.PositionMs), now), now)
 		}
+		return
+	case MsgChat:
+		l.chat(s, m, now)
+		return
+	case MsgDeleteChat:
+		// Only its sender deletes a message, and never in an archived room. The page offers nothing
+		// else, so a refusal is dropped.
+		if err := l.hub.Rooms.DeleteMessage(l.hub.ctx, l.id, s.who.UserID, m.ID); err != nil {
+			slog.Debug("delete chat message", "room", l.id, "err", err)
+			return
+		}
+		l.broadcast(ChatDeletedMsg{Type: MsgChatDeleted, ID: m.ID})
 		return
 	}
 	snap := func() { s.send(encode(StateMsg{Type: MsgState, State: l.sync.State(now)})) }
@@ -163,6 +181,19 @@ func (l *loop) intent(s *socket, m ClientMsg) {
 		return
 	}
 	l.apply(e, now)
+}
+
+// chat stores a message with what the room plays, and where, and sends it to everyone. The page never
+// sends one the server refuses (blank, too long, an archived room), so a refusal is dropped.
+func (l *loop) chat(s *socket, m ClientMsg, now int64) {
+	st := l.sync.State(now)
+	msg, err := l.hub.Rooms.AddMessage(l.hub.ctx, NewMessage{RoomID: l.id, UserID: s.who.UserID, Text: m.Text,
+		ReplyTo: m.ReplyTo, VideoID: st.VideoID, PositionMs: st.Position(now), SentAt: time.Now().UnixMilli()})
+	if err != nil {
+		slog.Debug("add chat message", "room", l.id, "err", err)
+		return
+	}
+	l.broadcast(ChatMsg{Type: MsgChat, Message: msg})
 }
 
 // switched puts on the room's new video.

@@ -37,9 +37,11 @@ export class RoomSocket {
 		this.connect();
 	}
 
-	// send drops the message while disconnected: the full state arrives on reconnect.
-	send(m: ClientMessage) {
-		if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+	// send drops the message while disconnected, and says so: the full state arrives on reconnect.
+	send(m: ClientMessage): boolean {
+		if (this.ws?.readyState !== WebSocket.OPEN) return false;
+		this.ws.send(JSON.stringify(m));
+		return true;
 	}
 
 	// close leaves the room: the clean close tells the server so, and it shows "was here" at once.

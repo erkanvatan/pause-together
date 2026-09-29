@@ -24,7 +24,7 @@ func TestProtocol(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sidecar := int64(7)
+	sidecar, twelve := int64(7), int64(12)
 	client := []ClientMsg{
 		{Type: MsgPing, T: 1234.5},
 		{Type: MsgPlay},
@@ -39,6 +39,9 @@ func TestProtocol(t *testing.T) {
 		{Type: MsgStatus, Status: "buffering"},
 		{Type: MsgStatus, Status: "away", PositionMs: 5000},
 		{Type: MsgStatus, Status: "cantPlay"},
+		{Type: MsgChat, Text: "Hello"},
+		{Type: MsgChat, Text: "Right?", ReplyTo: &twelve},
+		{Type: MsgDeleteChat, ID: 12},
 	}
 	if len(fixture.Client) != len(client) {
 		t.Fatalf("fixture has %d client messages, want %d", len(fixture.Client), len(client))
@@ -63,6 +66,10 @@ func TestProtocol(t *testing.T) {
 			DurationMs: 3_600_000, CodecString: "avc1.640028"}},
 		Subtitle: &Subtitle{Sidecar: &sidecar},
 	}
+	hello := Message{ID: 12, From: alice, Text: "Hello", SentAt: 1_727_000_000_000, Video: heat.Video.VideoSummary,
+		PositionMs: 90_000}
+	right := Message{ID: 13, From: bob, Text: "Right?", SentAt: 1_727_000_005_000, Video: heat.Video.VideoSummary,
+		PositionMs: 95_000, ReplyTo: &Quote{ID: 12, From: alice, Text: "Hello"}}
 	server := []any{
 		HelloMsg{Type: MsgHello, BuildID: "1727000000000", UserID: 1},
 		StateMsg{Type: MsgState, State: State{VideoID: 7, Audio: stream(1), Subtitle: &Subtitle{Stream: stream(3)},
@@ -75,6 +82,9 @@ func TestProtocol(t *testing.T) {
 		PausedMsg{Type: MsgPaused, By: bob},
 		PongMsg{Type: MsgPong, T: 1234.5, ServerMs: 98_765},
 		TypeMsg{Type: MsgDeleted},
+		ChatHistoryMsg{Type: MsgChatHistory, Messages: []Message{hello}},
+		ChatMsg{Type: MsgChat, Message: right},
+		ChatDeletedMsg{Type: MsgChatDeleted, ID: 12},
 	}
 	if len(fixture.Server) != len(server) {
 		t.Fatalf("fixture has %d server messages, want %d", len(fixture.Server), len(server))

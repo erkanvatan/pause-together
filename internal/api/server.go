@@ -60,6 +60,7 @@ func (s *server) mux(web fs.FS) *http.ServeMux {
 	mux.HandleFunc("PUT /api/rooms/{id}/name", s.renameRoom)
 	mux.HandleFunc("POST /api/rooms/{id}/archive", s.setArchived(true))
 	mux.HandleFunc("POST /api/rooms/{id}/unarchive", s.setArchived(false))
+	mux.HandleFunc("GET /api/rooms/{id}/messages", s.roomMessages)
 	mux.HandleFunc("GET /stream/{key}/{name}", s.streamFile)
 	mux.HandleFunc("GET /ws", s.roomSocket)
 	if s.admin {

@@ -1,6 +1,6 @@
 // The room socket's messages: JSON {type: ...}. internal/room/protocol.go defines the same ones; change
 // both together. internal/room/testdata/protocol.json holds one of each, checked on both sides.
-import type { Room, SubtitleChoice, Who } from '$lib/api';
+import type { ChatMessage, Room, SubtitleChoice, Who } from '$lib/api';
 
 // The close code of a socket whose room doesn't exist (any more): deleted while this page was away.
 export const CLOSE_NOT_FOUND = 4404;
@@ -16,7 +16,9 @@ export type ClientMessage =
 	| { type: 'playAnyway' }
 	| { type: 'subtitle'; subtitle: SubtitleChoice | null }
 	| { type: 'offset'; ms: number }
-	| { type: 'status'; status: Status; positionMs: number };
+	| { type: 'status'; status: Status; positionMs: number }
+	| { type: 'chat'; text: string; replyTo: number | null } // replyTo: the message it answers
+	| { type: 'deleteChat'; id: number };
 
 // A room's playback state. Times are server ms.
 export type RoomState = {
@@ -52,4 +54,7 @@ export type ServerMessage =
 	| { type: 'prepare'; prepare: Prepare }
 	| { type: 'paused'; by: Who }
 	| { type: 'pong'; t: number; serverMs: number }
-	| { type: 'deleted' };
+	| { type: 'deleted' }
+	| { type: 'chatHistory'; messages: ChatMessage[] } // on join: the newest, oldest first
+	| { type: 'chat'; message: ChatMessage }
+	| { type: 'chatDeleted'; id: number };

@@ -18,8 +18,9 @@ const (
 	// sendBuffer is how many messages a socket may fall behind by. A socket further behind is dropped,
 	// so a slow one never holds up its room; it reconnects and gets the full state.
 	sendBuffer = 64
-	// readLimit caps a client message. They are all tiny.
-	readLimit = 4 << 10
+	// readLimit caps a client message. The biggest is a chat message: MaxMessageRunes runes, which the
+	// page's JSON.stringify writes in up to 6 bytes each (a control character as \u0001).
+	readLimit = 8 << 10
 )
 
 // Hub runs one loop per room with people in it, and connects sockets to them.

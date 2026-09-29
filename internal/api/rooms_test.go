@@ -1,9 +1,13 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/erkanvatan/pause-together/internal/room"
 )
 
 // seedVideo adds video 7, Heat (1995), with one stereo audio track (stream 1), to a library.
@@ -76,6 +80,52 @@ func TestRooms(t *testing.T) {
 		}
 		if got := strings.TrimSpace(rec.Body.String()); s.want != "" && got != s.want {
 			t.Errorf("%s: body = %s\nwant %s", s.name, got, s.want)
+		}
+	}
+}
+
+// Older messages load a page at a time, going back from a cursor.
+func TestRoomMessages(t *testing.T) {
+	w := newWSTest(t)
+	var ids []int64
+	for range 150 {
+		m, err := w.d.Rooms.AddMessage(t.Context(), room.NewMessage{RoomID: 1, UserID: w.aliceID, Text: "m", VideoID: 7})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, m.ID)
+	}
+	tests := []struct {
+		name       string
+		path       string
+		wantStatus int
+		first      int64 // the page's first id
+		n          int
+	}{
+		{"newest", "/api/rooms/1/messages", http.StatusOK, ids[50], 100},
+		{"older", fmt.Sprintf("/api/rooms/1/messages?before=%d", ids[50]), http.StatusOK, ids[0], 50},
+		{"none older", fmt.Sprintf("/api/rooms/1/messages?before=%d", ids[0]), http.StatusOK, 0, 0},
+		{"unknown room", "/api/rooms/2/messages", http.StatusNotFound, 0, 0},
+		{"bad cursor", "/api/rooms/1/messages?before=x", http.StatusBadRequest, 0, 0},
+	}
+	for _, tt := range tests {
+		rec := adminRequest(w.guest, http.MethodGet, tt.path, "")
+		if rec.Code != tt.wantStatus {
+			t.Errorf("%s: status = %d (%s), want %d", tt.name, rec.Code, rec.Body.String(), tt.wantStatus)
+			continue
+		}
+		if rec.Code != http.StatusOK {
+			continue
+		}
+		var page []room.Message
+		if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+			t.Fatal(err)
+		}
+		if len(page) != tt.n || (tt.n > 0 && page[0].ID != tt.first) {
+			t.Errorf("%s: %d messages from %v, want %d from %d", tt.name, len(page), page, tt.n, tt.first)
+		}
+		if page == nil {
+			t.Errorf("%s: null, want []", tt.name)
 		}
 	}
 }

@@ -351,7 +351,7 @@ also the first check off `localhost`, which counts as secure and hides HTTPS-onl
 
 **Not here:** chat.
 
-### [ ] 16. Chat
+### [x] 16. Chat
 
 **Goal:** chat per room, alongside the video.
 

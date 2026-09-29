@@ -12,7 +12,10 @@
 		{ "type": "status", "status": "ready", "positionMs": 12345.678 },
 		{ "type": "status", "status": "buffering", "positionMs": 0 },
 		{ "type": "status", "status": "away", "positionMs": 5000 },
-		{ "type": "status", "status": "cantPlay", "positionMs": 0 }
+		{ "type": "status", "status": "cantPlay", "positionMs": 0 },
+		{ "type": "chat", "text": "Hello", "replyTo": null },
+		{ "type": "chat", "text": "Right?", "replyTo": 12 },
+		{ "type": "deleteChat", "id": 12 }
 	],
 	"server": [
 		{ "type": "hello", "buildId": "1727000000000", "userId": 1 },
@@ -90,6 +93,65 @@
 		},
 		{ "type": "paused", "by": { "userId": 2, "name": "Bob" } },
 		{ "type": "pong", "t": 1234.5, "serverMs": 98765 },
-		{ "type": "deleted" }
+		{ "type": "deleted" },
+		{
+			"type": "chatHistory",
+			"messages": [
+				{
+					"id": 12,
+					"from": { "userId": 1, "name": "Alice" },
+					"text": "Hello",
+					"sentAt": 1727000000000,
+					"video": {
+						"id": 7,
+						"type": "movies",
+						"title": "Heat",
+						"year": 1995,
+						"edition": "",
+						"version": "",
+						"season": 0,
+						"episode": 0,
+						"episodeEnd": 0,
+						"episodeTitle": "",
+						"group": "",
+						"durationMs": 3600000,
+						"codecString": "avc1.640028",
+						"unplayable": "",
+						"appleOnly": false
+					},
+					"positionMs": 90000,
+					"replyTo": null
+				}
+			]
+		},
+		{
+			"type": "chat",
+			"message": {
+				"id": 13,
+				"from": { "userId": 2, "name": "Bob" },
+				"text": "Right?",
+				"sentAt": 1727000005000,
+				"video": {
+					"id": 7,
+					"type": "movies",
+					"title": "Heat",
+					"year": 1995,
+					"edition": "",
+					"version": "",
+					"season": 0,
+					"episode": 0,
+					"episodeEnd": 0,
+					"episodeTitle": "",
+					"group": "",
+					"durationMs": 3600000,
+					"codecString": "avc1.640028",
+					"unplayable": "",
+					"appleOnly": false
+				},
+				"positionMs": 95000,
+				"replyTo": { "id": 12, "from": { "userId": 1, "name": "Alice" }, "text": "Hello", "deleted": false }
+			}
+		},
+		{ "type": "chatDeleted", "id": 12 }
 	]
 }
