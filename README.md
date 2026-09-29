@@ -6,7 +6,7 @@
 
 A self-hosted watch-together app. Same show. Same second. Different places.
 
-[Features](#features) • [How it works](#how-it-works) • [Getting started](#getting-started) • [Development](#development)
+[Features](#features) • [How it works](#how-it-works) • [Getting started](#getting-started) • [Tailscale](#connecting-devices-with-tailscale) • [Development](#development)
 
 </div>
 
@@ -75,12 +75,12 @@ flowchart LR
    | --- | --- | --- |
    | `MEDIA_ROOT` | Folder with all your media. Mounted read-only. Must exist. | `~/Videos` |
    | `DATA_DIR` | Folder for the database, cache and backups. `task up` creates it. | `~/.local/share/pausetogether` |
-   | `PUBLIC_BIND` | Host IP for the guest port. Set it to your Tailscale IP. | `127.0.0.1` |
+   | `PUBLIC_BIND` | Host IP for the guest port. Set it to your [Tailscale IP](#on-the-host). | `127.0.0.1` |
    | `GUEST_PORT`, `ADMIN_PORT` | Host ports. | `8420`, `8421` |
 
-   > [!CAUTION]
-   > Never set `PUBLIC_BIND` to `0.0.0.0`. Docker bypasses `ufw`, so that opens the app on every
-   > network the host joins, café Wi-Fi included.
+> [!CAUTION]
+> Never set `PUBLIC_BIND` to `0.0.0.0`. Docker bypasses `ufw`, so that opens the app on every
+> network the host joins, café Wi-Fi included.
 
 3. Let Docker bind the Tailscale IP even when it starts before Tailscale does:
 
@@ -107,11 +107,72 @@ flowchart LR
 6. Open `http://localhost:8421` on the host. Go to the admin page and add a library: a folder under
    your media root, plus its type.
 
-7. Give guests one address, for example `http://<tailscale-ip>:8420`. Stick to one: the Tailscale IP
-   and the MagicDNS name each give a guest a different identity.
+7. Let guests in: see [Connecting devices with Tailscale](#connecting-devices-with-tailscale).
 
 > [!TIP]
 > `task logs` follows the server log. `task down` stops the server, so check nobody is mid-movie.
+
+### Connecting devices with Tailscale
+
+Guests reach the host through [Tailscale](https://tailscale.com). It's a free app that links your
+devices into one private network, even across different homes. No router setup, no open ports. Each
+device gets a fixed address starting with `100.`.
+
+You set it up once on the host. Each guest installs the app, accepts your invite and opens one link.
+
+#### On the host
+
+1. Install Tailscale and log in:
+
+   ```sh
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up
+   ```
+
+   `tailscale up` prints a link. Open it and sign in with a Google, Microsoft, GitHub or Apple
+   account. That creates your free Tailscale account.
+
+2. Get the host's Tailscale IP:
+
+   ```sh
+   tailscale ip -4        # e.g. 100.101.102.103
+   ```
+
+   Put it in `.env` as `PUBLIC_BIND=100.101.102.103`, then run `task up`. If the server is already
+   running, run `task up` again to pick up the change.
+
+3. Turn off key expiry for the host. By default Tailscale logs every device out after 180 days, and
+   guests would find the server gone. On the [Machines page](https://login.tailscale.com/admin/machines),
+   open the host's `⋯` menu and pick **Disable key expiry**.
+
+4. Share the host with each guest. On the same page, open the host's `⋯` menu and pick **Share…**.
+   Send the guest the link, or enter their email. A share gives them this one machine, not your other
+   devices.
+
+#### On each guest device
+
+1. Open the share link from the host. Sign in with a Google, Microsoft, GitHub or Apple account, and
+   accept the shared machine. This is done once per person, not per device.
+2. Install Tailscale from the [download page](https://tailscale.com/download), or the App Store or
+   Google Play on phones and tablets. Sign in with the same account and turn it on. Phones ask to add a
+   VPN: allow it.
+3. Open the host's address in a browser, with `http://` and the port: `http://100.101.102.103:8420`.
+   Pick a name, then bookmark the page.
+
+Give every guest the same address, the Tailscale IP. Each address (`localhost`, the IP, the MagicDNS
+name) gives a guest a different identity, so switching loses their name.
+
+> [!NOTE]
+> Tailscale must be on while watching. On phones it's a switch in the app, and it can turn itself off.
+> If the page won't load, check that first.
+
+#### If something doesn't work
+
+| Problem | What to check |
+| --- | --- |
+| Page won't load | Tailscale is on, on both the host and the guest device. `PUBLIC_BIND` is the host's Tailscale IP, and `task up` ran after you set it. The address has `http://` and `:8420`. |
+| Worked before, stopped | Tailscale got turned off on the device. Or the host's key expired: see step 3 above. |
+| Video keeps buffering | While the guest watches, run `tailscale status` on the host and find their device. `direct` is good. `relay` means traffic goes through Tailscale's servers, which is slower. Strict networks (work, school, some mobile data) often force a relay. Also check the host's upload speed. |
 
 ### Naming your files
 
