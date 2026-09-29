@@ -109,7 +109,8 @@ Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env`
 
 ```
 cmd/pausetogether/   main: config, wiring, both HTTP listeners
-internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only), SPA serving
+internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only), SPA serving;
+                     host.go (admin Host check), ws.go (room socket join), stream.go (/stream files)
 internal/room/       rooms (create, switch, rename, archive, delete) and the prepare jobs they need;
                      sync.go: one room's sync rules, pure (clock passed in); timing.go: its timing constants;
                      hub.go (sockets, one loop per room with people in it), loop.go (a room's goroutine),
