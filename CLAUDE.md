@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 serves its local video library. Guests reach it over Tailscale and watch in sync from PCs, tablets and
 phones. Same show. Same second. Different places.
 
-**Status: being built in slices; `docs/plan.md` ticks off the done ones.** This file is the spec. As code
-lands, update the layout and commands below to match reality. The rules here are decided: flag problems,
+**Status: slices 1–17 are built; the field test is next (`docs/plan.md`).** This file is the spec. When
+code changes, update the layout and commands below to match reality. The rules here are decided: flag problems,
 but don't quietly change them. Work each slice by the steps under "How to work a slice" in
 `docs/plan.md`.
 
@@ -53,13 +53,12 @@ task up | task down | task logs                               # build + start, s
 Ask before `task up` or `task down`: they restart the live server, maybe mid-movie. Dev and prod use
 different ports, compose project names and data dirs, so `task dev` is safe to run next to prod.
 
-Prod config lives in `.env` (template: `.env.example`). Each variable arrives with the slice that first
-uses it:
-- `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media` (slice 6). Required. The
+Prod config lives in `.env` (template: `.env.example`):
+- `MEDIA_ROOT`: host folder holding all media, mounted read-only at `/media`. Required. The
   folder must exist: compose won't make it (`create_host_path: false`).
 - `DEV_MEDIA_ROOT`: optional, dev only, e.g. a scratch folder to copy test files into. Also works from
   the shell: `DEV_MEDIA_ROOT=/tmp/media task dev`.
-- `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data` (slice 2). Required.
+- `DATA_DIR`: host folder for the database, cache and backups, mounted at `/data`. Required.
   `task up` creates it, owned by you. Compose itself uses `create_host_path: false`, so a plain
   `docker compose up` with a missing folder fails instead of Docker making it as root, where the app
   can't write.
@@ -109,8 +108,10 @@ Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env`
 
 ```
 cmd/pausetogether/   main: config, wiring, both HTTP listeners
-internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only), SPA serving;
-                     host.go (admin Host check), ws.go (room socket join), stream.go (/stream files)
+internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only);
+                     server.go (routes, both listeners), spa.go (SPA serving), host.go (admin Host check),
+                     me.go (user cookie), rooms.go, videos.go (picker), admin.go (admin API),
+                     ws.go (room socket join), stream.go (/stream files)
 internal/room/       rooms (create, switch, rename, archive, delete) and the prepare jobs they need;
                      sync.go: one room's sync rules, pure (clock passed in); timing.go: its timing constants;
                      hub.go (sockets, one loop per room with people in it), loop.go (a room's goroutine),
@@ -125,6 +126,7 @@ internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied
 internal/user/       name rules, users table (token stored as a SHA-256 hash), lookup by cookie token
 testdata/make.sh     makes the test clips in testdata/media (git-ignored)
 docs/plan.md         build order in slices, and how to work one
+.claude/skills/      git-commit, fix-comments (used by the slice steps in docs/plan.md)
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
 web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode),
@@ -510,3 +512,4 @@ So each room's video is **prepared once**, then served as a plain file.
   each message and both sides' tests read it, so a new message goes there too.
 - The frontend uses relative URLs only, so one build works on both ports and behind the dev proxy.
 - LF line endings everywhere.
+- No attribution lines in commits or PRs: no `Claude-Session` link, no "Generated with Claude".
