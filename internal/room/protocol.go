@@ -84,7 +84,6 @@ type RoomMsg struct {
 type PresenceMsg struct {
 	Type     string `json:"type"`
 	Watching []Who  `json:"watching"`
-	WasHere  []Who  `json:"wasHere"`
 }
 
 type PrepareMsg struct {

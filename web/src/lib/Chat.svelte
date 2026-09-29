@@ -1,7 +1,7 @@
 <script lang="ts">
 	// A room's chat: the messages, and a line to write one. Text is shown as text, never as HTML.
 	import { onMount, tick, untrack } from 'svelte';
-	import type { ChatMessage } from '$lib/api';
+	import type { ChatMessage, Who } from '$lib/api';
 	import { canSend, MAX_MESSAGE_CHARS, messageLength } from '$lib/chat';
 	import Icon from '$lib/Icon.svelte';
 	import { videoName } from '$lib/picker';
@@ -11,6 +11,7 @@
 	let {
 		messages,
 		more,
+		watching,
 		userId,
 		videoId,
 		readOnly,
@@ -24,6 +25,7 @@
 	}: {
 		messages: ChatMessage[]; // oldest first
 		more: boolean; // older ones may be on the server
+		watching: Who[];
 		userId: number; // this user's
 		videoId: number; // the room's video now; other videos are named on their messages
 		readOnly: boolean; // an archived room
@@ -117,6 +119,28 @@
 			</button>
 		{/if}
 	</header>
+
+	<!-- Who's here, like a chat app's online list. Two lines at most, then it scrolls, so it never
+	pushes the messages off a phone. -->
+	{#if watching.length > 0}
+		<section aria-label={strings.watchingNow} class="shrink-0 border-b border-line px-4 pb-2 text-sm">
+			<!-- The label flows with the names, so they wrap under it at full width. -->
+			<!-- Focusable, so a keyboard can scroll it. -->
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+			<ul tabindex="0" class="flex max-h-[calc(2lh+0.25rem)] flex-wrap gap-x-1.5 gap-y-1 overflow-y-auto [scrollbar-color:var(--color-line)_transparent] [scrollbar-width:thin]">
+				<li class="mr-1.5 flex items-center gap-2 text-haze" aria-hidden="true">
+					<span class="size-2 rounded-full bg-lamp"></span>
+					{strings.watchingNow}
+				</li>
+				<!-- Each name on its own chip: names can hold spaces, so a plain gap can't tell two apart. -->
+				{#each watching as w (w.userId)}
+					<li title={w.name} class="max-w-full truncate rounded-control bg-midnight px-2 {w.userId === userId ? 'text-lamp' : ''}">
+						{w.name}
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
 
 	<ol bind:this={list} onscroll={scrolled} class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
 		{#if olderFailed}

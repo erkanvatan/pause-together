@@ -2,26 +2,17 @@ package room
 
 import "slices"
 
-// Presence tracks who is in a room: "watching now" (an open socket, or the last one closed less than
-// PresenceGraceMs ago) and "was here" (joined before, gone now). Each user shows once, however many
-// tabs they have open. Pure: time is passed in.
+// Presence tracks who is watching a room now: an open socket, or the last one closed less than
+// PresenceGraceMs ago. Someone gone longer is forgotten. Each user shows once, however many tabs they
+// have open. Pure: time is passed in.
 type Presence struct {
-	visitors []*visitor // in the order they first showed up
+	visitors []*visitor // in the order they came; someone forgotten who comes back goes last
 }
 
 type visitor struct {
 	who     Who
 	sockets int
 	until   int64 // with no socket: watching until this time
-}
-
-// Load adds who was here before, from the database.
-func (p *Presence) Load(wasHere []Who) {
-	for _, w := range wasHere {
-		if p.find(w.UserID) == nil {
-			p.visitors = append(p.visitors, &visitor{who: w})
-		}
-	}
 }
 
 // Join counts a socket of w's. It also takes w's current name.
@@ -51,17 +42,14 @@ func (p *Presence) Leave(userID, now int64, left bool) {
 	}
 }
 
-// Snapshot returns who is watching now and who was here, at now. Neither is nil, so both are sent as [].
-func (p *Presence) Snapshot(now int64) (watching, wasHere []Who) {
-	watching, wasHere = []Who{}, []Who{}
+// Watching returns who is watching at now, and forgets who is gone. Never nil, so it is sent as [].
+func (p *Presence) Watching(now int64) []Who {
+	p.visitors = slices.DeleteFunc(p.visitors, func(v *visitor) bool { return v.sockets == 0 && now >= v.until })
+	watching := []Who{}
 	for _, v := range p.visitors {
-		if v.sockets > 0 || now < v.until {
-			watching = append(watching, v.who)
-		} else {
-			wasHere = append(wasHere, v.who)
-		}
+		watching = append(watching, v.who)
 	}
-	return watching, wasHere
+	return watching
 }
 
 func (p *Presence) find(userID int64) *visitor {

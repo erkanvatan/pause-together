@@ -574,34 +574,3 @@ func TestSaveState(t *testing.T) {
 		t.Errorf("deleted sidecar: subtitle = %+v, want off", got.Subtitle)
 	}
 }
-
-func TestVisitors(t *testing.T) {
-	ctx := context.Background()
-	r := newTestRooms(t)
-	if _, err := r.DB.Exec(`INSERT INTO users (id, token_hash, name) VALUES (1, x'01', 'Bob'), (2, x'02', 'Alice')`); err != nil {
-		t.Fatal(err)
-	}
-	a := mustCreate(t, r, pick(1, stream(1)))
-	b := mustCreate(t, r, pick(2, stream(1)))
-	for _, v := range []struct{ room, user int64 }{{a.ID, 1}, {a.ID, 2}, {a.ID, 1}, {b.ID, 2}} {
-		if err := r.Visit(ctx, v.room, v.user); err != nil {
-			t.Fatal(err)
-		}
-	}
-	got, err := r.Visitors(ctx, a.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := []Who{{UserID: 2, Name: "Alice"}, {UserID: 1, Name: "Bob"}}; !slices.Equal(got, want) {
-		t.Errorf("visitors = %v, want %v", got, want)
-	}
-
-	// Deleting a room deletes its visitors, not the users.
-	if err := r.Delete(ctx, a.ID); err != nil {
-		t.Fatal(err)
-	}
-	var n int
-	if err := r.DB.QueryRow("SELECT count(*) FROM room_visitors").Scan(&n); err != nil || n != 1 {
-		t.Errorf("visitor rows after delete = %d (err %v), want 1", n, err)
-	}
-}

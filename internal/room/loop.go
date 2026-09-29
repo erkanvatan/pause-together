@@ -22,15 +22,15 @@ type loop struct {
 	in   chan func() // unbuffered: a send succeeds only while the loop runs
 	done chan struct{}
 
-	room              Room // as the pages show it; its position and subtitle may lag behind sync's
-	sync              *Sync
-	presence          Presence
-	sockets           []*socket
-	key               string  // the cache key of the room's prepared copy; "" when it can't play
-	prepare           Prepare // as last sent
-	watching, wasHere []Who   // as last sent
-	gone              bool    // deleted
-	touchedMs         int64   // when the loop last marked its copy used; 0 = not yet
+	room      Room // as the pages show it; its position and subtitle may lag behind sync's
+	sync      *Sync
+	presence  Presence
+	sockets   []*socket
+	key       string  // the cache key of the room's prepared copy; "" when it can't play
+	prepare   Prepare // as last sent
+	watching  []Who   // as last sent
+	gone      bool    // deleted
+	touchedMs int64   // when the loop last marked its copy used; 0 = not yet
 }
 
 func newLoop(h *Hub, rm Room) *loop {
@@ -63,11 +63,6 @@ func (l *loop) run(ctx context.Context) {
 		l.room = rm
 	}
 	l.sync = NewSync(l.room, l.hub.now())
-	if who, err := l.hub.Rooms.Visitors(ctx, l.id); err != nil {
-		slog.Error("load room visitors", "room", l.id, "err", err)
-	} else {
-		l.presence.Load(who)
-	}
 	tick := time.NewTicker(TickMs * time.Millisecond)
 	defer tick.Stop()
 	for {
@@ -106,9 +101,6 @@ func (l *loop) run(ctx context.Context) {
 // join adds s. It gets the whole picture; everyone else, only what changed.
 func (l *loop) join(s *socket) {
 	now := l.hub.now()
-	if err := l.hub.Rooms.Visit(l.hub.ctx, l.id, s.who.UserID); err != nil {
-		slog.Error("record room visitor", "room", l.id, "err", err)
-	}
 	l.presence.Join(s.who)
 	e := l.sync.Join(s.id, s.who, now)
 	// The file may have changed since the key was found: a rescan, or a server restart.
@@ -124,7 +116,7 @@ func (l *loop) join(s *socket) {
 	} else {
 		s.send(encode(ChatHistoryMsg{Type: MsgChatHistory, Messages: ms}))
 	}
-	s.send(encode(PresenceMsg{Type: MsgPresence, Watching: l.watching, WasHere: l.wasHere}))
+	s.send(encode(PresenceMsg{Type: MsgPresence, Watching: l.watching}))
 	l.sockets = append(l.sockets, s)
 }
 
@@ -277,12 +269,12 @@ func (l *loop) touch(now int64) {
 
 // publish sends presence when it changed, and gives the hub its watching list.
 func (l *loop) publish(now int64) {
-	watching, wasHere := l.presence.Snapshot(now)
-	if reflect.DeepEqual(watching, l.watching) && reflect.DeepEqual(wasHere, l.wasHere) {
+	watching := l.presence.Watching(now)
+	if reflect.DeepEqual(watching, l.watching) {
 		return
 	}
-	l.watching, l.wasHere = watching, wasHere
-	l.broadcast(PresenceMsg{Type: MsgPresence, Watching: watching, WasHere: wasHere})
+	l.watching = watching
+	l.broadcast(PresenceMsg{Type: MsgPresence, Watching: watching})
 	l.hub.mu.Lock()
 	if r := l.hub.rooms[l.id]; r != nil && r.loop == l {
 		r.watching = watching

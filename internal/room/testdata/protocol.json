@@ -66,8 +66,7 @@
 		},
 		{
 			"type": "presence",
-			"watching": [{ "userId": 1, "name": "Alice" }],
-			"wasHere": []
+			"watching": [{ "userId": 1, "name": "Alice" }]
 		},
 		{
 			"type": "prepare",

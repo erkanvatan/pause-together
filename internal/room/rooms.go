@@ -257,32 +257,6 @@ func (r *Rooms) SaveState(ctx context.Context, id int64, st State) error {
 	return err
 }
 
-// Visit records that a user joined a room, for its "was here" list.
-func (r *Rooms) Visit(ctx context.Context, roomID, userID int64) error {
-	_, err := r.DB.ExecContext(ctx, "INSERT OR IGNORE INTO room_visitors (room_id, user_id) VALUES (?, ?)", roomID, userID)
-	return err
-}
-
-// Visitors returns everyone who ever joined a room, with their current names.
-func (r *Rooms) Visitors(ctx context.Context, roomID int64) ([]Who, error) {
-	rows, err := r.DB.QueryContext(ctx, `
-		SELECT u.id, u.name FROM room_visitors v JOIN users u ON u.id = v.user_id
-		WHERE v.room_id = ? ORDER BY u.name, u.id`, roomID)
-	if err != nil {
-		return nil, err
-	}
-	var who []Who
-	for rows.Next() {
-		var w Who
-		if err := rows.Scan(&w.UserID, &w.Name); err != nil {
-			_ = rows.Close()
-			return nil, err
-		}
-		who = append(who, w)
-	}
-	return who, errors.Join(rows.Err(), rows.Close())
-}
-
 // opened reads a room back after a change.
 func (r *Rooms) opened(ctx context.Context, id int64) (Room, error) {
 	rw, err := r.get(ctx, id)

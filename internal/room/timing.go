@@ -14,7 +14,7 @@ const (
 	// more often than that (PING_EVERY_MS in web/src/lib/sync/timing.ts).
 	HeartbeatTimeoutMs = 10_000
 	// PresenceGraceMs: someone whose last socket closed stays "watching now" this long, so a flaky phone
-	// that reconnects doesn't flicker to "was here".
+	// that reconnects doesn't flicker out of the list.
 	PresenceGraceMs = 15_000
 	// TouchEveryMs: how often a room with people in it marks its prepared copy used, so the cache
 	// clean-up (a day at least: media.MinUnusedDays) never deletes a copy in use.

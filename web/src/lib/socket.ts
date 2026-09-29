@@ -44,7 +44,7 @@ export class RoomSocket {
 		return true;
 	}
 
-	// close leaves the room: the clean close tells the server so, and it shows "was here" at once.
+	// close leaves the room: the clean close tells the server so, and it drops us from the list at once.
 	close() {
 		this.closed = true;
 		clearTimeout(this.retryTimer);

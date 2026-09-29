@@ -50,7 +50,7 @@ export type ServerMessage =
 	| { type: 'hello'; buildId: string; userId: number }
 	| { type: 'state'; state: RoomState }
 	| { type: 'room'; room: Room }
-	| { type: 'presence'; watching: Who[]; wasHere: Who[] }
+	| { type: 'presence'; watching: Who[] }
 	| { type: 'prepare'; prepare: Prepare }
 	| { type: 'paused'; by: Who }
 	| { type: 'pong'; t: number; serverMs: number }

@@ -131,7 +131,6 @@ export const strings = {
 	} as Record<string, string>,
 	roomDeleted: 'That room was deleted.',
 	watchingNow: 'Watching now',
-	wasHere: 'Was here',
 	watchingList: (names: string) => `Watching: ${names}`,
 	tapToJoin: 'Tap to join',
 	play: 'Play',

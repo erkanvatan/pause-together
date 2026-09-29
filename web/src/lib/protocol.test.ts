@@ -78,7 +78,7 @@ const server: ServerMessage[] = [
 			archived: false
 		}
 	},
-	{ type: 'presence', watching: [alice], wasHere: [] },
+	{ type: 'presence', watching: [alice] },
 	{
 		type: 'prepare',
 		prepare: { state: 'queued', place: 2, progress: 0, error: '', key: '', subtitles: [] }

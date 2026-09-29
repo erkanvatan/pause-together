@@ -76,7 +76,7 @@ func TestProtocol(t *testing.T) {
 			SubtitleOffsetMs: 500, DurationMs: 3_600_000, Playing: true, PositionMs: 90_000, AtMs: 4000,
 			Waiting: []Who{alice}, Behind: []Lag{{Who: bob, Ms: 3000}}}},
 		RoomMsg{Type: MsgRoom, Room: heat},
-		PresenceMsg{Type: MsgPresence, Watching: []Who{alice}, WasHere: []Who{}},
+		PresenceMsg{Type: MsgPresence, Watching: []Who{alice}},
 		PrepareMsg{Type: MsgPrepare, Prepare: Prepare{State: "queued", Place: 2, Subtitles: []int{}}},
 		PrepareMsg{Type: MsgPrepare, Prepare: Prepare{State: "ready", Key: "0123456789abcdef0123456789abcdef", Subtitles: []int{3, 5}}},
 		PausedMsg{Type: MsgPaused, By: bob},

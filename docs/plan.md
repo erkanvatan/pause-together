@@ -425,7 +425,42 @@ real phone on the guest port.
 
 **Not here:** other new features, Turkish strings, artwork or posters (the spec rules out online lookups).
 
-### [ ] 19. Field test
+### [x] 19. Presence in the chat panel
+
+**Goal:** one short list of who's here now, at the top of the chat. No "was here".
+
+Why: each browser has its own cookie, so one person on three browsers is three users. "Was here" kept
+all of them forever and filled the room page.
+
+- Drop "was here" everywhere. Presence keeps only "watching now": an open socket, or the 15 s
+  reconnect grace. A clean close still leaves at once. Someone gone past the grace is forgotten.
+- Migration `0010`: drop `room_visitors`. Remove `Rooms.Visit`, `Rooms.Visitors` and
+  `Presence.Load`, and `wasHere` from the `presence` message (Go, TS and `protocol.json` together).
+  Remove the `wasHere` string.
+- Room page: the list under the player goes. The watching-now list moves to the top of the chat panel,
+  under its header, like a chat app's "online" list. The same panel in the side panel, the bottom sheet
+  and fullscreen. The homepage cards stay as they are.
+- Work the look with the `frontend-design` skill. In plan mode, ASCII wireframes of the chat panel with
+  the list: wide screen, portrait phone bottom sheet, and 1, 4 and 12 people with long names. The list
+  must never push the messages off a phone screen: cap its height or let it scroll sideways. Tokens and
+  shared classes from `web/src/app.css` only.
+- Update CLAUDE.md: the presence rule under "Rooms", and chat's UI under "Chat".
+
+**Done when (tests):**
+- Presence, table-driven: gone past the grace → not in the list; clean close → out at once; two tabs →
+  one entry; a drop under 15 s → still in.
+- Migration test: `room_visitors` is gone, `rooms` and `messages` rows survive.
+- Protocol fixture decodes the same in Go and TS without `wasHere`.
+- The rest pass unchanged.
+
+**By hand:** one room, three browsers with different names, then close two. The list shrinks, and
+nothing stays behind. Screenshots of the chat panel at 360×800, phone landscape and desktop, with one
+and many people.
+
+**Not here:** merging one person's browsers into one user (needs accounts, out of scope). A count or
+list while the chat is closed.
+
+### [ ] 20. Field test
 
 **Goal:** real devices, real network.
 

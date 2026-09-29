@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 serves its local video library. Guests reach it over Tailscale and watch in sync from PCs, tablets and
 phones. Same show. Same second. Different places.
 
-**Status: slices 1–18 are built; the field test is next (`docs/plan.md`).** This file is the spec. When
+**Status: slices 1–19 are built; the field test is next (`docs/plan.md`).** This file is the spec. When
 code changes, update the layout and commands below to match reality. The rules here are decided: flag problems,
 but don't quietly change them. Work each slice by the steps under "How to work a slice" in
 `docs/plan.md`.
@@ -148,7 +148,7 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
                      Subtitles.svelte (the subtitle overlay), prefs.ts (per-device player settings in
                      localStorage), time.ts (1:40:00), chat.ts (pure: message length, the message list),
-                     Chat.svelte (the chat panel), Icon.svelte (inline SVG icons);
+                     Chat.svelte (the chat panel, with who's watching), Icon.svelte (inline SVG icons);
                      sync/ (pure): clock.ts (server clock offset), drift.ts (drift fix, follow step), state.ts
                      (target position, local intents), status.ts (what the player reports, and when),
                      timing.ts (its timing constants)
@@ -403,10 +403,11 @@ So each room's video is **prepared once**, then served as a plain file.
   "Next episode". No autoplay.
 - Progress is per room only: the position is saved on pause, seek and switch, and every 5 s while
   playing. No per-user progress.
-- Presence: "watching now" (open socket) and "was here" (joined before, gone now), with a 15 s
-  reconnect grace so flaky phones don't flicker between the two. A page that closes its socket cleanly
-  (tab closed, or went to another page) skips the grace: it left on purpose. Each user shows once,
-  even with two tabs open.
+- Presence: "watching now" only: an open socket, plus a 15 s reconnect grace so flaky phones don't
+  flicker out of the list. A page that closes its socket cleanly (tab closed, or went to another page)
+  skips the grace: it left on purpose. Someone gone past the grace is forgotten, and nothing is stored.
+  No "was here": each browser has its own cookie, so one person on three browsers would stay listed
+  three times forever. Each user shows once, even with two tabs open.
 
 ## Sync
 
@@ -494,6 +495,9 @@ So each room's video is **prepared once**, then served as a plain file.
 - UI: a side panel on wide screens, a bottom sheet on portrait phones. While it's closed, new messages
   pop up as small toasts over the video and fade out; tapping one opens a reply to it. Must work in
   fullscreen.
+- The "watching now" list sits at the top of the chat panel, under its header, like a chat app's
+  online list. At most two lines, then it scrolls, so it never pushes the messages off a phone. Not
+  shown while the chat is closed.
 
 ## Operations
 

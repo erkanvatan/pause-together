@@ -60,7 +60,6 @@
 	let renaming = $state(false);
 	let name = $state('');
 	let watching = $state<Who[]>([]);
-	let wasHere = $state<Who[]>([]);
 	let prepare = $state<Prepare | null>(null);
 	let socket = $state<RoomSocket | null>(null);
 	let playState = $state<RoomState | null>(null);
@@ -90,7 +89,6 @@
 		confirming = null;
 		renaming = false;
 		watching = [];
-		wasHere = [];
 		prepare = null;
 		socket = null;
 		playState = null;
@@ -178,7 +176,6 @@
 				break;
 			case 'presence':
 				watching = m.watching;
-				wasHere = m.wasHere;
 				break;
 			case 'prepare':
 				prepare = m.prepare;
@@ -296,6 +293,7 @@
 	<Chat
 		{messages}
 		{more}
+		{watching}
 		{userId}
 		videoId={room?.video.id ?? 0}
 		{readOnly}
@@ -427,27 +425,6 @@
 				{@render chatPanel(true)}
 			</div>
 		{/if}
-
-		<div class="flex flex-col gap-2 pt-2">
-			{#each [{ title: strings.watchingNow, people: watching, here: true }, { title: strings.wasHere, people: wasHere, here: false }] as list (list.title)}
-				{#if list.people.length > 0}
-					<section class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-						<h2 class="flex items-center gap-2 text-sm text-haze">
-							<span
-								class="size-2 rounded-full {list.here ? 'bg-lamp' : 'border border-haze'}"
-								aria-hidden="true"
-							></span>
-							{list.title}
-						</h2>
-						<ul class="flex min-w-0 flex-wrap gap-x-4 gap-y-1">
-							{#each list.people as p (p.userId)}
-								<li class="break-all">{p.name}</li>
-							{/each}
-						</ul>
-					</section>
-				{/if}
-			{/each}
-		</div>
 	{:else if loadFailed}
 		<p class="pt-16 text-haze">{strings.loadFailed}</p>
 	{/if}

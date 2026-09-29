@@ -66,3 +66,52 @@ func TestMigration4MarksOldSubtitleTracks(t *testing.T) {
 		}
 	}
 }
+
+// Migration 10 drops the "was here" list. Rooms and their chat stay.
+func TestMigration10DropsRoomVisitors(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "test.db")
+	db, err := Open(ctx, path, upTo(t, 9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		"INSERT INTO users (id, token_hash, name) VALUES (1, x'01', 'Alice')",
+		"INSERT INTO libraries (id, path, type) VALUES (1, 'Movies', 'movies')",
+		`INSERT INTO videos (id, library_id, path, title, year, edition, version, season, episode, episode_end,
+			episode_title, group_name, size, mtime) VALUES (1, 1, 'A (2020).mkv', 'A', 2020, '', '', 0, 0, 0, '', '', 1, 1)`,
+		"INSERT INTO rooms (id, name, video_id) VALUES (1, 'Movie night', 1)",
+		"INSERT INTO messages (room_id, user_id, text, video_id, position_ms, sent_at) VALUES (1, 1, 'hi', 1, 0, 0)",
+		"INSERT INTO room_visitors (room_id, user_id) VALUES (1, 1)",
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err = Open(ctx, path, Migrations())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	counts := []struct {
+		query string
+		want  int
+	}{
+		{"SELECT count(*) FROM sqlite_master WHERE name = 'room_visitors'", 0},
+		{"SELECT count(*) FROM rooms WHERE name = 'Movie night'", 1},
+		{"SELECT count(*) FROM messages WHERE text = 'hi'", 1},
+	}
+	for _, c := range counts {
+		var n int
+		if err := db.QueryRow(c.query).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != c.want {
+			t.Errorf("%s = %d, want %d", c.query, n, c.want)
+		}
+	}
+}
