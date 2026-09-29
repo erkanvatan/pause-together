@@ -206,7 +206,8 @@ func (r *Rooms) Rename(ctx context.Context, id int64, name string) (Room, error)
 }
 
 // SetArchived archives or unarchives a room. Archiving cancels its prepare unless another room still
-// needs it.
+// needs it. Unarchiving queues it again, as opening does: the cache clean-up doesn't count archived rooms.
+// The room comes back either way, with the error of the queueing.
 func (r *Rooms) SetArchived(ctx context.Context, id int64, archived bool) (Room, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -222,7 +223,11 @@ func (r *Rooms) SetArchived(ctx context.Context, id int64, archived bool) (Room,
 			return Room{}, err
 		}
 	}
-	return r.opened(ctx, id)
+	rm, err := r.opened(ctx, id)
+	if err != nil || archived || rm.Video.Missing || rm.Video.Unplayable != "" {
+		return rm, err
+	}
+	return rm, r.need(ctx, rm.Video.ID, rm.Audio)
 }
 
 // Delete deletes a room, and cancels its prepare unless another room still needs it. Its video row

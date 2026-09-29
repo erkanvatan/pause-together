@@ -59,7 +59,7 @@ func newTestRoomsCache(t *testing.T) (*Rooms, string) {
 	}
 	// No worker runs, so jobs stay queued and Jobs.List shows every one.
 	cache := t.TempDir()
-	return &Rooms{DB: db, Library: &library.Libraries{DB: db, Root: root}, Jobs: media.NewJobs(cache, nil)}, cache
+	return &Rooms{DB: db, Library: &library.Libraries{DB: db, Root: root}, Jobs: media.NewJobs(cache, db, nil)}, cache
 }
 
 // makeReady puts a prepared copy of key in the cache, as a finished job leaves it.
@@ -252,14 +252,13 @@ func TestArchivedRoom(t *testing.T) {
 		t.Errorf("switch: err = %v, want ErrArchived", err)
 	}
 
+	// Unarchiving queues the prepare, even for people already in the room: its copy may have been
+	// cleaned up while it was archived.
 	if got, err := r.SetArchived(ctx, rm.ID, false); err != nil || got.Archived {
 		t.Fatalf("unarchive: %+v, %v", got, err)
 	}
-	if _, err := r.Open(ctx, rm.ID); err != nil {
-		t.Fatal(err)
-	}
 	if got, want := jobs(r), []string{key(t, r, 1, stream(1))}; !slices.Equal(got, want) {
-		t.Errorf("unarchived and opened: jobs = %v, want %v", got, want)
+		t.Errorf("unarchived: jobs = %v, want %v", got, want)
 	}
 	if _, err := r.SetArchived(ctx, 99, true); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown room: err = %v, want ErrNotFound", err)

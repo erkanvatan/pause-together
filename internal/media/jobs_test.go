@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/erkanvatan/pause-together/internal/store"
 )
 
 // fakePreparer writes a partial file, reports half the duration done, then waits for the test: a
@@ -54,7 +56,12 @@ func newTestJobs(t *testing.T) *testJobs {
 	t.Helper()
 	dir := t.TempDir()
 	prep := &fakePreparer{started: make(chan Job), finish: make(chan error)}
-	j := NewJobs(dir, prep)
+	db, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "test.db"), store.Migrations())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	j := NewJobs(dir, db, prep)
 	j.FreeSpace = func(string) (uint64, error) { return 1 << 40, nil }
 	return &testJobs{Jobs: j, prep: prep, dir: dir}
 }
@@ -498,5 +505,197 @@ func TestJobsSubtitles(t *testing.T) {
 		if got := q.Subtitles(tt.key); !slices.Equal(got, tt.want) || got == nil {
 			t.Errorf("Subtitles(%q) = %#v, want %v", tt.key, got, tt.want)
 		}
+	}
+}
+
+// makeCopy writes files into the cache folder name and sets the folder's mtime to at.
+func makeCopy(t *testing.T, dir, name string, at time.Time, files ...string) string {
+	t.Helper()
+	p := filepath.Join(dir, name)
+	if err := os.MkdirAll(p, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if err := os.WriteFile(filepath.Join(p, f), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chtimes(p, at, at); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func exists(t *testing.T, p string) bool {
+	t.Helper()
+	_, err := os.Stat(p)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		t.Fatal(err)
+	}
+	return err == nil
+}
+
+func TestJobsClean(t *testing.T) {
+	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+	day := 24 * time.Hour
+	key := func(c byte) string { return strings.Repeat(string(c), 32) }
+	tests := []struct {
+		name  string
+		dir   string
+		files []string
+		age   time.Duration
+		kept  bool
+	}{
+		{"unused for 8 days", key('a'), []string{videoFile, "2.vtt"}, 8 * day, false},
+		{"used 6 days ago", key('b'), []string{videoFile}, 6 * day, true},
+		{"sidecar: the scan's", key('c'), []string{sidecarFile}, 30 * day, true},
+		{"job still writing", key('d') + tmpSuffix, []string{videoFile}, 30 * day, true},
+		{"not a key", "stray", []string{videoFile}, 30 * day, true},
+	}
+	q := newTestJobs(t)
+	q.Now = func() time.Time { return now }
+	paths := make([]string, len(tests))
+	for i, tt := range tests {
+		paths[i] = makeCopy(t, q.dir, tt.dir, now.Add(-tt.age), tt.files...)
+	}
+	q.Clean(t.Context())
+	for i, tt := range tests {
+		if got := exists(t, paths[i]); got != tt.kept {
+			t.Errorf("%s: kept = %v, want %v", tt.name, got, tt.kept)
+		}
+	}
+	if tmp, want := q.tmpLeft(t), []string{key('d') + tmpSuffix}; !slices.Equal(tmp, want) {
+		t.Errorf("tmp left = %v, want only the running job's %v", tmp, want)
+	}
+}
+
+func TestJobsClear(t *testing.T) {
+	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+	key := func(c byte) string { return strings.Repeat(string(c), 32) }
+	tests := []struct {
+		name  string
+		dir   string
+		files []string
+		kept  bool
+	}{
+		{"used just now", key('a'), []string{videoFile, "2.vtt"}, false},
+		{"sidecar: the scan's", key('b'), []string{sidecarFile}, true},
+		{"job still writing", key('c') + tmpSuffix, []string{videoFile}, true},
+		{"not a key", "stray", []string{videoFile}, true},
+	}
+	q := newTestJobs(t)
+	q.Now = func() time.Time { return now }
+	paths := make([]string, len(tests))
+	for i, tt := range tests {
+		paths[i] = makeCopy(t, q.dir, tt.dir, now, tt.files...)
+	}
+	q.Clear()
+	for i, tt := range tests {
+		if got := exists(t, paths[i]); got != tt.kept {
+			t.Errorf("%s: kept = %v, want %v", tt.name, got, tt.kept)
+		}
+	}
+	if tmp, want := q.tmpLeft(t), []string{key('c') + tmpSuffix}; !slices.Equal(tmp, want) {
+		t.Errorf("tmp left = %v, want only the running job's %v", tmp, want)
+	}
+}
+
+func TestJobsUnusedDays(t *testing.T) {
+	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+	day := 24 * time.Hour
+	q := newTestJobs(t)
+	q.Now = func() time.Time { return now }
+	ctx := t.Context()
+	if got, err := q.UnusedDays(ctx); err != nil || got != 7 {
+		t.Fatalf("UnusedDays = %d, %v; want the default 7", got, err)
+	}
+	for _, bad := range []int{0, -1, MaxUnusedDays + 1} {
+		if err := q.SetUnusedDays(ctx, bad); !errors.Is(err, ErrBadDays) {
+			t.Errorf("SetUnusedDays(%d) = %v, want ErrBadDays", bad, err)
+		}
+	}
+	if err := q.SetUnusedDays(ctx, 3); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := q.UnusedDays(ctx); err != nil || got != 3 {
+		t.Fatalf("UnusedDays = %d, %v; want 3, and the bad ones not saved", got, err)
+	}
+	old := makeCopy(t, q.dir, testJob(1).Key(), now.Add(-4*day), videoFile)
+	recent := makeCopy(t, q.dir, testJob(2).Key(), now.Add(-2*day), videoFile)
+	q.Clean(ctx)
+	if exists(t, old) || !exists(t, recent) {
+		t.Errorf("after Clean with 3 days: 4 days unused kept = %v, 2 days kept = %v; want false, true",
+			exists(t, old), exists(t, recent))
+	}
+}
+
+// Opening a room with a ready copy counts as using it.
+func TestJobsAddTouchesReadyCopy(t *testing.T) {
+	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+	q := newTestJobs(t)
+	q.Now = func() time.Time { return now }
+	job := testJob(1)
+	p := makeCopy(t, q.dir, job.Key(), now.Add(-8*24*time.Hour), videoFile)
+	q.Add(job)
+	q.Clean(t.Context())
+	if !exists(t, p) {
+		t.Error("a copy just asked for was deleted")
+	}
+}
+
+func TestJobsTouch(t *testing.T) {
+	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+	q := newTestJobs(t)
+	q.Now = func() time.Time { return now }
+	job := testJob(1)
+	p := makeCopy(t, q.dir, job.Key(), now.Add(-8*24*time.Hour), videoFile)
+	q.Touch(job.Key())
+	q.Clean(t.Context())
+	if !exists(t, p) {
+		t.Error("a touched copy was deleted")
+	}
+	missing := testJob(2).Key()
+	q.Touch(missing)
+	if exists(t, filepath.Join(q.dir, missing)) {
+		t.Error("Touch made a folder for a missing copy")
+	}
+}
+
+// A finished copy counts as used when it finishes, not when its job started.
+func TestJobsPrepareTouchesCopy(t *testing.T) {
+	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+	q := newTestJobs(t)
+	q.Now = func() time.Time { return now }
+	q.start(t)
+	job := testJob(1)
+	q.Add(job)
+	q.started(t)
+	q.prep.finish <- nil
+	// The copy is ready a moment before it's touched.
+	waitFor(t, "the copy to be touched", func() bool {
+		info, err := os.Stat(filepath.Join(q.dir, job.Key()))
+		return err == nil && info.ModTime().Equal(now)
+	})
+}
+
+// Shutdown mid-job: Run returns only after the half-written copy is gone.
+func TestJobsShutdownMidJob(t *testing.T) {
+	q := newTestJobs(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		q.Run(ctx)
+	}()
+	q.Add(testJob(1))
+	q.started(t)
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run never returned")
+	}
+	if tmp := q.tmpLeft(t); len(tmp) != 0 {
+		t.Errorf("tmp after shutdown = %v, want none", tmp)
 	}
 }

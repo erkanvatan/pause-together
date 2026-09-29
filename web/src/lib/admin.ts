@@ -61,6 +61,20 @@ export const deleteRoom = (id: number) => call<void>('DELETE', `/api/admin/rooms
 export const setLanguages = (langs: Languages) =>
 	call<Languages>('PUT', '/api/admin/languages', langs);
 
+// The cache clean-up setting: a prepared copy nobody has used for unusedDays is deleted.
+export type CacheSettings = { unusedDays: number };
+
+// The bounds of unusedDays (media.MinUnusedDays, media.MaxUnusedDays).
+export const minUnusedDays = 1;
+export const maxUnusedDays = 365;
+
+export const getCache = () => call<CacheSettings>('GET', '/api/admin/cache');
+
+export const setCache = (c: CacheSettings) => call<CacheSettings>('PUT', '/api/admin/cache', c);
+
+// clearCache deletes every prepared copy. Converted sidecar subtitles and a running job stay.
+export const clearCache = () => call<void>('DELETE', '/api/admin/cache');
+
 // listFolders lists the folders inside path, relative to the media folder ('' is the media folder).
 export async function listFolders(path: string): Promise<Result<string[]>> {
 	const r = await call<{ folders: string[] }>(

@@ -31,7 +31,7 @@ func adminDeps(t *testing.T) Deps {
 	d := deps(users)
 	d.Libraries = &library.Libraries{DB: users.DB, Root: root}
 	d.Scans = library.NewScans(&library.Scanner{DB: users.DB, Root: root})
-	d.Jobs = media.NewJobs(t.TempDir(), media.FFmpeg{})
+	d.Jobs = media.NewJobs(t.TempDir(), users.DB, media.FFmpeg{})
 	d.Rooms = &room.Rooms{DB: users.DB, Library: d.Libraries, Jobs: d.Jobs}
 	d.Hub = room.NewHub(t.Context(), d.Rooms, testBuildID)
 	t.Cleanup(d.Hub.Wait) // before the database closes: cleanups run last-in first-out
@@ -65,6 +65,9 @@ func TestAdminRoutesOnlyOnAdminPort(t *testing.T) {
 		{http.MethodGet, "/api/admin/problems", ""},
 		{http.MethodGet, "/api/admin/jobs", ""},
 		{http.MethodPut, "/api/admin/languages", `{"audio":"","subtitles":["tr"]}`},
+		{http.MethodGet, "/api/admin/cache", ""},
+		{http.MethodPut, "/api/admin/cache", `{"unusedDays":30}`},
+		{http.MethodDelete, "/api/admin/cache", ""},
 		{http.MethodDelete, "/api/admin/rooms/1", ""},
 	}
 	build := fakeBuild()
@@ -196,6 +199,28 @@ func TestAdminJobsEmpty(t *testing.T) {
 	}](t, rec)
 	if body.Jobs == nil || len(body.Jobs) != 0 || body.CacheBytes == nil || *body.CacheBytes != 0 || body.FreeBytes == 0 {
 		t.Errorf("body = %s, want an empty jobs list, cache 0, some free space", rec.Body.String())
+	}
+}
+
+func TestAdminCache(t *testing.T) {
+	h := Admin(fakeBuild(), adminDeps(t))
+	steps := []struct {
+		method, body string
+		status       int
+		want         string
+	}{
+		{http.MethodGet, "", http.StatusOK, `{"unusedDays":7}`},
+		{http.MethodPut, `{"unusedDays":30}`, http.StatusOK, `{"unusedDays":30}`},
+		{http.MethodPut, `{"unusedDays":0}`, http.StatusBadRequest, `{"error":"bad-days"}`},
+		{http.MethodPut, `{"unusedDays":366}`, http.StatusBadRequest, `{"error":"bad-days"}`},
+		{http.MethodPut, `{}`, http.StatusBadRequest, `{"error":"bad-days"}`},
+		{http.MethodGet, "", http.StatusOK, `{"unusedDays":30}`},
+	}
+	for _, st := range steps {
+		rec := adminRequest(h, st.method, "/api/admin/cache", st.body)
+		if got := strings.TrimSpace(rec.Body.String()); rec.Code != st.status || got != st.want {
+			t.Errorf("%s %s: %d %s, want %d %s", st.method, st.body, rec.Code, got, st.status, st.want)
+		}
 	}
 }
 

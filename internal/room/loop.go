@@ -30,6 +30,7 @@ type loop struct {
 	prepare           Prepare // as last sent
 	watching, wasHere []Who   // as last sent
 	gone              bool    // deleted
+	touchedMs         int64   // when the loop last marked its copy used; 0 = not yet
 }
 
 func newLoop(h *Hub, rm Room) *loop {
@@ -72,6 +73,13 @@ func (l *loop) run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			// The server is stopping. Pause the room and tell the pages, or they play on without it and
+			// jump back when it returns. Then save where the room is: a playing room last saved up to
+			// SaveEveryMs ago. ctx is done, but the database stays open until every loop has stopped.
+			now := l.hub.now()
+			l.sync.Pause(0, now)
+			l.broadcast(StateMsg{Type: MsgState, State: l.sync.State(now)})
+			l.save(context.WithoutCancel(ctx), now)
 			for _, s := range l.sockets {
 				s.closeWith(websocket.StatusGoingAway)
 			}
@@ -81,10 +89,12 @@ func (l *loop) run(ctx context.Context) {
 		case <-tick.C:
 			now := l.hub.now()
 			l.apply(l.sync.Tick(now), now)
-			// A ready copy stays: nothing deletes the copy of a room in use. Joins and switches check again.
+			// A ready copy stays: the cache clean-up keeps a copy while touch marks it used. Joins, switches
+			// and unarchiving check again.
 			if l.prepare.State != media.JobReady {
 				l.checkPrepare()
 			}
+			l.touch(now)
 		}
 		l.publish(l.hub.now())
 		if l.gone || l.idle() {
@@ -207,10 +217,16 @@ func (l *loop) switched(rm Room) {
 }
 
 // changed shows a renamed or unarchived room. It takes only the name and the archived flag: rm was
-// read before this call, and a switch may have reached the loop since.
+// read before this call, and a switch may have reached the loop since. An archived room's copy may have
+// been cleaned up, so unarchiving checks it again.
 func (l *loop) changed(rm Room) {
+	unarchived := l.room.Archived && !rm.Archived
 	l.room.Name, l.room.Archived = rm.Name, rm.Archived
 	l.broadcast(RoomMsg{Type: MsgRoom, Room: l.room})
+	if unarchived {
+		l.findKey()
+		l.checkPrepare()
+	}
 }
 
 func (l *loop) deleted() {
@@ -235,11 +251,28 @@ func (l *loop) apply(e Effect, now int64) {
 		l.broadcast(PausedMsg{Type: MsgPaused, By: *e.PausedBy})
 	}
 	if e.Save {
-		st.PositionMs = st.Position(now)
-		if err := l.hub.Rooms.SaveState(l.hub.ctx, l.id, st); err != nil {
-			slog.Error("save room state", "room", l.id, "err", err)
-		}
+		l.save(l.hub.ctx, now)
 	}
+}
+
+// save stores the room's position, subtitle and offset.
+func (l *loop) save(ctx context.Context, now int64) {
+	st := l.sync.State(now)
+	st.PositionMs = st.Position(now)
+	if err := l.hub.Rooms.SaveState(ctx, l.id, st); err != nil {
+		slog.Error("save room state", "room", l.id, "err", err)
+	}
+}
+
+// touch marks the room's copy used, at once and then every TouchEveryMs, so the cache clean-up keeps
+// it while the room is in use. Opening a room marks it too, but not when the copy plays on after its
+// source is gone. An archived room can't play, so it doesn't count.
+func (l *loop) touch(now int64) {
+	if l.key == "" || l.room.Archived || (l.touchedMs != 0 && now-l.touchedMs < TouchEveryMs) {
+		return
+	}
+	l.hub.Rooms.Jobs.Touch(l.key)
+	l.touchedMs = now
 }
 
 // publish sends presence when it changed, and gives the hub its watching list.
@@ -263,6 +296,9 @@ func (l *loop) findKey() {
 	key, err := l.hub.Rooms.playableKey(l.hub.ctx, l.room.Video.ID, l.room.Audio)
 	if err != nil {
 		slog.Error("find prepare job", "room", l.id, "err", err)
+	}
+	if key != l.key {
+		l.touchedMs = 0 // a new copy: touch it on the next tick
 	}
 	l.key = key
 }

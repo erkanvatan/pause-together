@@ -6,6 +6,11 @@ services:
     build: .
     image: pausetogether:latest
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    # Back after a reboot, once the Docker service starts (enabled in systemd, see README.md).
+    restart: unless-stopped
+    # Room for the clean shutdown: saving room positions, up to 5 s for open streams, stopping ffmpeg.
+    # Docker kills the process after 10 s by default.
+    stop_grace_period: 30s
     ports:
       # Guest port: only as open as PUBLIC_BIND. Docker bypasses ufw.
       - "${PUBLIC_BIND:-127.0.0.1}:${GUEST_PORT:-8420}:8080"

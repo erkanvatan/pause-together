@@ -60,6 +60,14 @@ export const strings = {
 		failed: "Couldn't save. Try again."
 	} as Record<string, string>,
 
+	cacheCleanup: 'Cache clean-up',
+	unusedDays: 'Delete prepared copies unused for (days)',
+	unusedDaysHint: 'From 1 to 365. Opening a room prepares its copy again.',
+	cacheErrors: {
+		'bad-days': 'Use a whole number of days from 1 to 365.',
+		failed: "Couldn't save. Try again."
+	} as Record<string, string>,
+
 	cantUse: "Files we can't use",
 	allUsable: 'Every file is usable.',
 	appleOnly: 'Apple devices only',
@@ -68,6 +76,9 @@ export const strings = {
 	jobs: 'Prepare jobs',
 	noJobs: 'Nothing to prepare.',
 	diskUsage: (cache: string, free: string) => `Cache ${cache} · ${free} free on its disk`,
+	clearCache: 'Clear cache',
+	clearCacheConfirm:
+		'Delete every prepared copy? Anyone watching now is cut off, and each room prepares its video again when opened.',
 	jobRunning: (percent: number) => `Preparing… ${percent}%`,
 	jobQueued: (place: number) =>
 		place === 1 ? 'Queued, next in line' : `Queued, ${ordinal(place)} in line`,

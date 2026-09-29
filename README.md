@@ -89,16 +89,25 @@ flowchart LR
    sudo sysctl --system
    ```
 
-4. Build and start:
+4. Start Docker at boot, so PauseTogether comes back by itself after a restart:
+
+   ```sh
+   sudo systemctl enable docker.service containerd.service
+   ```
+
+5. Build and start:
 
    ```sh
    task up
    ```
 
-5. Open `http://localhost:8421` on the host. Go to the admin page and add a library: a folder under
+   It keeps running across reboots until you stop it with `task down`. After that, it stays off
+   until the next `task up`.
+
+6. Open `http://localhost:8421` on the host. Go to the admin page and add a library: a folder under
    your media root, plus its type.
 
-6. Give guests one address, for example `http://<tailscale-ip>:8420`. Stick to one: the Tailscale IP
+7. Give guests one address, for example `http://<tailscale-ip>:8420`. Stick to one: the Tailscale IP
    and the MagicDNS name each give a guest a different identity.
 
 > [!TIP]

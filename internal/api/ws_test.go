@@ -22,11 +22,15 @@ type wsTest struct {
 	alice, bob     string // tokens
 	aliceID, bobID int64
 	guest, admin   http.Handler
+	stopHub        context.CancelFunc // stops the room loops, as a server shutdown does
 }
 
 func newWSTest(t *testing.T) *wsTest {
 	t.Helper()
 	d := adminDeps(t)
+	hubCtx, stopHub := context.WithCancel(t.Context())
+	d.Hub = room.NewHub(hubCtx, d.Rooms, testBuildID)
+	t.Cleanup(d.Hub.Wait)
 	if _, err := d.Libraries.DB.Exec("INSERT INTO libraries (id, path, type) VALUES (1, 'Movies', 'movies')"); err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +39,7 @@ func newWSTest(t *testing.T) *wsTest {
 	if _, err := d.Rooms.Create(t.Context(), room.Pick{VideoID: 7, Audio: &one}); err != nil {
 		t.Fatal(err)
 	}
-	w := &wsTest{d: d, guest: Guest(fakeBuild(), d), admin: Admin(fakeBuild(), d)}
+	w := &wsTest{d: d, guest: Guest(fakeBuild(), d), admin: Admin(fakeBuild(), d), stopHub: stopHub}
 	for _, u := range []struct {
 		name  string
 		token *string
@@ -424,5 +428,43 @@ func TestSocketLongChat(t *testing.T) {
 	send(t, a, `{"type":"chat","text":"`+strings.Repeat(`\u0001`, room.MaxMessageRunes)+`","replyTo":null}`)
 	if text, _ := chatText(until(t, a, room.MsgChat, nil)); text != strings.Repeat("\x01", room.MaxMessageRunes) {
 		t.Errorf("got %d runes back, want the %d sent", len([]rune(text)), room.MaxMessageRunes)
+	}
+}
+
+// A shutdown pauses a playing room, tells the pages, and saves where it is, not where it was at its
+// last timed save. A page that played on would jump back when the server returns.
+func TestSocketShutdownPausesAndSaves(t *testing.T) {
+	w := newWSTest(t)
+	a := w.join(t, w.alice)
+	until(t, a, room.MsgPresence, nil)
+	send(t, a, `{"type":"play"}`)
+	until(t, a, room.MsgState, func(m msg) bool { return m["state"].(map[string]any)["playing"] == true })
+	time.Sleep(300 * time.Millisecond) // well under SaveEveryMs
+
+	w.stopHub()
+	w.d.Hub.Wait()
+	var pos int64
+	if err := w.d.Rooms.DB.QueryRow("SELECT position_ms FROM rooms WHERE id = 1").Scan(&pos); err != nil {
+		t.Fatal(err)
+	}
+	if pos < 300 {
+		t.Errorf("saved position = %d ms, want at least 300", pos)
+	}
+	var paused bool
+	for {
+		m, err := read(t, a)
+		if err != nil {
+			if code := websocket.CloseStatus(err); code != websocket.StatusGoingAway {
+				t.Errorf("socket closed with %v, want going away", err)
+			}
+			break
+		}
+		if m["type"] == room.MsgState {
+			st := m["state"].(map[string]any)
+			paused = st["playing"] == false && int64(st["positionMs"].(float64)) == pos
+		}
+	}
+	if !paused {
+		t.Errorf("no paused state at %d ms before the socket closed", pos)
 	}
 }

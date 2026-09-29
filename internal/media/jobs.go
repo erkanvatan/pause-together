@@ -2,6 +2,7 @@ package media
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -38,6 +39,23 @@ const freeSpaceMargin = 1 << 30
 // videoFile is the prepared video's name inside its key's folder.
 const videoFile = "video.mp4"
 
+// The host's clean-up setting, in days, stays within these: a prepared copy nobody has used for that
+// long is deleted. Opening a room prepares it again. The database checks the same bounds.
+const (
+	MinUnusedDays = 1
+	MaxUnusedDays = 365
+)
+
+// ErrBadDays means a clean-up setting outside MinUnusedDays to MaxUnusedDays.
+var ErrBadDays = errors.New("unused days out of range")
+
+// CleanInterval is how often Clean runs.
+const CleanInterval = time.Hour
+
+// oldSuffix marks a copy Clean is deleting. It ends in tmpSuffix, so the start-up clean-up deletes what
+// a stop left behind, and it can't clash with a job's own tmp folder.
+const oldSuffix = ".old" + tmpSuffix
+
 // tmpSuffix marks a folder a job is still writing. It's renamed to the bare key when done, so a
 // half-written copy never looks finished.
 const tmpSuffix = ".tmp"
@@ -66,13 +84,17 @@ type JobStatus struct {
 }
 
 // Jobs prepares videos into the cache folder, one at a time, in the order they were asked for. Each
-// copy lives in its own folder, named by its job's key.
+// copy lives in its own folder, named by its job's key. The folder's mtime is when the copy was last
+// used, not its video's: http.ServeContent sends the video's mtime as Last-Modified.
 type Jobs struct {
 	dir      string
+	db       *sql.DB // holds the clean-up setting
 	preparer Preparer
 	// FreeSpace reports the free bytes on dir's disk. Tests swap it.
 	FreeSpace func(dir string) (uint64, error)
-	wake      chan struct{}
+	// Now is the clock for when copies were used. Tests swap it.
+	Now  func() time.Time
+	wake chan struct{}
 
 	mu      sync.Mutex
 	queue   []Job
@@ -91,19 +113,23 @@ type failedJob struct {
 	status JobStatus
 }
 
-// NewJobs returns an empty queue that prepares into dir with p. Run works through it.
-func NewJobs(dir string, p Preparer) *Jobs {
-	return &Jobs{dir: dir, preparer: p, FreeSpace: freeSpace, wake: make(chan struct{}, 1)}
+// NewJobs returns an empty queue that prepares into dir with p. Run works through it. db holds the
+// clean-up setting.
+func NewJobs(dir string, db *sql.DB, p Preparer) *Jobs {
+	return &Jobs{dir: dir, db: db, preparer: p, FreeSpace: freeSpace, Now: time.Now, wake: make(chan struct{}, 1)}
 }
 
-// Add queues a job, unless its copy is ready or it is queued or running already. A job that failed
-// before is tried again.
+// Add queues a job, unless its copy is ready (then the copy counts as used) or it is queued or running
+// already. A job that failed before is tried again.
 func (q *Jobs) Add(j Job) {
 	key := j.Key()
+	q.mu.Lock()
+	// Under the lock, so Clean can't delete the copy between the check and the touch.
 	if q.ready(key) {
+		q.touch(key)
+		q.mu.Unlock()
 		return
 	}
-	q.mu.Lock()
 	q.failed = slices.DeleteFunc(q.failed, func(f failedJob) bool { return f.status.Key == key })
 	running := q.current != nil && !q.cancelled && q.current.Key() == key
 	if running || slices.ContainsFunc(q.queue, func(queued Job) bool { return queued.Key() == key }) {
@@ -231,6 +257,117 @@ func (q *Jobs) Disk() (cache int64, free uint64, err error) {
 	return cache, free, err
 }
 
+// Touch marks key's copy as used now, so Clean keeps it. A missing copy is left missing.
+func (q *Jobs) Touch(key string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.touch(key)
+}
+
+// touch is Touch, with q.mu held.
+func (q *Jobs) touch(key string) {
+	if !validKey(key) {
+		return
+	}
+	now := q.Now()
+	if err := os.Chtimes(filepath.Join(q.dir, key), now, now); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		slog.Error("mark copy used", "err", err)
+	}
+}
+
+// UnusedDays returns the clean-up setting: a copy nobody has used for this many days is deleted.
+func (q *Jobs) UnusedDays(ctx context.Context) (int, error) {
+	var days int
+	err := q.db.QueryRowContext(ctx, "SELECT unused_days FROM cache_settings").Scan(&days)
+	return days, err
+}
+
+// SetUnusedDays saves the clean-up setting. The next Clean uses it. Days outside MinUnusedDays to
+// MaxUnusedDays fail with ErrBadDays.
+func (q *Jobs) SetUnusedDays(ctx context.Context, days int) error {
+	if days < MinUnusedDays || days > MaxUnusedDays {
+		return ErrBadDays
+	}
+	_, err := q.db.ExecContext(ctx, "UPDATE cache_settings SET unused_days = ?", days)
+	return err
+}
+
+// Clean deletes the prepared copies nobody has used for UnusedDays. A converted sidecar shares the
+// cache folder but belongs to the scan, and a .tmp folder to a running job: both stay.
+func (q *Jobs) Clean(ctx context.Context) {
+	days, err := q.UnusedDays(ctx)
+	if err != nil {
+		slog.Error("clean cache", "err", err)
+		return
+	}
+	cutoff := q.Now().Add(-time.Duration(days) * 24 * time.Hour)
+	q.remove(q.take(func(lastUsed time.Time) bool { return lastUsed.Before(cutoff) }))
+}
+
+// Clear deletes every prepared copy, used or not. Like Clean, it leaves converted sidecars and a
+// running job's .tmp folder alone. Anyone streaming a deleted copy is cut off; opening the room again
+// prepares it anew.
+func (q *Jobs) Clear() {
+	q.remove(q.take(func(time.Time) bool { return true }))
+}
+
+// remove deletes the copies take moved out of the way.
+func (q *Jobs) remove(old []string) {
+	for _, p := range old {
+		if err := os.RemoveAll(p); err != nil {
+			slog.Error("delete copy", "err", err)
+		}
+	}
+}
+
+// take renames the copies whose last use drop approves out of the way, and returns their new paths.
+// Under q.mu, so Add can't touch a copy in between; deleting a copy of many GB waits until the lock is
+// free.
+func (q *Jobs) take(drop func(lastUsed time.Time) bool) []string {
+	entries, err := os.ReadDir(q.dir)
+	if err != nil {
+		slog.Error("clean cache", "err", err)
+		return nil
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	var old []string
+	for _, e := range entries {
+		key := e.Name()
+		if !validKey(key) || !q.ready(key) {
+			continue
+		}
+		// Read again under the lock: an Add may have touched it since ReadDir.
+		info, err := e.Info()
+		if err != nil || !drop(info.ModTime()) {
+			continue
+		}
+		p := filepath.Join(q.dir, key+oldSuffix)
+		if err := os.Rename(filepath.Join(q.dir, key), p); err != nil {
+			slog.Error("delete copy", "err", err)
+			continue
+		}
+		slog.Info("deleting copy", "key", key, "last used", info.ModTime())
+		old = append(old, p)
+	}
+	return old
+}
+
+// CleanEvery runs Clean every interval until ctx is done. Not at start: a clock that is wrong at boot,
+// before NTP fixes it, would make every copy look unused.
+func (q *Jobs) CleanEvery(ctx context.Context, interval time.Duration) {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			q.Clean(ctx)
+		}
+	}
+}
+
 // Run prepares queued jobs until ctx is cancelled. It first deletes what jobs left half-written when
 // the app last stopped.
 func (q *Jobs) Run(ctx context.Context) {
@@ -313,6 +450,10 @@ func (q *Jobs) prepare(ctx context.Context, j Job) error {
 	}
 	if err == nil {
 		err = os.Rename(tmp, final)
+	}
+	if err == nil {
+		// The folder's mtime is the run's start, hours ago for a long video.
+		q.Touch(key)
 	}
 	if err != nil {
 		if rmErr := os.RemoveAll(tmp); rmErr != nil {

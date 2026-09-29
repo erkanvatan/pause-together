@@ -24,6 +24,10 @@ import (
 	"github.com/erkanvatan/pause-together/web"
 )
 
+// shutdownTimeout is how long the HTTP servers wait for open requests on shutdown. .air.toml's
+// kill_delay must stay longer.
+const shutdownTimeout = 5 * time.Second
+
 // mediaDir is where the media folder is mounted in the container. Library paths are relative to it.
 const mediaDir = "/media"
 
@@ -94,7 +98,7 @@ func run() error {
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return err
 	}
-	jobs := media.NewJobs(cacheDir, media.FFmpeg{})
+	jobs := media.NewJobs(cacheDir, db, media.FFmpeg{})
 
 	scanner := &library.Scanner{DB: db, Root: mediaDir, Prober: media.FFprobe{},
 		Subtitles: media.Subtitles{Dir: cacheDir}}
@@ -113,6 +117,7 @@ func run() error {
 	wg.Go(func() { scans.Run(bgCtx) })
 	wg.Go(func() { scans.Every(bgCtx, library.RescanInterval) })
 	wg.Go(func() { jobs.Run(bgCtx) })
+	wg.Go(func() { jobs.CleanEvery(bgCtx, media.CleanInterval) })
 	if watcher != nil {
 		wg.Go(func() { watcher.Run(bgCtx) })
 	}
@@ -172,14 +177,23 @@ func run() error {
 	case err = <-errs:
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Both at once, so each gets the whole timeout.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	for _, srv := range servers {
-		if serr := srv.Shutdown(shutdownCtx); serr != nil {
-			err = errors.Join(err, serr)
-		}
+	serrs := make([]error, len(servers))
+	var swg sync.WaitGroup
+	for i, srv := range servers {
+		swg.Go(func() {
+			serrs[i] = srv.Shutdown(shutdownCtx)
+			if errors.Is(serrs[i], context.DeadlineExceeded) {
+				// A video stream never goes idle: a viewer mid-movie keeps its request open. Cut it off.
+				slog.Info("closing open streams", "addr", srv.Addr)
+				serrs[i] = srv.Close()
+			}
+		})
 	}
-	return err
+	swg.Wait()
+	return errors.Join(append(serrs, err)...)
 }
 
 // newServer sets no write timeout: it would cut off long video streams and WebSockets.

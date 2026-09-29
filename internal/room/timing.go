@@ -16,6 +16,9 @@ const (
 	// PresenceGraceMs: someone whose last socket closed stays "watching now" this long, so a flaky phone
 	// that reconnects doesn't flicker to "was here".
 	PresenceGraceMs = 15_000
+	// TouchEveryMs: how often a room with people in it marks its prepared copy used, so the cache
+	// clean-up (a day at least: media.MinUnusedDays) never deletes a copy in use.
+	TouchEveryMs = 3_600_000
 	// TickMs: how often a room's loop applies what time alone changes, and checks its prepare job.
 	TickMs = 250
 )

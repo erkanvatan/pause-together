@@ -30,8 +30,9 @@ func streamHandlers(t *testing.T) (map[string]http.Handler, string, []byte) {
 	if err := os.WriteFile(filepath.Join(dir, key, "2.vtt"), []byte(testVTT), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	d := deps(testUsers(t))
-	d.Jobs = media.NewJobs(dir, media.FFmpeg{})
+	users := testUsers(t)
+	d := deps(users)
+	d.Jobs = media.NewJobs(dir, users.DB, media.FFmpeg{})
 	build := fakeBuild()
 	return map[string]http.Handler{"guest": Guest(build, d), "admin": Admin(build, d)}, key, data
 }

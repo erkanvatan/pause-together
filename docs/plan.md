@@ -367,20 +367,25 @@ Deleting someone else's message is refused. An archived room's chat is read-only
 
 **By hand:** chat between two devices, in fullscreen too.
 
-### [ ] 17. Operations
+### [x] 17. Operations
 
 **Goal:** it survives reboots, deploys and a full disk.
 
 - SIGTERM: save positions, close sockets, stop ffmpeg, delete its temp file. `stop_grace_period`,
   `restart: unless-stopped`. Exec-form `ENTRYPOINT`, so the Go process gets the signal itself.
-- Cache clean-up: copies unused for 7 days (archived rooms don't count).
+- Cache clean-up: copies unused for 7 days (archived rooms don't count). The host sets the days on the
+  admin page (1 to 365).
+- "Clear cache" on the admin page: a red button under the cache size, with a warning before it deletes
+  every prepared copy. Converted sidecars and a running job stay.
 - Measure a prepare job while someone streams. Add `-readrate` only if viewers buffer.
 - Host setup steps in `README.md`: `net.ipv4.ip_nonlocal_bind=1`, Docker enabled in systemd, `PUBLIC_BIND`.
 
-**Done when (tests):** shutdown saves positions and leaves no `*.tmp`; clean-up rule with an injected clock.
+**Done when (tests):** shutdown saves positions and leaves no `*.tmp`; clean-up rule with an injected clock;
+Clear deletes every copy but sidecars and `.tmp` folders.
 
 **By hand:** `task down` mid-movie, `task up`, room is paused at the right spot. Reboot the PC: the app
-comes back by itself and a guest can reach it.
+comes back by itself and a guest can reach it. "Clear cache" asks first, then the cache size drops to
+the sidecars.
 
 ### [ ] 18. Field test
 

@@ -219,8 +219,10 @@ container mount for source files, and one name for two things gets mixed up in c
 - Libraries: add, remove, rescan with progress.
 - Files we can't use (skipped or unplayable), each with its reason, plus "Apple devices only" warnings.
 - The job queue, with failed jobs and ffmpeg's error.
-- Cache size and free disk space.
+- Cache size and free disk space, and a "Clear cache" button (asks first) that deletes every prepared
+  copy. Converted sidecar subtitles and a running job stay.
 - Language defaults for new picks.
+- Cache clean-up: after how many days unused a prepared copy is deleted.
 - The page polls every 5 s while the tab is visible (every 1 s during a scan), and right away when it
   becomes visible again: the file watcher and the timed rescan change things behind its back.
 - Room delete is not here. It lives on the homepage room cards, shown only when `isAdmin`. The call
@@ -325,11 +327,18 @@ So each room's video is **prepared once**, then served as a plain file.
 - Jobs run one at a time and report progress to the room, or its place in line ("Queued, 2nd in
   line"). A job is cancelled as soon as no room needs its result (switched away, archived, deleted).
 - Before each job, check free disk space. If it's too low, fail with a clear message.
-- A copy is deleted once nobody has opened any room using it for 7 days. Archived rooms don't count:
+- A copy is deleted once nobody has opened any room using it for a number of days the host sets on
+  the admin page: 1 to 365, default 7, in the `cache_settings` table. Archived rooms don't count:
   they can't play. Opening the room prepares it again. Sidecar copies share the cache folder but belong
   to their `sidecar_subtitles` row, not to rooms: the scan deletes them when the file goes.
-- A job reads and writes as fast as the disk allows, often on the disk viewers stream from. Measure
-  first. If viewers buffer during a job, cap it with ffmpeg's `-readrate`.
+  - "Last used" is the copy folder's mtime, not `video.mp4`'s: `http.ServeContent` sends the file's
+    mtime as `Last-Modified`. The folder is touched when the job finishes, when a room opens or switches
+    to a ready copy, and every hour while a room with people in it runs. The clean-up runs hourly,
+    not at start: a clock that is wrong at boot would make every copy look unused. Unarchiving a room
+    queues its prepare, since its copy may be gone.
+- A job reads and writes as fast as the disk allows, often on the disk viewers stream from. Measured
+  on the host's SSD: the disk still reads about 900 MB/s during a 4K job, and a 4K viewer needs about
+  3 MB/s. So no `-readrate`. Measure again if media moves to a slower disk (a USB drive, a NAS).
 - Serve with `http.ServeContent`: Range requests give native `<video>` seeking. No HLS.
 - Subtitles: text tracks (embedded SRT/ASS/mov_text; sidecar `.srt`/`.vtt`/`.ass`) become WebVTT in the
   cache, in UTF-8. Embedded ones come out during prepare. Sidecars are converted at scan (they're
@@ -465,11 +474,13 @@ So each room's video is **prepared once**, then served as a plain file.
 
 ## Operations
 
-- (planned) Start at boot: `restart: unless-stopped` in `compose.yml`, and the Docker service enabled
-  in systemd. The host PC is restarted often.
-- (planned) Clean shutdown on SIGTERM (`task down`, or the PC shutting down): save room positions,
-  close sockets, stop ffmpeg and delete its temp file. Set `stop_grace_period` in compose so the save
-  has time to finish; Docker kills the process after 10 s by default.
+- Start at boot: `restart: unless-stopped` in `compose.yml`, and the Docker service enabled in
+  systemd (README.md). The host PC is restarted often.
+- Clean shutdown on SIGTERM (`task down`, or the PC shutting down): pause every room and tell its
+  pages (or they play on alone and jump back when the server returns), save room positions, close
+  sockets, stop ffmpeg and delete its temp file. Open video streams never go idle, so the HTTP servers
+  wait at most 5 s for them, then cut them off. `stop_grace_period: 30s` in compose leaves room for
+  all of it; Docker kills the process after 10 s by default.
 - Backups: `VACUUM INTO` a file in `/data/backups` on start, then every 24 h while up. Skip it if the
   newest backup is under 24 h old (checked hourly, so a restart never stretches the gap to 48 h). The
   time is in the file name. Keep the last 7. Never copy the live database file: with WAL, a

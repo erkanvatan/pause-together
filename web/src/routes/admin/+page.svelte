@@ -4,14 +4,19 @@
 	import { getLanguages, type LibraryType } from '$lib/api';
 	import {
 		addLibrary,
+		clearCache,
 		formatBytes,
+		getCache,
 		jobText,
 		listJobs,
 		listLibraries,
 		listProblems,
+		maxUnusedDays,
+		minUnusedDays,
 		problemText,
 		removeLibrary,
 		rescanLibrary,
+		setCache,
 		setLanguages,
 		type Jobs,
 		type Library,
@@ -42,6 +47,7 @@
 	let addError = $state('');
 
 	let confirming = $state<number | null>(null); // library whose Remove waits for a yes
+	let confirmingClear = $state(false); // Clear cache waits for a yes
 
 	// Language defaults, as typed. Loaded once, not polled, so a poll never overwrites typing.
 	let audioLang = $state('');
@@ -51,6 +57,13 @@
 	let langsSaved = $state(false);
 	let langsError = $state('');
 	const subtitleCodes = $derived(subtitleLangs.split(/[\s,]+/).filter(Boolean));
+
+	// The cache clean-up setting, as typed. Loaded once, like the language defaults.
+	let unusedDays = $state(0);
+	let cacheLoaded = $state(false);
+	let savingCache = $state(false);
+	let cacheSaved = $state(false);
+	let cacheError = $state('');
 
 	const scanning = $derived(libraries.some((l) => l.scan.state !== ''));
 	const libraryPath = $derived(new Map(libraries.map((l) => [l.id, l.path])));
@@ -63,7 +76,12 @@
 		const probs = await listProblems();
 		const js = await listJobs();
 		const langs = langsLoaded ? null : await getLanguages();
-		loadFailed = !libs.ok || !probs.ok || !js.ok || langs?.ok === false;
+		const cache = cacheLoaded ? null : await getCache();
+		loadFailed = !libs.ok || !probs.ok || !js.ok || langs?.ok === false || cache?.ok === false;
+		if (cache?.ok) {
+			unusedDays = cache.value.unusedDays;
+			cacheLoaded = true;
+		}
 		if (langs?.ok) {
 			showLanguages(langs.value.audio, langs.value.subtitles);
 			langsLoaded = true;
@@ -130,6 +148,15 @@
 		langsSaved = r.ok;
 		langsError = r.ok ? '' : (strings.langErrors[r.error] ?? strings.langErrors.failed);
 		if (r.ok) showLanguages(r.value.audio, r.value.subtitles);
+	}
+
+	async function saveCache(e: SubmitEvent) {
+		e.preventDefault();
+		savingCache = true;
+		const r = await setCache({ unusedDays });
+		savingCache = false;
+		cacheSaved = r.ok;
+		cacheError = r.ok ? '' : (strings.cacheErrors[r.error] ?? strings.cacheErrors.failed);
 	}
 
 	function fullPath(p: Problem) {
@@ -310,6 +337,46 @@
 			</section>
 		{/if}
 
+		{#if cacheLoaded}
+			<section class="flex flex-col gap-3">
+				<h2 class="text-lg font-semibold">{strings.cacheCleanup}</h2>
+				<form
+					onsubmit={saveCache}
+					oninput={() => (cacheSaved = false)}
+					class="flex flex-col gap-3"
+				>
+					<label class="flex flex-col gap-1">
+						<span>{strings.unusedDays}</span>
+						<input
+							type="number"
+							bind:value={unusedDays}
+							min={minUnusedDays}
+							max={maxUnusedDays}
+							step="1"
+							required
+							class="w-24 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5"
+						/>
+						<span class="text-sm text-neutral-400">{strings.unusedDaysHint}</span>
+					</label>
+					<div class="flex items-center gap-3">
+						<button
+							type="submit"
+							disabled={savingCache}
+							class="rounded-md bg-neutral-100 px-3 py-1.5 font-medium text-neutral-950 disabled:opacity-40"
+						>
+							{strings.save}
+						</button>
+						{#if cacheSaved}
+							<span class="text-sm text-neutral-400">{strings.saved}</span>
+						{/if}
+					</div>
+					{#if cacheError}
+						<p class="text-sm text-red-400" role="alert">{cacheError}</p>
+					{/if}
+				</form>
+			</section>
+		{/if}
+
 		{#if libraries.length > 0}
 			<section class="flex flex-col gap-3">
 				<h2 class="text-lg font-semibold">{strings.cantUse}</h2>
@@ -337,6 +404,33 @@
 				<p class="text-sm text-neutral-400">
 					{strings.diskUsage(formatBytes(jobs.cacheBytes), formatBytes(jobs.freeBytes))}
 				</p>
+				{#if confirmingClear}
+					<div class="flex flex-wrap items-center gap-2 text-sm" role="alert">
+						<span class="text-neutral-300">{strings.clearCacheConfirm}</span>
+						<button
+							onclick={() => {
+								confirmingClear = false;
+								act(clearCache());
+							}}
+							class="rounded-md bg-red-600 px-2.5 py-1 font-medium text-white"
+						>
+							{strings.clearCache}
+						</button>
+						<button
+							onclick={() => (confirmingClear = false)}
+							class="rounded-md border border-neutral-700 px-2.5 py-1"
+						>
+							{strings.cancel}
+						</button>
+					</div>
+				{:else}
+					<button
+						onclick={() => (confirmingClear = true)}
+						class="self-start rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-500"
+					>
+						{strings.clearCache}
+					</button>
+				{/if}
 				{#if jobs.jobs.length === 0}
 					<p class="text-neutral-400">{strings.noJobs}</p>
 				{:else}

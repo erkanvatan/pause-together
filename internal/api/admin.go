@@ -20,6 +20,9 @@ func (s *server) adminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/admin/problems", s.listProblems)
 	mux.HandleFunc("GET /api/admin/jobs", s.listJobs)
 	mux.HandleFunc("PUT /api/admin/languages", s.putLanguages)
+	mux.HandleFunc("GET /api/admin/cache", s.getCache)
+	mux.HandleFunc("PUT /api/admin/cache", s.putCache)
+	mux.HandleFunc("DELETE /api/admin/cache", s.clearCache)
 	mux.HandleFunc("DELETE /api/admin/rooms/{id}", s.deleteRoom)
 }
 
@@ -28,6 +31,7 @@ const (
 	errBadRequest = "bad-request"
 	errBadType    = "bad-type"
 	errBadLang    = "bad-lang"
+	errBadDays    = "bad-days"
 	errNotFolder  = "not-folder"
 	errOverlap    = "overlap"
 )
@@ -167,6 +171,41 @@ func (s *server) putLanguages(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, langs)
 	}
+}
+
+// cacheSettings is the cache clean-up setting.
+type cacheSettings struct {
+	UnusedDays int `json:"unusedDays"` // a prepared copy nobody has used for this long is deleted
+}
+
+func (s *server) getCache(w http.ResponseWriter, r *http.Request) {
+	days, err := s.Jobs.UnusedDays(r.Context())
+	if err != nil {
+		internalError(w, "cache settings", err)
+		return
+	}
+	writeJSON(w, cacheSettings{UnusedDays: days})
+}
+
+func (s *server) putCache(w http.ResponseWriter, r *http.Request) {
+	var req cacheSettings
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	switch err := s.Jobs.SetUnusedDays(r.Context(), req.UnusedDays); {
+	case errors.Is(err, media.ErrBadDays):
+		writeError(w, http.StatusBadRequest, errBadDays)
+	case err != nil:
+		internalError(w, "save cache settings", err)
+	default:
+		writeJSON(w, req)
+	}
+}
+
+// clearCache deletes every prepared copy. The clean-up setting stays.
+func (s *server) clearCache(w http.ResponseWriter, _ *http.Request) {
+	s.Jobs.Clear()
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // pathID reads the {id} path value.
