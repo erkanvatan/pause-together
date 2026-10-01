@@ -44,6 +44,11 @@
 	let list: HTMLOListElement;
 	let input = $state<HTMLInputElement>();
 	let selected = $state<number | null>(null); // the tapped message, showing its time and actions
+	// The one message in the tab order; the arrow keys move it. null: the newest.
+	let current = $state<number | null>(null);
+	const focusable = $derived(
+		messages.some((m) => m.id === current) ? current : (messages.at(-1)?.id ?? null)
+	);
 	let loading = false;
 	let olderFailed = $state(false);
 	let atBottom = true; // new messages keep the list at the bottom only when it's there
@@ -104,6 +109,18 @@
 		if (matchMedia('(pointer: coarse)').matches) input?.blur();
 	}
 
+	// The messages are one stop for Tab, like a list box: ↑ and ↓ step through them, Home and End jump
+	// to the ends. Moving focus scrolls the message into view.
+	function listKey(e: KeyboardEvent) {
+		const step = { ArrowUp: -1, ArrowDown: 1, Home: -Infinity, End: Infinity }[e.key];
+		const at = messages.findIndex((m) => m.id === focusable);
+		if (step === undefined || at < 0 || !(e.target as HTMLElement).dataset.message) return;
+		e.preventDefault();
+		const to = messages[Math.min(Math.max(at + step, 0), messages.length - 1)];
+		current = to.id;
+		tick().then(() => list.querySelector<HTMLElement>(`[data-message="${to.id}"]`)?.focus());
+	}
+
 	function reply(m: ChatMessage) {
 		selected = null;
 		replyTo = m;
@@ -142,7 +159,8 @@
 		</section>
 	{/if}
 
-	<ol bind:this={list} onscroll={scrolled} class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions (the keys move between its buttons) -->
+	<ol bind:this={list} onscroll={scrolled} onkeydown={listKey} class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
 		{#if olderFailed}
 			<li class="px-2 text-sm text-ember">{strings.olderFailed}</li>
 		{/if}
@@ -152,6 +170,9 @@
 		{#each messages as m (m.id)}
 			<li class="rounded-control {selected === m.id ? 'bg-midnight/60' : ''}">
 				<button
+					data-message={m.id}
+					tabindex={m.id === focusable ? 0 : -1}
+					onfocus={() => (current = m.id)}
 					onclick={() => (selected = selected === m.id ? null : m.id)}
 					title={strings.sentAt(m.sentAt)}
 					class="flex w-full flex-col gap-0.5 rounded-control px-2 py-1.5 text-left hover:bg-midnight/40"

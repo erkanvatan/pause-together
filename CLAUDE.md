@@ -141,7 +141,7 @@ web/                 SvelteKit app; web/embed.go embeds its build (go:embed can'
 web/src/app.css      design tokens (@theme), shared classes, font imports
 web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode),
-                     Picker.svelte,
+                     Picker.svelte, Dialog.svelte (modals on the browser's <dialog>: focus, Escape, inert page),
                      FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts,
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID),
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
@@ -470,6 +470,9 @@ So each room's video is **prepared once**, then served as a plain file.
 - Over the video's middle: back 10 s, play or pause, forward 10 s. Hidden while "Tap to join", "Waiting
   for …" or "Next episode" hold the middle.
 - No playback speed control. `playbackRate` belongs to the drift fix.
+- Keys, as in other players: Space or K play and pause, ← and → skip 10 s, J and L skip 20 s,
+  F fullscreen, C the subtitle panel, H chat, M mute. Never while typing or with a dialog open. The
+  bar's tooltips name them.
 - Per device, in `localStorage`: volume, mute, subtitle size (default medium). Everything in room state is shared.
 - Subtitle cues: `<i>` and `<b>` become real elements. Everything else (`{\an8}`, ASS tags, other
   markup) is dropped.

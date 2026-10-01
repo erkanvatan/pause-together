@@ -305,6 +305,31 @@
 		socket.send({ type: 'offset', ms });
 	}
 
+	// Keys for the player, like other video players: Space or K plays and pauses, ← and → skip, J and L
+	// skip twice as far, F for fullscreen, C for the subtitle panel, H for chat, M to mute. Never while typing, in a dialog, or for a key
+	// something on the page already used. Space stays with a focused button or link, and the arrows with
+	// a focused slider.
+	function shortcut(e: KeyboardEvent) {
+		if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+		const t = e.target as HTMLElement;
+		const typing = t.closest('input:not([type=range]), textarea, select, [contenteditable]');
+		if (typing || document.querySelector('dialog[open]')) return;
+		const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+		const ready = online && !!playState;
+		if ((key === ' ' && !t.closest('button, a, input')) || key === 'k') {
+			if (ready) togglePlay();
+		} else if ((key === 'ArrowLeft' || key === 'ArrowRight') && !t.closest('input')) {
+			if (ready && durationMs > 0) skip(key === 'ArrowLeft' ? -skipMs : skipMs);
+		} else if (key === 'j' || key === 'l') {
+			if (ready && durationMs > 0) skip(key === 'j' ? -2 * skipMs : 2 * skipMs);
+		} else if (key === 'f') toggleFullscreen();
+		else if (key === 'c') subtitlesOpen = !subtitlesOpen;
+		else if (key === 'h') chatOpen = !chatOpen;
+		else if (key === 'm') muted = !muted;
+		else return;
+		e.preventDefault();
+	}
+
 	function wake() {
 		idle = false;
 		clearTimeout(idleTimer);
@@ -397,6 +422,7 @@
 		const t = e.target as HTMLElement;
 		if (!t.closest('input:not([type=range]), textarea, select, [contenteditable]')) wake();
 		if (e.key === 'Escape') filled = false;
+		shortcut(e);
 	}}
 />
 
@@ -468,6 +494,7 @@
 							onclick={() => skip(-skipMs)}
 							disabled={!online || durationMs === 0}
 							aria-label={strings.skipBack(skipMs / 1000)}
+							title={strings.withKey(strings.skipBack(skipMs / 1000), '←')}
 							class="transport size-12 sm:size-14"
 						>
 							<Icon name="skip-back" step={skipMs / 1000} class="size-7 sm:size-8" />
@@ -484,6 +511,7 @@
 							onclick={() => skip(skipMs)}
 							disabled={!online || durationMs === 0}
 							aria-label={strings.skipForward(skipMs / 1000)}
+							title={strings.withKey(strings.skipForward(skipMs / 1000), '→')}
 							class="transport size-12 sm:size-14"
 						>
 							<Icon name="skip-forward" step={skipMs / 1000} class="size-7 sm:size-8" />
@@ -658,6 +686,7 @@
 							onclick={togglePlay}
 							disabled={!online || !playState}
 							aria-label={playState?.playing ? strings.pause : strings.play}
+							title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keySpace)}
 							class="icon-btn"
 						>
 							<Icon name={playState?.playing ? 'pause' : 'play'} />
@@ -670,6 +699,7 @@
 								max={durationMs}
 								step="1000"
 								value={dragMs ?? shownMs}
+								aria-valuetext={strings.positionOf(formatTime(dragMs ?? shownMs), formatTime(durationMs))}
 								disabled={!online || durationMs === 0}
 								oninput={(e) => (dragMs = Number(e.currentTarget.value))}
 								onchange={(e) => {
@@ -685,6 +715,7 @@
 						<button
 							onclick={() => (muted = !muted)}
 							aria-label={muted ? strings.unmute : strings.mute}
+							title={strings.withKey(muted ? strings.unmute : strings.mute, 'M')}
 							class="icon-btn"
 						>
 							<Icon name={muted ? 'muted' : 'volume'} />
@@ -697,6 +728,7 @@
 								max="1"
 								step="0.05"
 								bind:value={volume}
+								aria-valuetext={strings.percent(volume)}
 								class="hidden h-11 w-20 @xl/bar:block"
 							/>
 						{/if}
@@ -704,6 +736,7 @@
 							onclick={() => (subtitlesOpen = !subtitlesOpen)}
 							aria-label={strings.subtitle}
 							aria-pressed={subtitlesOpen}
+							title={strings.withKey(strings.subtitle, 'C')}
 							class="icon-btn ml-auto {playState?.subtitle ? 'text-lamp' : ''}"
 						>
 							<Icon name="captions" />
@@ -712,6 +745,7 @@
 							onclick={() => (chatOpen = !chatOpen)}
 							aria-label={strings.chat}
 							aria-pressed={chatOpen}
+							title={strings.withKey(strings.chat, 'H')}
 							class="icon-btn"
 						>
 							<Icon name="chat" />
@@ -719,6 +753,7 @@
 						<button
 							onclick={toggleFullscreen}
 							aria-label={full ? strings.exitFullscreen : strings.fullscreen}
+							title={strings.withKey(full ? strings.exitFullscreen : strings.fullscreen, 'F')}
 							class="icon-btn"
 						>
 							<Icon name={full ? 'shrink' : 'expand'} />

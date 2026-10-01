@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import { fade } from 'svelte/transition';
 	import Chat from '$lib/Chat.svelte';
+	import Dialog from '$lib/Dialog.svelte';
 	import {
 		CHAT_PAGE_SIZE,
 		TOAST_MS,
@@ -75,6 +76,7 @@
 	// The chat starts open: beside the video in landscape, under it in portrait.
 	let chatOpen = $state(true);
 	let toasts = $state<ChatMessage[]>([]);
+	let heard = $state(''); // the newest message from someone else, for screen readers
 
 	// Opening the room starts preparing its video, then the socket joins it. It runs again when a link
 	// leads to another room, since that reuses this page.
@@ -99,6 +101,7 @@
 		replyTo = null;
 		draft = '';
 		toasts = [];
+		heard = '';
 		const load = async () => {
 			const r = await openRoom(roomId);
 			if (stopped) return;
@@ -191,7 +194,10 @@
 			}
 			case 'chat':
 				messages = withMessage(messages, m.message);
-				if (!chatOpen && m.message.from.userId !== userId) toast(m.message);
+				if (m.message.from.userId !== userId) {
+					heard = strings.said(m.message.from.name, m.message.text);
+					if (!chatOpen) toast(m.message);
+				}
 				break;
 			case 'chatDeleted':
 				messages = withDeleted(messages, m.id);
@@ -336,6 +342,7 @@
 	{#if offline && room?.archived}
 		<p class="text-haze" role="status">{strings.hostOffline}</p>
 	{/if}
+	<p aria-live="polite" class="sr-only">{heard}</p>
 	{#if notFound}
 		<div class="flex flex-col items-start gap-6 pt-16">
 			<p class="font-display text-2xl font-bold">{strings.roomNotFound}</p>
@@ -437,21 +444,19 @@
 
 {#if confirming}
 	{@const c = confirming}
-	<div
-		class="fixed inset-0 z-20 flex items-center justify-center bg-midnight/80 p-4"
-		role="dialog"
-		aria-modal="true"
-	>
+	<Dialog label={strings.switchVideo} onclose={() => (confirming = null)} class="items-center justify-center p-4">
 		<div class="flex max-w-md flex-col gap-5 rounded-panel border border-line bg-dusk p-5">
 			<p class="text-lg break-words">{c.text}</p>
 			<div class="flex gap-2">
 				<button onclick={() => doSwitch(c.pick)} class="btn btn-primary">
 					{strings.switchAction}
 				</button>
-				<button onclick={() => (confirming = null)} class="btn btn-quiet">
+				<!-- Focus starts on Cancel: a stray Enter mustn't change the video for everyone. -->
+				<!-- svelte-ignore a11y_autofocus -->
+				<button onclick={() => (confirming = null)} autofocus class="btn btn-quiet">
 					{strings.cancel}
 				</button>
 			</div>
 		</div>
-	</div>
+	</Dialog>
 {/if}

@@ -146,6 +146,12 @@ export const strings = {
 	unmute: 'Unmute',
 	volume: 'Volume',
 	position: 'Position',
+	// The seek bar and volume as a screen reader says them: "1:02:13 of 2:34:27", "80%".
+	positionOf: (at: string, total: string) => `${at} of ${total}`,
+	percent: (n: number) => new Intl.NumberFormat(strings.locale, { style: 'percent' }).format(n),
+	// A control's tooltip with its key: "Play (Space)".
+	withKey: (label: string, key: string) => `${label} (${key})`,
+	keySpace: 'Space',
 	playAnyway: 'Play anyway',
 	playWithout: (names: string[]) => `Play without ${list(names)}`,
 	dontWaitForMe: "Don't wait for me",
@@ -179,6 +185,8 @@ export const strings = {
 	nextEpisodeNamed: (code: string, title: string) =>
 		title ? `Next episode: ${code} ${title}` : `Next episode: ${code}`,
 	chat: 'Chat',
+	// A new chat message, as a screen reader hears it.
+	said: (name: string, text: string) => `${name}: ${text}`,
 	closeChat: 'Close chat',
 	noMessages: 'No messages yet.',
 	messagePlaceholder: 'Message',

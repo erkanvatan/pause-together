@@ -41,7 +41,23 @@
 	function closeRename() {
 		renaming = false;
 	}
+
+	// The name menu closes on Escape, giving focus back to its button, and on a press anywhere outside it.
+	let menu = $state<HTMLDivElement>();
+	let menuButton = $state<HTMLButtonElement>();
+
+	function menuKey(e: KeyboardEvent) {
+		if (!menuOpen || e.key !== 'Escape') return;
+		menuOpen = false;
+		menuButton?.focus();
+	}
+
+	function menuOutside(e: PointerEvent) {
+		if (menuOpen && !menu?.contains(e.target as Node)) menuOpen = false;
+	}
 </script>
+
+<svelte:window onkeydown={menuKey} onpointerdown={menuOutside} />
 
 <svelte:head>
 	<meta name="theme-color" content={themeColor} />
@@ -68,11 +84,11 @@
 				<Icon name="pause" class="size-6 text-lamp" />
 				<span class="font-display text-xl font-bold">{strings.appName}</span>
 			</a>
-			<div class="relative min-w-0">
+			<div bind:this={menu} class="relative min-w-0">
 				<button
+					bind:this={menuButton}
 					onclick={() => (menuOpen = !menuOpen)}
 					aria-expanded={menuOpen}
-					aria-haspopup="menu"
 					class="btn max-w-full px-3 font-normal text-haze hover:text-moonlight"
 				>
 					<span class="truncate">{me.name}</span>
@@ -80,11 +96,9 @@
 				</button>
 				{#if menuOpen}
 					<div
-						role="menu"
 						class="absolute right-0 z-20 mt-1 min-w-48 rounded-control border border-line bg-dusk p-1"
 					>
 						<button
-							role="menuitem"
 							onclick={() => {
 								menuOpen = false;
 								renaming = true;
@@ -94,7 +108,7 @@
 							{strings.rename}
 						</button>
 						{#if me.isAdmin}
-							<a role="menuitem" href="/admin" onclick={() => (menuOpen = false)} class="row">
+							<a href="/admin" onclick={() => (menuOpen = false)} class="row">
 								{strings.admin}
 							</a>
 						{/if}

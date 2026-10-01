@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import {
 		getLanguages,
 		getVideo,
@@ -10,6 +10,7 @@
 		type VideoDetail,
 		type VideoSummary
 	} from '$lib/api';
+	import Dialog from '$lib/Dialog.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import {
 		audioLabel,
@@ -157,11 +158,26 @@
 		);
 	}
 
+	// A step that replaces the focused row (a video, show or folder opened, or Back) would drop focus
+	// out of the dialog. Put it on the new step's first row or menu instead: not the search box, which
+	// would open a phone's keyboard.
+	let panel: HTMLDivElement;
+	$effect(() => {
+		void [picked, showKey, folderName];
+		tick().then(() => {
+			if (panel && !panel.contains(document.activeElement)) {
+				(panel.querySelector<HTMLElement>('.row:not(:disabled)') ?? panel.querySelector('select'))?.focus();
+			}
+		});
+	});
+
 	const canGoBack = $derived(picked !== null || (!results && (show || folder)));
 
-	// Escape steps back one level: out of a video, a search, a show or folder, then the picker.
+	// Escape steps back one level: out of a video, a search, a show or folder, then the picker. Handled
+	// here, so the dialog doesn't close at once.
 	function escape(e: KeyboardEvent) {
 		if (e.key !== 'Escape') return;
+		e.preventDefault();
 		if (picked) back();
 		else if (query) query = '';
 		else if (canGoBack) back();
@@ -203,13 +219,9 @@
 	</li>
 {/snippet}
 
-<div
-	class="fixed inset-0 z-20 flex items-stretch justify-center bg-midnight/80 sm:items-center sm:p-6"
-	role="dialog"
-	aria-modal="true"
-	aria-label={strings.pickVideo}
->
+<Dialog label={strings.pickVideo} {onclose} class="items-stretch justify-center sm:items-center sm:p-6">
 	<div
+		bind:this={panel}
 		class="flex w-full flex-col bg-dusk sm:h-[85vh] sm:max-w-2xl sm:rounded-panel sm:border sm:border-line"
 	>
 		<header class="flex items-center gap-1 border-b border-line p-1 pl-2">
@@ -363,4 +375,4 @@
 			</div>
 		{/if}
 	</div>
-</div>
+</Dialog>
