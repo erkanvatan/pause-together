@@ -108,6 +108,7 @@
 	const durationMs = $derived(playState?.durationMs ?? 0);
 
 	let subtitlesOpen = $state(false); // the subtitle panel
+	let panelHeight = $state(0); // its height, so the subtitles sit above it outside fullscreen
 	const options = $derived(detail ? subtitleOptions(detail) : []);
 	const subtitleKey = $derived(
 		options.find((o) => sameSubtitle(o.choice, playState?.subtitle ?? null))?.key ?? ''
@@ -480,7 +481,7 @@
 					{offsetMs}
 					size={subtitleSize}
 					videoMs={() => video.currentTime * 1000}
-					lift={full && !faded ? barHeight : 0}
+					lift={full ? (faded ? 0 : barHeight) : subtitlesOpen ? panelHeight : 0}
 				/>
 			{/if}
 
@@ -615,11 +616,15 @@
 				bind:clientHeight={barHeight}
 				onpointerenter={() => (overBar = true)}
 				onpointerleave={() => (overBar = false)}
-				class="pointer-events-auto"
+				class="pointer-events-auto relative"
 			>
+				<!-- Outside fullscreen the panel lies over the video's foot too, so opening it moves nothing. -->
 				{#if subtitlesOpen}
 					<div
-						class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm"
+						bind:clientHeight={panelHeight}
+						class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm {full
+							? ''
+							: 'absolute inset-x-0 bottom-full'}"
 					>
 						<label class="flex max-w-full min-w-0 items-center gap-2">
 							<span class="text-haze">{strings.subtitle}</span>

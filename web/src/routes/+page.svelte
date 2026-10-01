@@ -84,8 +84,8 @@
 {#snippet card(r: RoomCard)}
 	{@const subtitle = roomSubtitle(r)}
 	<li class="relative flex flex-col gap-3 py-3 pl-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
-		{#if r.watching.length > 0}
-			<!-- The lamp is on: someone is in this room. -->
+		{#if r.watching.length > 0 && !r.archived}
+			<!-- The lamp is on: someone is in this room. An archived one can't play, so it stays dark. -->
 			<span class="absolute inset-y-3 left-0 w-1 rounded-full bg-lamp" aria-hidden="true"></span>
 		{/if}
 		<a href="/rooms/{r.id}" class="group min-h-11 min-w-0 flex-1 rounded-control">
@@ -99,7 +99,7 @@
 			{#if subtitle}
 				<span class="mt-1 block break-words text-haze">{subtitle}</span>
 			{/if}
-			{#if r.watching.length > 0}
+			{#if r.watching.length > 0 && !r.archived}
 				<span class="mt-1 flex items-center gap-2 text-sm">
 					<span class="size-2 shrink-0 rounded-full bg-lamp" aria-hidden="true"></span>
 					<span class="min-w-0 break-words">

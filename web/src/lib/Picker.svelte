@@ -23,6 +23,7 @@
 		subtitleLabel,
 		subtitleOptions,
 		videoName,
+		videoTitle,
 		whyUnplayable,
 		withYear,
 		type Sort
@@ -220,9 +221,13 @@
 {/snippet}
 
 <Dialog label={strings.pickVideo} {onclose} class="items-stretch justify-center sm:items-center sm:p-6">
+	<!-- The list keeps one tall frame, so it doesn't jump while searching; the short track step fits
+	its content. -->
 	<div
 		bind:this={panel}
-		class="flex w-full flex-col bg-dusk sm:h-[85vh] sm:max-w-2xl sm:rounded-panel sm:border sm:border-line"
+		class="flex w-full flex-col bg-dusk sm:max-w-2xl sm:rounded-panel sm:border sm:border-line {picked
+			? ''
+			: 'sm:h-[85vh]'}"
 	>
 		<header class="flex items-center gap-1 border-b border-line p-1 pl-2">
 			{#if canGoBack}
@@ -233,7 +238,7 @@
 			{/if}
 			<h2 class="min-w-0 flex-1 truncate px-2 font-display text-lg font-bold">
 				{#if picked}
-					{videoName(picked)}
+					{videoTitle(picked)}
 				{:else if show && !results}
 					{withYear(show.title, show.year)}
 				{:else if folder && !results}
@@ -253,6 +258,9 @@
 
 		{#if picked}
 			<div class="flex flex-1 flex-col gap-5 overflow-y-auto p-4">
+				{#if picked.version}
+					<p class="-mt-1 break-words text-haze">{picked.version}</p>
+				{/if}
 				<label class="flex flex-col gap-1.5">
 					<span class="text-sm text-haze">{strings.audio}</span>
 					<!-- One track is no choice: say what it is. -->

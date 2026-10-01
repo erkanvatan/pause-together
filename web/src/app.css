@@ -110,12 +110,14 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 	.btn-danger:not(:disabled):hover {
 		background-color: color-mix(in oklab, var(--color-ember) 82%, white);
 	}
-	/* A filled button that can't be pressed yet goes out, rather than dimming to brown. */
+	/* A filled button that can't be pressed yet goes out, rather than dimming to brown. Its edge keeps
+	it a button on a dusk panel; inset, so the size doesn't change. */
 	.btn-primary:disabled,
 	.btn-danger:disabled {
 		opacity: 1;
 		background-color: var(--color-dusk);
 		color: var(--color-haze);
+		box-shadow: inset 0 0 0 1px var(--color-line);
 	}
 
 	/* A square button holding one Icon, 44 px on every screen. */

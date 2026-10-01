@@ -55,6 +55,7 @@
 	let langsLoaded = $state(false);
 	let savingLangs = $state(false);
 	let langsSaved = $state(false);
+	let langsChanged = $state(false); // Save lights up only when there's something to save
 	let langsError = $state('');
 	const subtitleCodes = $derived(subtitleLangs.split(/[\s,]+/).filter(Boolean));
 
@@ -63,6 +64,7 @@
 	let cacheLoaded = $state(false);
 	let savingCache = $state(false);
 	let cacheSaved = $state(false);
+	let cacheChanged = $state(false);
 	let cacheError = $state('');
 
 	const scanning = $derived(libraries.some((l) => l.scan.state !== ''));
@@ -146,6 +148,7 @@
 		const r = await setLanguages({ audio: audioLang.trim(), subtitles: subtitleCodes });
 		savingLangs = false;
 		langsSaved = r.ok;
+		langsChanged = !r.ok;
 		langsError = r.ok ? '' : (strings.langErrors[r.error] ?? strings.langErrors.failed);
 		if (r.ok) showLanguages(r.value.audio, r.value.subtitles);
 	}
@@ -156,6 +159,7 @@
 		const r = await setCache({ unusedDays });
 		savingCache = false;
 		cacheSaved = r.ok;
+		cacheChanged = !r.ok;
 		cacheError = r.ok ? '' : (strings.cacheErrors[r.error] ?? strings.cacheErrors.failed);
 	}
 
@@ -294,7 +298,10 @@
 						<p class="text-sm text-haze">{strings.languageDefaultsNote}</p>
 						<form
 							onsubmit={saveLanguages}
-							oninput={() => (langsSaved = false)}
+							oninput={() => {
+								langsSaved = false;
+								langsChanged = true;
+							}}
 							class="flex flex-col gap-4"
 						>
 							<label class="flex flex-col gap-1.5">
@@ -316,7 +323,7 @@
 								</span>
 							</label>
 							<div class="flex items-center gap-3">
-								<button type="submit" disabled={savingLangs} class="btn btn-primary">
+								<button type="submit" disabled={savingLangs || !langsChanged} class="btn btn-primary">
 									{strings.save}
 								</button>
 								{#if langsSaved}
@@ -335,7 +342,10 @@
 						{@render heading(strings.cacheCleanup)}
 						<form
 							onsubmit={saveCache}
-							oninput={() => (cacheSaved = false)}
+							oninput={() => {
+								cacheSaved = false;
+								cacheChanged = true;
+							}}
 							class="flex flex-col gap-4"
 						>
 							<label class="flex flex-col gap-1.5">
@@ -352,7 +362,7 @@
 								<span class="text-sm text-haze">{strings.unusedDaysHint}</span>
 							</label>
 							<div class="flex items-center gap-3">
-								<button type="submit" disabled={savingCache} class="btn btn-primary">
+								<button type="submit" disabled={savingCache || !cacheChanged} class="btn btn-primary">
 									{strings.save}
 								</button>
 								{#if cacheSaved}
@@ -396,7 +406,8 @@
 							{strings.diskUsage(formatBytes(jobs.cacheBytes), formatBytes(jobs.freeBytes))}
 						</p>
 						{#if !confirmingClear}
-							<button onclick={() => (confirmingClear = true)} class="btn btn-danger btn-small">
+							<!-- Quiet until asked: ember belongs to the confirm step. -->
+							<button onclick={() => (confirmingClear = true)} class="btn btn-quiet btn-small">
 								{strings.clearCache}
 							</button>
 						{/if}

@@ -1,6 +1,6 @@
 // Room helpers for the homepage and the room page. Pure: no fetch, no DOM.
 import type { Room, Who } from '$lib/api';
-import { videoName } from '$lib/picker';
+import { videoName, videoTitle } from '$lib/picker';
 import type { Wait } from '$lib/protocol';
 import { strings } from '$lib/strings';
 import { formatTime } from '$lib/time';
@@ -8,7 +8,7 @@ import { formatTime } from '$lib/time';
 // roomTitle names a room in big type: its own name, or else its video's without the version label
 // ("1080p.BrRip.x264"). Release tags are noise in a heading; roomSubtitle carries them.
 export function roomTitle(r: Room): string {
-	return r.name || videoName({ ...r.video, version: '' });
+	return r.name || videoTitle(r.video);
 }
 
 // roomSubtitle is the quiet line under a room's title: the whole video name under a room name, or

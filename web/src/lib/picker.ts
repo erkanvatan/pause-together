@@ -166,13 +166,23 @@ export function withYear(title: string, year: number): string {
 // videoName names a video on its own, as in search results: "Heat (1995) · Director's Cut",
 // "Dark (2017) · S01E02 · Secrets", "Trips/Rome · Day 1".
 export function videoName(v: VideoSummary): string {
+	return videoNameParts(v).join(' · ');
+}
+
+// videoTitle is videoName without the version label ("1080p.BrRip.x264"), for big type: release tags
+// are noise in a heading. The version goes on a quiet line of its own.
+export function videoTitle(v: VideoSummary): string {
+	return videoNameParts({ ...v, version: '' }).join(' · ');
+}
+
+function videoNameParts(v: VideoSummary): string[] {
 	switch (v.type) {
 		case 'movies':
-			return [withYear(v.title, v.year), v.edition, v.version].filter(Boolean).join(' · ');
+			return [withYear(v.title, v.year), v.edition, v.version].filter(Boolean);
 		case 'tv':
-			return [withYear(v.title, v.year), episodeCode(v), v.episodeTitle].filter(Boolean).join(' · ');
+			return [withYear(v.title, v.year), episodeCode(v), v.episodeTitle].filter(Boolean);
 		case 'other':
-			return [v.group, v.title].filter(Boolean).join(' · ');
+			return [v.group, v.title].filter(Boolean);
 	}
 }
 

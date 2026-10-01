@@ -253,7 +253,8 @@ Quiet and soft-spoken: flat fills, short labels, a short 150ms color change on h
 - **Danger:** ember fill, midnight text. Only inside a confirm step.
 - **Small:** 2rem tall, label size. Still 2.75rem on touch screens.
 - **Disabled:** quiet buttons fade to 45%. Filled buttons don't dim to brown: they turn dusk with haze
-  text, like a lamp switched off.
+  text and a line edge (inset, so the size holds), like a lamp switched off. A form's Save stays off
+  until something in it changes, so a settings page at rest shows no lit lamps.
 - **Focus:** a 2px lamp outline, 2px offset, on every focusable element.
 
 ### Icon Buttons
