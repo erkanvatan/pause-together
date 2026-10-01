@@ -20,12 +20,12 @@ const blocked = (): PrefsStorage => {
 
 describe('loadPlayerPrefs', () => {
 	it.each([
-		['nothing stored → defaults', null, { volume: 1, muted: false, subtitleSize: 'small' }],
-		['junk → defaults', '{nope', { volume: 1, muted: false, subtitleSize: 'small' }],
-		['not an object → defaults', '3', { volume: 1, muted: false, subtitleSize: 'small' }],
-		['stored values', '{"volume":0.4,"muted":true}', { volume: 0.4, muted: true, subtitleSize: 'small' }],
-		['volume out of range → clamped', '{"volume":7,"muted":false}', { volume: 1, muted: false, subtitleSize: 'small' }],
-		['negative volume → 0', '{"volume":-1}', { volume: 0, muted: false, subtitleSize: 'small' }],
+		['nothing stored → defaults', null, { volume: 1, muted: false, subtitleSize: 'medium' }],
+		['junk → defaults', '{nope', { volume: 1, muted: false, subtitleSize: 'medium' }],
+		['not an object → defaults', '3', { volume: 1, muted: false, subtitleSize: 'medium' }],
+		['stored values', '{"volume":0.4,"muted":true}', { volume: 0.4, muted: true, subtitleSize: 'medium' }],
+		['volume out of range → clamped', '{"volume":7,"muted":false}', { volume: 1, muted: false, subtitleSize: 'medium' }],
+		['negative volume → 0', '{"volume":-1}', { volume: 0, muted: false, subtitleSize: 'medium' }],
 		[
 			'subtitle size',
 			'{"volume":1,"muted":false,"subtitleSize":"large"}',
@@ -34,16 +34,16 @@ describe('loadPlayerPrefs', () => {
 		[
 			'unknown subtitle size → default',
 			'{"subtitleSize":"huge"}',
-			{ volume: 1, muted: false, subtitleSize: 'small' }
+			{ volume: 1, muted: false, subtitleSize: 'medium' }
 		],
-		['wrong types → defaults for those', '{"volume":"loud","muted":"yes"}', { volume: 1, muted: false, subtitleSize: 'small' }]
+		['wrong types → defaults for those', '{"volume":"loud","muted":"yes"}', { volume: 1, muted: false, subtitleSize: 'medium' }]
 	])('%s', (_, stored, want) => {
 		const s = storage(stored);
 		expect(loadPlayerPrefs(() => s)).toEqual(want);
 	});
 
 	it('blocked storage → defaults', () => {
-		expect(loadPlayerPrefs(blocked)).toEqual({ volume: 1, muted: false, subtitleSize: 'small' });
+		expect(loadPlayerPrefs(blocked)).toEqual({ volume: 1, muted: false, subtitleSize: 'medium' });
 	});
 });
 

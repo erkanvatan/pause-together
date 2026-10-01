@@ -9,7 +9,7 @@ export type PlayerPrefs = { volume: number; muted: boolean; subtitleSize: Subtit
 export type PrefsStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
 const key = 'pt.player';
-const defaults: PlayerPrefs = { volume: 1, muted: false, subtitleSize: 'small' };
+const defaults: PlayerPrefs = { volume: 1, muted: false, subtitleSize: 'medium' };
 
 // loadPlayerPrefs reads the stored settings. Anything missing or broken gets its default. storage is
 // a getter: with site data blocked, even reading window.localStorage throws, which means defaults too.
