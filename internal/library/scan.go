@@ -27,6 +27,10 @@ type Library struct {
 // ErrRemoved stops a scan whose library was removed while it ran.
 var ErrRemoved = errors.New("library removed")
 
+// ErrFolderGone is a scan's error when the library's folder no longer exists: moved, renamed, or a
+// drive that isn't mounted.
+var ErrFolderGone = errors.New("library folder is gone")
+
 // Prober reads a video file's technical facts. media.FFprobe is the real one.
 type Prober interface {
 	Probe(ctx context.Context, path string) (media.Info, error)
@@ -77,7 +81,9 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(do
 	// Resolved, so a library folder that is itself a symlink gets walked. Folder links inside it still
 	// aren't. Checked on every scan: the link may point outside the media folder by now.
 	root, _, err := realPath(s.Root, lib.Path)
-	if err != nil {
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%w: %w", ErrFolderGone, err)
+	} else if err != nil {
 		return err
 	}
 	// Watches of folders that are gone are dropped before the walk: a folder moved inside the library

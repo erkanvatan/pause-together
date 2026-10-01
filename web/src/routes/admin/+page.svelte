@@ -243,7 +243,9 @@
 								{/if}
 							</div>
 						{/if}
-						{#if lib.scan.error}
+						{#if lib.scan.gone}
+							<p class="text-sm text-ember">{strings.folderGone}</p>
+						{:else if lib.scan.error}
 							<p class="text-sm text-ember">
 								{strings.scanFailed} <span class="font-mono break-all">{lib.scan.error}</span>
 							</p>
@@ -289,13 +291,73 @@
 						<button type="submit" disabled={adding || path === ''} class="btn btn-primary">
 							{strings.add}
 						</button>
-						<span class="text-sm break-all text-haze">/{path}</span>
+						<span class="text-sm break-all text-haze">
+							{path === '' ? strings.openFolderHint : `/${path}`}
+						</span>
 					</div>
 					{#if addError}
 						<p class="text-sm text-ember" role="alert">{addError}</p>
 					{/if}
 				</form>
 			</section>
+
+			{#if libraries.length > 0}
+				<section class="flex flex-col gap-3">
+					{@render heading(strings.cantUse)}
+					{#if problemCount === 0}
+						<p class="text-haze">{strings.allUsable}</p>
+					{:else}
+						<ul class="flex flex-col gap-3">
+							{#each [...problems.skipped, ...problems.unplayable] as p (`${p.libraryId}/${p.path}`)}
+								<li class="flex flex-col">
+									<span class="break-all">{fullPath(p)}</span>
+									<span class="text-sm text-haze">{problemText(p)}</span>
+									{#if p.probeError}
+										<span class="font-mono text-sm break-all text-haze">{p.probeError}</span>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</section>
+			{/if}
+
+			{#if problems.appleOnly.length > 0}
+				<section class="flex flex-col gap-3">
+					{@render heading(strings.appleOnly)}
+					<p class="text-sm text-haze">{strings.appleOnlyNote}</p>
+					<ul class="flex flex-col gap-1">
+						{#each problems.appleOnly as p (`${p.libraryId}/${p.path}`)}
+							<li class="break-all">{fullPath(p)}</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
+
+			{#if jobs}
+				<section class="flex flex-col gap-3">
+					{@render heading(strings.jobs)}
+					{#if jobs.jobs.length === 0}
+						<p class="text-haze">{strings.noJobs}</p>
+					{:else}
+						<ul class="flex flex-col gap-3">
+							{#each jobs.jobs as j (j.key)}
+								<li class="flex flex-col">
+									<span class="break-all">{j.name}</span>
+									<span class="text-sm {j.state === 'failed' ? 'text-ember' : 'text-haze'}">
+										{jobText(j)}
+									</span>
+									{#if j.detail}
+										<span class="font-mono text-sm break-all whitespace-pre-wrap text-haze">
+											{j.detail}
+										</span>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</section>
+			{/if}
 
 			<div class="grid gap-12 md:grid-cols-2">
 				{#if langsLoaded}
@@ -347,6 +409,36 @@
 				{#if cacheLoaded}
 					<section class="flex flex-col gap-3">
 						{@render heading(strings.cacheCleanup)}
+						{#if jobs}
+							<div class="flex flex-col items-start gap-3">
+								<p class="text-sm text-haze">
+									{strings.diskUsage(formatBytes(jobs.cacheBytes), formatBytes(jobs.freeBytes))}
+								</p>
+								{#if !confirmingClear}
+									<!-- Quiet until asked: ember belongs to the confirm step. -->
+									<button onclick={() => (confirmingClear = true)} class="btn btn-quiet btn-small">
+										{strings.clearCache}
+									</button>
+								{/if}
+							</div>
+							{#if confirmingClear}
+								<div class="flex flex-wrap items-center gap-2 text-sm" role="alert">
+									<span>{strings.clearCacheConfirm}</span>
+									<button
+										onclick={() => {
+											confirmingClear = false;
+											act(clearCache());
+										}}
+										class="btn btn-danger btn-small"
+									>
+										{strings.clearCache}
+									</button>
+									<button onclick={() => (confirmingClear = false)} class="btn btn-quiet btn-small">
+										{strings.cancel}
+									</button>
+								</div>
+							{/if}
+						{/if}
 						<form
 							onsubmit={saveCache}
 							oninput={() => {
@@ -384,92 +476,6 @@
 					</section>
 				{/if}
 			</div>
-
-			{#if libraries.length > 0}
-				<section class="flex flex-col gap-3">
-					{@render heading(strings.cantUse)}
-					{#if problemCount === 0}
-						<p class="text-haze">{strings.allUsable}</p>
-					{:else}
-						<ul class="flex flex-col gap-3">
-							{#each [...problems.skipped, ...problems.unplayable] as p (`${p.libraryId}/${p.path}`)}
-								<li class="flex flex-col">
-									<span class="break-all">{fullPath(p)}</span>
-									<span class="text-sm text-haze">{problemText(p)}</span>
-									{#if p.probeError}
-										<span class="font-mono text-sm break-all text-haze">{p.probeError}</span>
-									{/if}
-								</li>
-							{/each}
-						</ul>
-					{/if}
-				</section>
-			{/if}
-
-			{#if jobs}
-				<section class="flex flex-col gap-3">
-					{@render heading(strings.jobs)}
-					<div class="flex flex-col items-start gap-3">
-						<p class="text-sm text-haze">
-							{strings.diskUsage(formatBytes(jobs.cacheBytes), formatBytes(jobs.freeBytes))}
-						</p>
-						{#if !confirmingClear}
-							<!-- Quiet until asked: ember belongs to the confirm step. -->
-							<button onclick={() => (confirmingClear = true)} class="btn btn-quiet btn-small">
-								{strings.clearCache}
-							</button>
-						{/if}
-					</div>
-					{#if confirmingClear}
-						<div class="flex flex-wrap items-center gap-2 text-sm" role="alert">
-							<span>{strings.clearCacheConfirm}</span>
-							<button
-								onclick={() => {
-									confirmingClear = false;
-									act(clearCache());
-								}}
-								class="btn btn-danger btn-small"
-							>
-								{strings.clearCache}
-							</button>
-							<button onclick={() => (confirmingClear = false)} class="btn btn-quiet btn-small">
-								{strings.cancel}
-							</button>
-						</div>
-					{/if}
-					{#if jobs.jobs.length === 0}
-						<p class="text-haze">{strings.noJobs}</p>
-					{:else}
-						<ul class="flex flex-col gap-3">
-							{#each jobs.jobs as j (j.key)}
-								<li class="flex flex-col">
-									<span class="break-all">{j.name}</span>
-									<span class="text-sm {j.state === 'failed' ? 'text-ember' : 'text-haze'}">
-										{jobText(j)}
-									</span>
-									{#if j.detail}
-										<span class="font-mono text-sm break-all whitespace-pre-wrap text-haze">
-											{j.detail}
-										</span>
-									{/if}
-								</li>
-							{/each}
-						</ul>
-					{/if}
-				</section>
-			{/if}
-
-			{#if problems.appleOnly.length > 0}
-				<section class="flex flex-col gap-3">
-					{@render heading(strings.appleOnly)}
-					<p class="text-sm text-haze">{strings.appleOnlyNote}</p>
-					<ul class="flex flex-col gap-1">
-						{#each problems.appleOnly as p (`${p.libraryId}/${p.path}`)}
-							<li class="break-all">{fullPath(p)}</li>
-						{/each}
-					</ul>
-				</section>
-			{/if}
 		</div>
 	</main>
 {/if}

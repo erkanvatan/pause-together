@@ -232,13 +232,16 @@ container mount for source files, and one name for two things gets mixed up in c
 
 ### Admin page
 
-- Libraries: add, remove, rescan with progress.
+In this order: what needs the host's hand first, settings last.
+
+- Libraries: add, remove, rescan with progress. A library whose folder is gone says so in plain words
+  (moved, renamed, a drive not mounted), not as the raw file error.
 - Files we can't use (skipped or unplayable), each with its reason, plus "Apple devices only" warnings.
 - The job queue, with failed jobs and ffmpeg's error.
-- Cache size and free disk space, and a "Clear cache" button (asks first) that deletes every prepared
-  copy. Converted sidecar subtitles and a running job stay.
 - Language defaults for new picks.
-- Cache clean-up: after how many days unused a prepared copy is deleted.
+- Cache clean-up: cache size and free disk space, a "Clear cache" button (asks first) that deletes
+  every prepared copy (converted sidecar subtitles and a running job stay), and after how many days
+  unused a prepared copy is deleted.
 - The page polls every 5 s while the tab is visible (every 1 s during a scan), and right away when it
   becomes visible again: the file watcher and the timed rescan change things behind its back.
 - Room delete is not here. It lives on the homepage room cards, behind "Manage", shown only when
@@ -403,7 +406,8 @@ So each room's video is **prepared once**, then served as a plain file.
 - Before a switch, the switcher confirms: "You're at 1:40:00. Switch to …?" Nobody else is asked. Not
   asked when nothing is lost: at 0:00, at the end, or the "Video missing" swap.
 - At the end of a video, the server (it knows the duration) pauses the room there. TV episodes show
-  "Next episode". No autoplay.
+  "Next episode"; anything else (a film, a show's last episode) shows "The end" and "Watch something
+  else". No autoplay.
 - Progress is per room only: the position is saved on pause, seek and switch, and every 5 s while
   playing. No per-user progress.
 - Presence: "watching now" only: an open socket, plus a 15 s reconnect grace so flaky phones don't
@@ -472,12 +476,17 @@ So each room's video is **prepared once**, then served as a plain file.
   never resizes the video, and subtitles move up while it shows). Never while paused, the subtitle panel
   is open or the seek bar is held. On touch screens, a tap on bare video hides them.
 - Over the video's middle: back 10 s, play or pause, forward 10 s. Hidden while "Tap to join", "Waiting
-  for …" or "Next episode" hold the middle.
+  for …", or the end of the video ("Next episode", "The end") hold the middle. Before the room's first
+  word on the socket, the middle says "Getting the room ready…" (after a moment, so a quick connect
+  never flashes it).
 - No playback speed control. `playbackRate` belongs to the drift fix.
 - Keys, as in other players: Space or K play and pause, ← and → skip 10 s, J and L skip 20 s,
   F fullscreen, C the subtitle panel, H chat, M mute. Never while typing or with a dialog open. The
-  bar's tooltips name them.
+  bar's tooltips name them. On the focused seek bar, the arrows skip 10 s too: its own 1 s step would
+  seek the whole room once per press.
 - Per device, in `localStorage`: volume, mute, subtitle size (default medium). Everything in room state is shared.
+  The subtitle panel says which is which: subtitle and timing under "For everyone", size under "On this
+  screen".
 - Subtitle cues: `<i>` and `<b>` become real elements. Everything else (`{\an8}`, ASS tags, other
   markup) is dropped.
 - Library picker: a search box, show → season → episode grouping, and a "recently added" sort. Videos

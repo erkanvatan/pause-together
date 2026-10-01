@@ -154,7 +154,8 @@ A cool violet night with one warm lamp and one red-orange warning.
 ### Primary
 - **Lamp Amber** (lamp): the one accent. Primary buttons, the play/pause button, focus rings, progress
   bars, the bar beside a room with people in it, your own name in chat. Also the native
-  `accent-color`, so checkboxes and range inputs match.
+  `accent-color`, so checkboxes and the seek bar match. The volume slider is moonlight: it's a setting,
+  not progress.
 
 ### Secondary
 - **Ember Coral** (ember): delete buttons, errors, "Video missing", failed prepare jobs. Never
@@ -259,7 +260,8 @@ Quiet and soft-spoken: flat fills, short labels, a short 150ms color change on h
 
 ### Icon Buttons
 A 2.75rem square holding one inline SVG icon, moonlight. Hover adds a 10% moonlight tint. A toggle
-that is on (its panel is open) keeps a 12% tint.
+that is on (its panel is open) keeps a 12% tint. The subtitles button is haze while subtitles are off
+and moonlight while on: state, not the lamp.
 
 ### Inputs / Fields
 - **Style:** dusk fill, line border, gentle corners, 2.5rem tall (2.75rem on touch).
@@ -276,7 +278,8 @@ then a haze line: the video name below a custom name, or the version label ("108
 a video title. Release tags never sit in the condensed face. Then a "watching" line with a lamp dot.
 When someone is in the room, a thin lamp bar lights its left edge: the lamp is on. Rooms with people
 in them come first, and the first one gets the screen's lamp: a primary "Join" ("Watch something"
-turns quiet). Archive and Delete hide behind a quiet "Manage" toggle beside the Rooms heading.
+turns quiet). A room with nobody in it has no Join button, so a haze chevron at the row's end says the
+row opens it. Archive and Delete hide behind a quiet "Manage" toggle beside the Rooms heading.
 Archived rooms show their title in haze.
 
 ### Player (signature component)
@@ -288,13 +291,18 @@ Archived rooms show their title in haze.
   video on a black-to-transparent fade (80% black at the bottom), and fades out with the transport
   (300ms). Subtitles slide up while it shows.
 - **Holds the middle:** "Tap to join" (a large round primary button), "Preparing… 42%" (a pill with a
-  thin lamp progress bar on dusk), "Waiting for …" and "Video missing". Both are dusk panels at 90%,
-  compact on a phone's small video box.
+  thin lamp progress bar on dusk), "Waiting for …", "Video missing", "Getting the room ready…" (a pill,
+  after a moment), and the end. The waiting and missing ones are dusk panels at 90%, compact on a
+  phone's small video box.
   - "Waiting for Alice" in body large, then why and for how long in haze label ("stepped away · 0:12"),
     then a quiet button that names its effect ("Play without Alice"). The person the room waits for
     reads "Everyone's waiting for you" and "Don't wait for me".
   - "Video missing" in ember, a line saying the pick resumes where the room was, and a lamp "Pick
     another video".
+  - The end: a TV episode offers a lamp "Next episode". Anything else gets a title card, "The end" in
+    the display face (3xl, 2xl on a phone's box), over a lamp "Watch something else".
+- **Subtitle panel:** a dusk strip over the bar, in two labelled groups: "For everyone" (subtitle,
+  timing) and "On this screen" (size). Group labels are semibold moonlight, field labels haze.
 
 ### Pills
 A short line over the video: "Host is offline, reconnecting…" (with a small ember signal icon), "Alice

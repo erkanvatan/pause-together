@@ -83,29 +83,36 @@
 
 {#snippet card(r: RoomCard)}
 	{@const subtitle = roomSubtitle(r)}
+	{@const joinable = r.watching.length > 0 && !r.archived}
 	<li class="relative flex flex-col gap-3 py-3 pl-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
-		{#if r.watching.length > 0 && !r.archived}
+		{#if joinable}
 			<!-- The lamp is on: someone is in this room. An archived one can't play, so it stays dark. -->
 			<span class="absolute inset-y-3 left-0 w-1 rounded-full bg-lamp" aria-hidden="true"></span>
 		{/if}
-		<a href="/rooms/{r.id}" class="group min-h-11 min-w-0 flex-1 rounded-control">
-			<span
-				class="block font-display text-xl font-bold break-words decoration-lamp decoration-2 underline-offset-4 group-hover:underline {r.archived
-					? 'text-haze'
-					: ''}"
-			>
-				{roomTitle(r)}
-			</span>
-			{#if subtitle}
-				<span class="mt-1 block break-words text-haze">{subtitle}</span>
-			{/if}
-			{#if r.watching.length > 0 && !r.archived}
-				<span class="mt-1 flex items-center gap-2 text-sm">
-					<span class="size-2 shrink-0 rounded-full bg-lamp" aria-hidden="true"></span>
-					<span class="min-w-0 break-words">
-						{strings.watchingList(r.watching.map((w) => w.name).join(', '))}
-					</span>
+		<a href="/rooms/{r.id}" class="group flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-control">
+			<span class="min-w-0 flex-1">
+				<span
+					class="block font-display text-xl font-bold break-words decoration-lamp decoration-2 underline-offset-4 group-hover:underline {r.archived
+						? 'text-haze'
+						: ''}"
+				>
+					{roomTitle(r)}
 				</span>
+				{#if subtitle}
+					<span class="mt-1 block break-words text-haze">{subtitle}</span>
+				{/if}
+				{#if joinable}
+					<span class="mt-1 flex items-center gap-2 text-sm">
+						<span class="size-2 shrink-0 rounded-full bg-lamp" aria-hidden="true"></span>
+						<span class="min-w-0 break-words">
+							{strings.watchingList(r.watching.map((w) => w.name).join(', '))}
+						</span>
+					</span>
+				{/if}
+			</span>
+			<!-- A room with nobody in it has no Join button: the chevron says the row opens it. -->
+			{#if !managing && !joinable}
+				<Icon name="chevron" class="size-5 shrink-0 text-haze group-hover:text-moonlight" />
 			{/if}
 		</a>
 		{#if managing}
@@ -122,7 +129,7 @@
 					</button>
 				{/if}
 			</div>
-		{:else if r.watching.length > 0 && !r.archived}
+		{:else if joinable}
 			<a
 				href="/rooms/{r.id}"
 				aria-label={strings.joinRoom(roomTitle(r))}

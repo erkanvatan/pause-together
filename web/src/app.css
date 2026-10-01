@@ -226,6 +226,11 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 		line-height: 1.4;
 	}
 
+	/* Shows only after a moment: a note about waiting that would otherwise flash on a quick load. */
+	.appear-late {
+		animation: appear 200ms 600ms both;
+	}
+
 	/* Fingers need 44 px. */
 	@media (pointer: coarse) {
 		.btn,
@@ -233,6 +238,12 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 		.field {
 			min-height: 2.75rem;
 		}
+	}
+}
+
+@keyframes appear {
+	from {
+		opacity: 0;
 	}
 }
 

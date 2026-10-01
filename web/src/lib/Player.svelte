@@ -137,6 +137,8 @@
 	// Where the room's prepared copy stands, shown in the video box; '' when there's nothing to say, or
 	// it's ready.
 	const preparing = $derived(prepare ? jobText(prepare) : '');
+	// Before the room's first word on the socket the box is black, with nothing to press: say why.
+	const connecting = $derived(prepare === null && !offline);
 
 	// At the end the room pauses; a TV episode then offers the next one.
 	const atEnd = $derived(
@@ -154,7 +156,7 @@
 
 	// Back, play or pause, forward, over the video; not while something else holds its middle.
 	const transport = $derived(
-		src !== '' && joined && !blocked && !cantPlay && !(atEnd && next) && !playState?.waiting.length
+		src !== '' && joined && !blocked && !cantPlay && !atEnd && !playState?.waiting.length
 	);
 
 	// Only src changes, never the element: a new one may need a fresh tap on iOS.
@@ -513,6 +515,7 @@
 							onclick={togglePlay}
 							disabled={!online || !playState}
 							aria-label={playState?.playing ? strings.pause : strings.play}
+							title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
 							class="transport transport-main size-16 sm:size-20"
 						>
 							<Icon name={playState?.playing ? 'pause' : 'play'} class="size-8 sm:size-10" />
@@ -536,6 +539,10 @@
 						{coarse ? strings.tapToJoin : strings.clickToJoin}
 					</button>
 				{/if}
+				{#if connecting}
+					<!-- Late, so a quick connect never flashes it. -->
+					<p class="pill appear-late">{strings.gettingReady}</p>
+				{/if}
 				{#if preparing}
 					<div class="flex w-full max-w-64 flex-col items-center gap-3">
 						<p class="pill text-balance {prepare?.state === 'failed' ? 'text-ember' : ''}">
@@ -552,6 +559,14 @@
 					<button onclick={nextEpisode} class="btn btn-primary max-w-full break-words">
 						{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
 					</button>
+				{:else if atEnd && !missing && !needsTap && !cantPlay}
+					<!-- A film's last frame is the room's last shared moment: a title card, and what's next. -->
+					<div class="flex flex-col items-center gap-4 @max-md:gap-2">
+						<p class="font-display text-3xl font-bold @max-md:text-2xl">{strings.theEnd}</p>
+						<button onclick={pickAnother} disabled={!online} class="btn btn-primary">
+							{strings.watchSomethingElse}
+						</button>
+					</div>
 				{/if}
 				{#if missing}
 					<!-- Compact on a phone's small video box, so it never spills out of it. -->
@@ -629,70 +644,82 @@
 				{#if subtitlesOpen}
 					<div
 						bind:clientHeight={panelHeight}
-						class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm {full
+						class="flex flex-wrap items-center gap-x-8 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm {full
 							? ''
 							: 'absolute inset-x-0 bottom-full'}"
 					>
-						<label class="flex max-w-full min-w-0 items-center gap-2">
-							<span class="text-haze">{strings.subtitle}</span>
-							<select
-								value={subtitleKey}
-								disabled={!online || !playState}
-								onchange={(e) =>
-									setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
-								class="field max-w-full min-w-0 py-1"
-							>
-								<option value="">{strings.subtitleOff}</option>
-								{#each options as o (o.key)}
-									{@const missing =
-										'stream' in o.choice &&
-										prepare?.state === 'ready' &&
-										!prepare.subtitles.includes(o.choice.stream)}
-									<option value={o.key} disabled={o.unavailable !== '' || missing}>
-										{missing
-											? strings.withNote(subtitleLabel(o, options), strings.notInCopy)
-											: subtitleLabel(o, options)}
-									</option>
-								{/each}
-							</select>
-						</label>
-						<div class="flex items-center gap-1">
-							<span class="mr-1 text-haze">{strings.subtitleTiming}</span>
-							<button
-								onclick={() => setOffset(offsetMs - offsetStepMs)}
-								disabled={!online || !playState}
-								aria-label={strings.subtitleSooner}
-								class="btn btn-quiet btn-small w-11 px-0"
-							>
-								−
-							</button>
-							<span class="w-16 text-center tabular-nums">{strings.subtitleOffset(offsetMs)}</span>
-							<button
-								onclick={() => setOffset(offsetMs + offsetStepMs)}
-								disabled={!online || !playState}
-								aria-label={strings.subtitleLater}
-								class="btn btn-quiet btn-small w-11 px-0"
-							>
-								+
-							</button>
-							{#if offsetMs !== 0}
-								<button
-									onclick={() => setOffset(0)}
+						<!-- Subtitle and timing change the room for everyone; size, only this screen. Said, so a guest
+						fixing their own view doesn't move everyone's. -->
+						<div
+							role="group"
+							aria-labelledby="subs-everyone"
+							class="flex max-w-full min-w-0 flex-wrap items-center gap-x-5 gap-y-2"
+						>
+							<span id="subs-everyone" class="font-semibold">{strings.forEveryone}</span>
+							<label class="flex max-w-full min-w-0 items-center gap-2">
+								<span class="text-haze">{strings.subtitle}</span>
+								<select
+									value={subtitleKey}
 									disabled={!online || !playState}
-									class="btn btn-small px-2 font-normal text-haze hover:text-moonlight"
+									onchange={(e) =>
+										setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
+									class="field max-w-full min-w-0 py-1"
 								>
-									{strings.reset}
+									<option value="">{strings.subtitleOff}</option>
+									{#each options as o (o.key)}
+										{@const missing =
+											'stream' in o.choice &&
+											prepare?.state === 'ready' &&
+											!prepare.subtitles.includes(o.choice.stream)}
+										<option value={o.key} disabled={o.unavailable !== '' || missing}>
+											{missing
+												? strings.withNote(subtitleLabel(o, options), strings.notInCopy)
+												: subtitleLabel(o, options)}
+										</option>
+									{/each}
+								</select>
+							</label>
+							<div class="flex items-center gap-1">
+								<span class="mr-1 text-haze">{strings.subtitleTiming}</span>
+								<button
+									onclick={() => setOffset(offsetMs - offsetStepMs)}
+									disabled={!online || !playState}
+									aria-label={strings.subtitleSooner}
+									class="btn btn-quiet btn-small w-11 px-0"
+								>
+									−
 								</button>
-							{/if}
+								<span class="w-16 text-center tabular-nums">{strings.subtitleOffset(offsetMs)}</span>
+								<button
+									onclick={() => setOffset(offsetMs + offsetStepMs)}
+									disabled={!online || !playState}
+									aria-label={strings.subtitleLater}
+									class="btn btn-quiet btn-small w-11 px-0"
+								>
+									+
+								</button>
+								{#if offsetMs !== 0}
+									<button
+										onclick={() => setOffset(0)}
+										disabled={!online || !playState}
+										class="btn btn-small px-2 font-normal text-haze hover:text-moonlight"
+									>
+										{strings.reset}
+									</button>
+								{/if}
+							</div>
 						</div>
-						<label class="flex items-center gap-2">
-							<span class="text-haze">{strings.subtitleSize}</span>
-							<select bind:value={subtitleSize} class="field py-1">
-								{#each SUBTITLE_SIZES as size (size)}
-									<option value={size}>{strings.subtitleSizes[size]}</option>
-								{/each}
-							</select>
-						</label>
+						<div role="group" aria-labelledby="subs-screen" class="flex items-center gap-x-5">
+							<span id="subs-screen" class="font-semibold">{strings.onThisScreen}</span>
+							<label class="flex items-center gap-2">
+								<span class="text-haze">{strings.subtitleSize}</span>
+								<select bind:value={subtitleSize} class="field py-1">
+									{#each SUBTITLE_SIZES as size (size)}
+										<option value={size}>{strings.subtitleSizes[size]}</option>
+									{/each}
+								</select>
+							</label>
+						</div>
 					</div>
 				{/if}
 
@@ -720,6 +747,14 @@
 								aria-valuetext={strings.positionOf(formatTime(dragMs ?? shownMs), formatTime(durationMs))}
 								disabled={!online || durationMs === 0}
 								oninput={(e) => (dragMs = Number(e.currentTarget.value))}
+								onkeydown={(e) => {
+									// An arrow skips 10 s, as everywhere else. The slider's own 1 s step would seek the
+									// whole room once per press.
+									const back = e.key === 'ArrowLeft' || e.key === 'ArrowDown';
+									if (!back && e.key !== 'ArrowRight' && e.key !== 'ArrowUp') return;
+									e.preventDefault();
+									if (!e.repeat && online && durationMs > 0) skip(back ? -skipMs : skipMs);
+								}}
 								onchange={(e) => {
 									dragMs = null;
 									intent({ type: 'seek', positionMs: Number(e.currentTarget.value) });
@@ -747,7 +782,7 @@
 								step="0.05"
 								bind:value={volume}
 								aria-valuetext={strings.percent(volume)}
-								class="hidden h-11 w-20 @xl/bar:block"
+								class="hidden h-11 w-20 accent-moonlight @xl/bar:block"
 							/>
 						{/if}
 						<button
@@ -755,7 +790,7 @@
 							aria-label={strings.subtitle}
 							aria-pressed={subtitlesOpen}
 							title={strings.withKey(strings.subtitle, strings.keys.subtitles)}
-							class="icon-btn ml-auto {playState?.subtitle ? 'text-lamp' : ''}"
+							class="icon-btn ml-auto {playState?.subtitle ? '' : 'text-haze'}"
 						>
 							<Icon name="captions" />
 						</button>

@@ -21,6 +21,7 @@ type ScanStatus struct {
 	Done  int    `json:"done"`  // while scanning: videos done so far
 	Total int    `json:"total"` // while scanning: videos found
 	Error string `json:"error"` // why the last scan failed; "" if it worked
+	Gone  bool   `json:"gone"`  // the last scan failed because the library's folder is gone
 }
 
 // Scans runs library scans one at a time, in the order they were asked for.
@@ -34,12 +35,12 @@ type Scans struct {
 	cancel  context.CancelFunc // stops the current scan
 	done    int
 	total   int
-	errs    map[int64]string
+	errs    map[int64]ScanStatus // the last failed scan: its Error and Gone
 }
 
 // NewScans returns an empty queue that scans with s. Run works through it.
 func NewScans(s *Scanner) *Scans {
-	return &Scans{scanner: s, wake: make(chan struct{}, 1), errs: map[int64]string{}}
+	return &Scans{scanner: s, wake: make(chan struct{}, 1), errs: map[int64]ScanStatus{}}
 }
 
 // Request queues scans of the given libraries. One already queued isn't queued twice; one being
@@ -107,13 +108,17 @@ func (q *Scans) Status() map[int64]ScanStatus {
 	defer q.mu.Unlock()
 	st := make(map[int64]ScanStatus)
 	for id, e := range q.errs {
-		st[id] = ScanStatus{Error: e}
+		st[id] = e
 	}
 	for _, id := range q.queue {
-		st[id] = ScanStatus{State: ScanQueued, Error: q.errs[id]}
+		e := q.errs[id]
+		e.State = ScanQueued
+		st[id] = e
 	}
 	if q.current != 0 {
-		st[q.current] = ScanStatus{State: ScanScanning, Done: q.done, Total: q.total, Error: q.errs[q.current]}
+		e := q.errs[q.current]
+		e.State, e.Done, e.Total = ScanScanning, q.done, q.total
+		st[q.current] = e
 	}
 	return st
 }
@@ -171,7 +176,7 @@ func (q *Scans) scan(ctx context.Context, id int64) {
 		// Shutdown, or the library was removed; the next start or a re-add scans it again.
 	default:
 		slog.Error("scan library", "library", lib.Path, "err", err)
-		q.errs[id] = err.Error()
+		q.errs[id] = ScanStatus{Error: err.Error(), Gone: errors.Is(err, ErrFolderGone)}
 	}
 	q.cancel()
 	q.current, q.cancel = 0, nil

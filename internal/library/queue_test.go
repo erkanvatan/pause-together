@@ -136,8 +136,8 @@ func TestScansRemovedDropsError(t *testing.T) {
 	runScans(t, q)
 	q.Request(l.lib.ID)
 	waitIdle(t, q)
-	if q.Status()[l.lib.ID].Error == "" {
-		t.Fatal("want a scan error")
+	if st := q.Status()[l.lib.ID]; st.Error == "" || !st.Gone {
+		t.Fatalf("status = %+v, want a scan error with Gone", st)
 	}
 	q.Removed(l.lib.ID)
 	if got := q.Status(); len(got) != 0 {

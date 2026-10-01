@@ -8,6 +8,7 @@ export type ScanStatus = {
 	done: number; // while scanning: videos done so far
 	total: number; // while scanning: videos found
 	error: string; // why the last scan failed; '' if it worked
+	gone: boolean; // the last scan failed because the library's folder is gone
 };
 
 export type Library = {
