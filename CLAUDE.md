@@ -13,6 +13,9 @@ code changes, update the layout and commands below to match reality. The rules h
 but don't quietly change them. Work each slice by the steps under "How to work a slice" in
 `docs/plan.md`.
 
+For any UI or copy change, read `PRODUCT.md` (users, tone) and `DESIGN.md` (the visual system) first.
+The tokens below are the short version; `DESIGN.md` is the long one.
+
 ## Stack
 
 - **Backend:** Go, standard library first. `net/http` routing with method/path patterns
@@ -139,6 +142,8 @@ internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied
 internal/user/       name rules, users table (token stored as a SHA-256 hash), lookup by cookie token
 testdata/make.sh     makes the test clips in testdata/media (git-ignored)
 docs/plan.md         build order in slices, and how to work one
+PRODUCT.md           who it's for, the tone, what it is not (read before UI or copy work)
+DESIGN.md            the visual system: colors, type, components (read before UI work)
 .claude/skills/      git-commit, fix-comments (used by the slice steps in docs/plan.md)
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
 web/src/app.css      design tokens (@theme), shared classes, font imports
