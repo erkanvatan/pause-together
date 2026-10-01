@@ -105,9 +105,11 @@
 			(decodeFailed ? strings.cantPlayHere(codecName(room.video.codecString)) : '')
 	);
 	const cantPlay = $derived(unplayable !== '');
-	// Nothing to play for anyone: the video is gone, or its copy failed. Play and seek would only move
-	// the room's clock over a black box.
-	const stuck = $derived(missing || prepare?.state === 'failed');
+	// Nothing to play yet, or ever: the copy is still being prepared, or failed, or the video is gone.
+	// Play and seek would only move the room's clock over a black box. A room that somehow plays can
+	// still be paused.
+	const stuck = $derived(missing || src === '');
+	const toggleable = $derived(!!playState && (!stuck || playState.playing));
 	const durationMs = $derived(playState?.durationMs ?? 0);
 
 	let subtitlesOpen = $state(false); // the subtitle panel
@@ -341,7 +343,7 @@
 		const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
 		const ready = online && !!playState && !stuck;
 		if ((key === ' ' && !t.closest('button, a, input')) || key === 'k') {
-			if (ready) togglePlay();
+			if (online && toggleable) togglePlay();
 		} else if ((key === 'ArrowLeft' || key === 'ArrowRight') && !t.closest('input')) {
 			if (ready && durationMs > 0) skip(key === 'ArrowLeft' ? -skipMs : skipMs);
 		} else if (key === 'j' || key === 'l') {
@@ -589,7 +591,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 						<p class="pill appear-late">{strings.gettingReady}</p>
 					{:else if middle === 'preparing'}
 						<div class="flex w-full max-w-64 flex-col items-center gap-3 @max-md:gap-1.5">
-							<p class="pill text-balance">{preparing}</p>
+							<p class="pill whitespace-nowrap tabular-nums">{preparing}</p>
 							{#if prepare?.state === 'running'}
 								<div class="h-1 w-full overflow-hidden rounded-full bg-dusk">
 									<div class="h-full bg-lamp" style:width="{prepare.progress * 100}%"></div>
@@ -765,7 +767,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 					<div class="flex flex-wrap items-center gap-x-1 px-1 py-1 @xl/bar:gap-x-2 @xl/bar:px-2">
 						<button
 							onclick={togglePlay}
-							disabled={!online || !playState || stuck}
+							disabled={!online || !toggleable}
 							aria-label={playState?.playing ? strings.pause : strings.play}
 							title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
 							class="icon-btn"
