@@ -29,19 +29,47 @@ export function roomProgress(r: Room): string {
 		: formatTime(positionMs);
 }
 
-// splitArchived splits rooms into the ones in use and the archived ones, each in the order given.
-// busyFirst puts rooms with people in them first: that's where a guest wants to go. Not while
-// managing: a room jumping up as someone joins would put another room's Archive under the finger.
-export function splitArchived<R extends Room & { watching: Who[] }>(
+type Card = Room & { watching: Who[]; gone: boolean; usedAt: number };
+
+// splitRooms sorts rooms into the homepage's groups: active, gone (can't play, nobody in it) and
+// archived. Rooms with people in them come first, then the most recently used: that's where a guest
+// wants to go. Not while managing: a room jumping up as someone joins would put another room's Archive
+// under the finger. So managing keeps the newest room first, and shows gone rooms among the rest,
+// where they can be archived.
+export function splitRooms<R extends Card>(
 	rooms: R[],
-	busyFirst: boolean
-): { active: R[]; archived: R[] } {
-	const active = rooms.filter((r) => !r.archived);
-	const busy = busyFirst ? active.filter((r) => r.watching.length > 0) : [];
+	managing: boolean
+): { active: R[]; gone: R[]; archived: R[] } {
+	const busy = (r: R) => r.watching.length > 0;
+	const sorted = [...rooms].sort((a, b) =>
+		managing
+			? b.id - a.id
+			: Number(busy(b)) - Number(busy(a)) || b.usedAt - a.usedAt || b.id - a.id
+	);
+	const folded = (r: R) => !managing && r.gone && !busy(r);
 	return {
-		active: [...busy, ...active.filter((r) => !busy.includes(r))],
-		archived: rooms.filter((r) => r.archived)
+		active: sorted.filter((r) => !r.archived && !folded(r)),
+		gone: sorted.filter((r) => !r.archived && folded(r)),
+		archived: sorted.filter((r) => r.archived)
 	};
+}
+
+// usedAgo says how long ago a room was used: "3 days ago", "yesterday". '' when unknown (0).
+export function usedAgo(usedAt: number, now: number): string {
+	if (usedAt === 0) return '';
+	const minutes = Math.max(0, Math.floor((now - usedAt) / 60_000));
+	const steps: [Intl.RelativeTimeFormatUnit, number][] = [
+		['year', 365 * 24 * 60],
+		['month', 30 * 24 * 60],
+		['week', 7 * 24 * 60],
+		['day', 24 * 60],
+		['hour', 60],
+		['minute', 1]
+	];
+	for (const [unit, size] of steps) {
+		if (minutes >= size) return strings.ago(Math.floor(minutes / size), unit);
+	}
+	return strings.justNow;
 }
 
 // needsConfirm says whether a switch asks first ("You're at 1:40:00. Switch to …?"). Not when nothing

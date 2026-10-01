@@ -32,7 +32,8 @@ func adminDeps(t *testing.T) Deps {
 	d.Libraries = &library.Libraries{DB: users.DB, Root: root}
 	d.Scans = library.NewScans(&library.Scanner{DB: users.DB, Root: root})
 	d.Jobs = media.NewJobs(t.TempDir(), users.DB, media.FFmpeg{})
-	d.Rooms = &room.Rooms{DB: users.DB, Library: d.Libraries, Jobs: d.Jobs}
+	d.Rooms = &room.Rooms{DB: users.DB, Library: d.Libraries, Jobs: d.Jobs,
+		Now: func() int64 { return 1_727_000_000_000 }}
 	d.Hub = room.NewHub(t.Context(), d.Rooms, testBuildID)
 	t.Cleanup(d.Hub.Wait) // before the database closes: cleanups run last-in first-out
 	return d

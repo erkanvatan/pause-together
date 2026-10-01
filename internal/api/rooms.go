@@ -24,7 +24,8 @@ const (
 type roomCard struct {
 	room.Room
 	Watching []room.Who `json:"watching"`
-	Gone     bool       `json:"gone"` // the video is gone, with no prepared copy
+	Gone     bool       `json:"gone"`   // the video is gone, with no prepared copy
+	UsedAt   int64      `json:"usedAt"` // when the room was last used: wall clock, Unix ms; 0 = unknown
 }
 
 func (s *server) listRooms(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +41,7 @@ func (s *server) listRooms(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			slog.Error("list rooms: is the video gone", "room", rm.ID, "err", err)
 		}
-		cards[i] = roomCard{Room: rm, Watching: s.Hub.Watching(rm.ID), Gone: gone}
+		cards[i] = roomCard{Room: rm, Watching: s.Hub.Watching(rm.ID), Gone: gone, UsedAt: rm.UsedAt}
 	}
 	writeJSON(w, cards)
 }

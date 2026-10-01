@@ -145,6 +145,12 @@ export const strings = {
 	deleteRoom: 'Delete',
 	deleteRoomConfirm: 'Delete this room for good?',
 	videoMissing: 'Video missing',
+	// The homepage's folded group of rooms whose video is gone.
+	videoMissingRooms: (n: number) => `Video missing (${n})`,
+	// When a room was last used, on its homepage card.
+	ago: (n: number, unit: Intl.RelativeTimeFormatUnit) =>
+		new Intl.RelativeTimeFormat(strings.locale, { numeric: 'auto' }).format(-n, unit),
+	justNow: 'just now',
 	// Where a room is in its video, on the homepage; otherwise positionOf: "1:02:13 of 2:34:27".
 	notStarted: 'Not started',
 	finished: 'Finished',

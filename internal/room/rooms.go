@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/erkanvatan/pause-together/internal/library"
 	"github.com/erkanvatan/pause-together/internal/media"
@@ -45,6 +46,9 @@ type Room struct {
 	// SubtitleOffsetMs shifts the subtitle: positive shows it later.
 	SubtitleOffsetMs int64 `json:"subtitleOffsetMs"`
 	Archived         bool  `json:"archived"`
+	// UsedAt is when the room was made, switched or last saved its state: wall clock, Unix ms. Only the
+	// homepage needs it, so it isn't part of the room on the socket.
+	UsedAt int64 `json:"-"`
 }
 
 // Rooms keeps rooms in the database, and asks Jobs for the prepared copies they need.
@@ -52,13 +56,15 @@ type Rooms struct {
 	DB      *sql.DB
 	Library *library.Libraries
 	Jobs    *media.Jobs
+	// Now is the wall clock in Unix ms, for when a room was used. nil: time.Now. Tests set it.
+	Now func() int64
 
 	// mu keeps each room change and its Add or Cancel together. Otherwise a room switching away could
 	// cancel a job another room has just asked for.
 	mu sync.Mutex
 }
 
-const roomColumns = "id, name, video_id, audio_stream, subtitle_stream, subtitle_sidecar, position_ms, subtitle_offset_ms, archived"
+const roomColumns = "id, name, video_id, audio_stream, subtitle_stream, subtitle_sidecar, position_ms, subtitle_offset_ms, archived, used_at"
 
 // row is a room as stored: Room without its video's details.
 type row struct {
@@ -70,11 +76,18 @@ func scanRow(r interface{ Scan(...any) error }) (row, error) {
 	var rw row
 	var subStream *int
 	var subSidecar *int64
-	err := r.Scan(&rw.ID, &rw.Name, &rw.videoID, &rw.Audio, &subStream, &subSidecar, &rw.PositionMs, &rw.SubtitleOffsetMs, &rw.Archived)
+	err := r.Scan(&rw.ID, &rw.Name, &rw.videoID, &rw.Audio, &subStream, &subSidecar, &rw.PositionMs, &rw.SubtitleOffsetMs, &rw.Archived, &rw.UsedAt)
 	if subStream != nil || subSidecar != nil {
 		rw.Subtitle = &Subtitle{Stream: subStream, Sidecar: subSidecar}
 	}
 	return rw, err
+}
+
+func (r *Rooms) now() int64 {
+	if r.Now != nil {
+		return r.Now()
+	}
+	return time.Now().UnixMilli()
 }
 
 // withVideo fills in the room's video.
@@ -142,8 +155,8 @@ func (r *Rooms) Create(ctx context.Context, p Pick) (Room, error) {
 	defer r.mu.Unlock()
 	var id int64
 	if err := r.DB.QueryRowContext(ctx, `
-		INSERT INTO rooms (name, video_id, audio_stream, subtitle_stream, subtitle_sidecar)
-		VALUES ('', ?, ?, ?, ?) RETURNING id`, p.VideoID, p.Audio, stream, sidecar).Scan(&id); err != nil {
+		INSERT INTO rooms (name, video_id, audio_stream, subtitle_stream, subtitle_sidecar, used_at)
+		VALUES ('', ?, ?, ?, ?, ?) RETURNING id`, p.VideoID, p.Audio, stream, sidecar, r.now()).Scan(&id); err != nil {
 		return Room{}, err
 	}
 	return r.opened(ctx, id)
@@ -176,8 +189,9 @@ func (r *Rooms) Switch(ctx context.Context, id int64, p Pick) (Room, error) {
 		position = old.PositionMs
 	}
 	if _, err := r.DB.ExecContext(ctx, `
-		UPDATE rooms SET video_id = ?, audio_stream = ?, subtitle_stream = ?, subtitle_sidecar = ?, position_ms = ?
-		WHERE id = ?`, p.VideoID, p.Audio, stream, sidecar, position, id); err != nil {
+		UPDATE rooms SET video_id = ?, audio_stream = ?, subtitle_stream = ?, subtitle_sidecar = ?, position_ms = ?,
+			used_at = ?
+		WHERE id = ?`, p.VideoID, p.Audio, stream, sidecar, position, r.now(), id); err != nil {
 		return Room{}, err
 	}
 	if err := r.need(ctx, p.VideoID, p.Audio); err != nil {
@@ -245,15 +259,17 @@ func (r *Rooms) Delete(ctx context.Context, id int64) error {
 	return r.release(ctx, rw.videoID, rw.Audio)
 }
 
-// SaveState stores the room state the loop keeps: position (st.PositionMs, as is), subtitle and offset.
+// SaveState stores the room state the loop keeps: position (st.PositionMs, as is), subtitle and offset,
+// and marks the room used.
 // It writes only while the room still plays st's video, so a save that lands after a switch can't
 // carry the old video's position over. A sidecar the scan has deleted since is saved as off.
 func (r *Rooms) SaveState(ctx context.Context, id int64, st State) error {
 	stream, sidecar := Pick{Subtitle: st.Subtitle}.subtitle()
 	_, err := r.DB.ExecContext(ctx, `
 		UPDATE rooms SET position_ms = ?, subtitle_stream = ?,
-			subtitle_sidecar = (SELECT id FROM sidecar_subtitles WHERE id = ?), subtitle_offset_ms = ?
-		WHERE id = ? AND video_id = ?`, st.PositionMs, stream, sidecar, st.SubtitleOffsetMs, id, st.VideoID)
+			subtitle_sidecar = (SELECT id FROM sidecar_subtitles WHERE id = ?), subtitle_offset_ms = ?, used_at = ?
+		WHERE id = ? AND video_id = ?`, st.PositionMs, stream, sidecar, st.SubtitleOffsetMs, r.now(), id,
+		st.VideoID)
 	return err
 }
 

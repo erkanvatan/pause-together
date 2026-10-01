@@ -361,6 +361,47 @@ func TestSwitchResetsPosition(t *testing.T) {
 	}
 }
 
+// A room is marked used when it's made, switched, or saves its state, but not when it's renamed or
+// opened.
+func TestUsedAt(t *testing.T) {
+	ctx := context.Background()
+	r := newTestRooms(t)
+	now := int64(1000)
+	r.Now = func() int64 { return now }
+	used := func(step string, want int64) {
+		t.Helper()
+		got, err := r.Open(ctx, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.UsedAt != want {
+			t.Errorf("%s: used at %d, want %d", step, got.UsedAt, want)
+		}
+	}
+
+	mustCreate(t, r, Pick{VideoID: 1, Audio: stream(1)})
+	used("create", 1000)
+	now = 2000
+	if _, err := r.Rename(ctx, 1, "Movie night"); err != nil {
+		t.Fatal(err)
+	}
+	used("rename", 1000)
+	if _, err := r.Switch(ctx, 1, pick(2, stream(1))); err != nil {
+		t.Fatal(err)
+	}
+	used("switch", 2000)
+	now = 3000
+	if err := r.SaveState(ctx, 1, State{VideoID: 2, PositionMs: 5000}); err != nil {
+		t.Fatal(err)
+	}
+	used("save", 3000)
+	now = 4000
+	if err := r.SaveState(ctx, 1, State{VideoID: 1, PositionMs: 5000}); err != nil {
+		t.Fatal(err)
+	}
+	used("save for the video before the switch", 3000)
+}
+
 // The "Video missing" swap: a room whose video is gone, with no prepared copy, can't play. The new
 // pick resumes where the room was. Any other switch starts at 0:00.
 func TestSwitchFromMissingVideo(t *testing.T) {

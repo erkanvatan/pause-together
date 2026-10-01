@@ -8,7 +8,7 @@
 	import { deleteRoom } from '$lib/admin';
 	import { createRoom, listRooms, setArchived, type Pick, type Result, type RoomCard } from '$lib/api';
 	import { me } from '$lib/me.svelte';
-	import { roomProgress, roomSubtitle, roomTitle, splitArchived } from '$lib/rooms';
+	import { roomProgress, roomSubtitle, roomTitle, splitRooms, usedAgo } from '$lib/rooms';
 	import { strings } from '$lib/strings';
 
 	// How often the room list is asked again while the tab is visible: others make, archive and
@@ -16,6 +16,7 @@
 	const pollMs = 5000;
 
 	let rooms = $state<RoomCard[] | null>(null); // null until the first load
+	let now = $state(Date.now()); // when rooms loaded, for "3 days ago"
 	let loadFailed = $state(false);
 	let actionError = $state(''); // why the last action failed
 	let visible = $state(true);
@@ -24,7 +25,7 @@
 	// Archive and Delete show only while managing, so a guest sees rooms to join, not chores.
 	let managing = $state(false);
 
-	const parts = $derived(splitArchived(rooms ?? [], !managing));
+	const parts = $derived(splitRooms(rooms ?? [], managing));
 	// Someone is watching: joining them is the page's main action, not starting something new.
 	const busy = $derived(parts.active.find((r) => r.watching.length > 0) ?? null);
 
@@ -36,7 +37,10 @@
 		const r = await listRooms();
 		if (seq !== refreshSeq) return; // an older answer, landing after a newer ask
 		loadFailed = !r.ok;
-		if (r.ok) rooms = r.value;
+		if (r.ok) {
+			rooms = r.value;
+			now = Date.now();
+		}
 	}
 
 	onMount(refresh);
@@ -85,6 +89,7 @@
 {#snippet card(r: RoomCard)}
 	{@const subtitle = roomSubtitle(r)}
 	{@const joinable = r.watching.length > 0 && !r.archived}
+	{@const ago = joinable ? '' : usedAgo(r.usedAt, now)}
 	<li class="relative flex flex-col gap-3 py-3 pl-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
 		{#if joinable}
 			<!-- The lamp is on: someone is in this room. An archived one can't play, so it stays dark. -->
@@ -108,6 +113,10 @@
 						<span class="text-ember">{strings.videoMissing}</span>
 					{:else}
 						<span class="text-haze tabular-nums">{roomProgress(r)}</span>
+					{/if}
+					<!-- Tells rooms with the same video apart, and says which one was on last. -->
+					{#if ago}
+						<span class="text-haze">{ago}</span>
 					{/if}
 					{#if joinable}
 						<span class="flex min-w-0 items-center gap-2">
@@ -199,9 +208,9 @@
 						</button>
 					{/if}
 				</div>
-				{#if parts.active.length === 0}
+				{#if parts.active.length === 0 && parts.gone.length === 0}
 					<p class="text-haze">{strings.noRooms}</p>
-				{:else}
+				{:else if parts.active.length > 0}
 					<ul class="flex flex-col gap-2">
 						{#each parts.active as r (r.id)}
 							{@render card(r)}
@@ -209,6 +218,24 @@
 					</ul>
 				{/if}
 			</section>
+
+			<!-- Rooms that can't play fold away, so they don't crowd the ones that can. Manage shows them
+			among the rest, to archive. -->
+			{#if parts.gone.length > 0}
+				<details class="group/gone flex flex-col gap-2">
+					<summary
+						class="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-control font-display text-xl font-bold text-haze hover:text-moonlight [&::-webkit-details-marker]:hidden"
+					>
+						<Icon name="chevron" class="size-5 shrink-0 transition-transform group-open/gone:rotate-90" />
+						{strings.videoMissingRooms(parts.gone.length)}
+					</summary>
+					<ul class="mt-2 flex flex-col gap-2">
+						{#each parts.gone as r (r.id)}
+							{@render card(r)}
+						{/each}
+					</ul>
+				</details>
+			{/if}
 
 			{#if parts.archived.length > 0}
 				<section class="flex flex-col gap-2">

@@ -6,7 +6,8 @@ import {
 	roomProgress,
 	roomSubtitle,
 	roomTitle,
-	splitArchived,
+	splitRooms,
+	usedAgo,
 	waitText,
 	type WaitText
 } from './rooms';
@@ -82,21 +83,67 @@ describe('roomProgress', () => {
 	});
 });
 
-describe('splitArchived', () => {
-	const card = (id: number, over: Partial<RoomCard> = {}): RoomCard => ({ ...room(id), watching: [], gone: false, ...over });
+describe('splitRooms', () => {
+	const card = (id: number, over: Partial<RoomCard> = {}): RoomCard => ({
+		...room(id),
+		watching: [],
+		gone: false,
+		usedAt: 0,
+		...over
+	});
 	const ann = [{ userId: 1, name: 'Ann' }];
+	const ids = (rs: RoomCard[]) => rs.map((r) => r.id);
 
-	it('keeps the order in each part', () => {
-		const rooms = [card(4), card(3, { archived: true }), card(2), card(1, { archived: true })];
-		const { active, archived } = splitArchived(rooms, false);
-		expect(active.map((r) => r.id)).toEqual([4, 2]);
-		expect(archived.map((r) => r.id)).toEqual([3, 1]);
+	it('splits active, gone and archived', () => {
+		const rooms = [card(4), card(3, { archived: true }), card(2, { gone: true }), card(1, { archived: true, gone: true })];
+		const { active, gone, archived } = splitRooms(rooms, false);
+		expect(ids(active)).toEqual([4]);
+		expect(ids(gone)).toEqual([2]);
+		expect(ids(archived)).toEqual([3, 1]);
 	});
 
-	it('puts rooms with people in them first, in the order given', () => {
-		const rooms = [card(5), card(4, { watching: ann }), card(3), card(2, { watching: ann }), card(1)];
-		expect(splitArchived(rooms, true).active.map((r) => r.id)).toEqual([4, 2, 5, 3, 1]);
-		expect(splitArchived(rooms, false).active.map((r) => r.id)).toEqual([5, 4, 3, 2, 1]);
+	it('keeps a gone room with people in it active: they may be swapping its video', () => {
+		const { active, gone } = splitRooms([card(2, { gone: true, watching: ann })], false);
+		expect(ids(active)).toEqual([2]);
+		expect(gone).toEqual([]);
+	});
+
+	it('puts rooms with people first, then the most recently used, then the newest', () => {
+		const rooms = [
+			card(1, { usedAt: 500 }),
+			card(2, { usedAt: 100, watching: ann }),
+			card(3, { usedAt: 900 }),
+			card(4),
+			card(5),
+			card(6, { usedAt: 300, watching: ann })
+		];
+		expect(ids(splitRooms(rooms, false).active)).toEqual([6, 2, 3, 1, 5, 4]);
+	});
+
+	it('keeps the newest first while managing, gone rooms among the rest', () => {
+		const rooms = [card(1, { usedAt: 900 }), card(3, { gone: true }), card(2, { watching: ann })];
+		const { active, gone } = splitRooms(rooms, true);
+		expect(ids(active)).toEqual([3, 2, 1]);
+		expect(gone).toEqual([]);
+	});
+});
+
+describe('usedAgo', () => {
+	const now = Date.UTC(2026, 9, 2, 12);
+	const min = 60_000;
+	it.each([
+		[0, ''],
+		[now, 'just now'],
+		[now + 5 * min, 'just now'], // a clock a little ahead
+		[now - 5 * min, '5 minutes ago'],
+		[now - 3 * 60 * min, '3 hours ago'],
+		[now - 30 * 60 * min, 'yesterday'],
+		[now - 3 * 24 * 60 * min, '3 days ago'],
+		[now - 15 * 24 * 60 * min, '2 weeks ago'],
+		[now - 70 * 24 * 60 * min, '2 months ago'],
+		[now - 400 * 24 * 60 * min, 'last year']
+	])('%i → %s', (usedAt, want) => {
+		expect(usedAgo(usedAt, now)).toBe(want);
 	});
 });
 

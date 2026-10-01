@@ -96,7 +96,8 @@ export type Quote = { id: number; from: Who; text: string; deleted: boolean }; /
 
 // A room on the homepage, with who's watching it now. gone: its video is gone, with no prepared copy,
 // so it can't play.
-export type RoomCard = Room & { watching: Who[]; gone: boolean };
+// usedAt: when the room was last used (made, switched, or its state saved), wall clock, Unix ms; 0 = unknown.
+export type RoomCard = Room & { watching: Who[]; gone: boolean; usedAt: number };
 
 // The server's error code, or 'failed' for no connection, a server error, or an unexpected body.
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
