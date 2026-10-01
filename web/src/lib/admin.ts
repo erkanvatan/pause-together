@@ -92,6 +92,17 @@ export function problemText(p: Problem): string {
 	return p.reason === 'codec' && p.codec ? `${text} (${p.codec})` : text;
 }
 
+// groupProblems groups files we can't use by why, each group in the order its first file came. So a
+// hundred misnamed files are one line with a count and the fix, not a hundred.
+export function groupProblems(problems: Problem[]): { text: string; problems: Problem[] }[] {
+	const groups = new Map<string, Problem[]>();
+	for (const p of problems) {
+		const text = problemText(p);
+		groups.set(text, [...(groups.get(text) ?? []), p]);
+	}
+	return [...groups].map(([text, problems]) => ({ text, problems }));
+}
+
 // guessType guesses a library's type from its folder's name, so the add form starts on the likely one:
 // "TV Shows" and "Series" hold shows, "Movies" and "Films" movies. null: no guess.
 export function guessType(path: string): LibraryType | null {

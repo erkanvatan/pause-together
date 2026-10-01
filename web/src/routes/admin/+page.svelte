@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import FolderPicker from '$lib/FolderPicker.svelte';
+	import Icon from '$lib/Icon.svelte';
 	import GuestLink from '$lib/GuestLink.svelte';
 	import { getLanguages, type LibraryType } from '$lib/api';
 	import {
@@ -8,6 +9,7 @@
 		clearCache,
 		formatBytes,
 		getCache,
+		groupProblems,
 		guessType,
 		jobText,
 		listJobs,
@@ -15,7 +17,6 @@
 		listProblems,
 		maxUnusedDays,
 		minUnusedDays,
-		problemText,
 		removeLibrary,
 		rescanLibrary,
 		setCache,
@@ -84,7 +85,7 @@
 
 	const scanning = $derived(libraries.some((l) => l.scan.state !== ''));
 	const libraryPath = $derived(new Map(libraries.map((l) => [l.id, l.path])));
-	const problemCount = $derived(problems.skipped.length + problems.unplayable.length);
+	const problemGroups = $derived(groupProblems([...problems.skipped, ...problems.unplayable]));
 
 	// Libraries first, then problems: once the libraries say a scan is done, the problems read after
 	// already include what it found.
@@ -216,7 +217,7 @@
 				{#if me.guestUrl}
 					<GuestLink />
 				{:else}
-					<p class="text-sm text-haze">{strings.noGuestLink}</p>
+					<p class="max-w-[70ch] text-sm text-haze">{strings.noGuestLink}</p>
 				{/if}
 			</div>
 
@@ -232,7 +233,7 @@
 					<div class="flex flex-col gap-2 py-1">
 						<div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
 							<div class="min-w-0">
-								<p class="font-semibold break-all">{lib.path}</p>
+								<p class="font-semibold break-words">{lib.path}</p>
 								<p class="text-sm text-haze">
 									{strings.libraryTypes[lib.type]}, {strings.videoCount(lib.videos)}
 								</p>
@@ -270,10 +271,10 @@
 							</div>
 						{/if}
 						{#if lib.scan.gone}
-							<p class="text-sm text-ember">{strings.folderGone}</p>
+							<p class="max-w-[70ch] text-sm text-ember">{strings.folderGone}</p>
 						{:else if lib.scan.error}
 							<p class="text-sm text-ember">
-								{strings.scanFailed} <span class="font-mono break-all">{lib.scan.error}</span>
+								{strings.scanFailed} <span class="font-mono break-words">{lib.scan.error}</span>
 							</p>
 						{/if}
 						{#if confirming === lib.id}
@@ -348,17 +349,40 @@
 			{#if libraries.length > 0}
 				<section class="flex flex-col gap-3">
 					{@render heading(strings.cantUse)}
-					{#if problemCount === 0}
+					{#if problemGroups.length === 0}
 						<p class="text-haze">{strings.allUsable}</p>
 					{:else}
-						<ul class="flex flex-col gap-3">
-							{#each [...problems.skipped, ...problems.unplayable] as p (`${p.libraryId}/${p.path}`)}
-								<li class="flex flex-col">
-									<span class="break-all">{fullPath(p)}</span>
-									<span class="text-sm text-haze">{problemText(p)}</span>
-									{#if p.probeError}
-										<span class="font-mono text-sm break-all text-haze">{p.probeError}</span>
-									{/if}
+						<!-- One line per reason with its count and fix; the files under it. A few are shown at once. -->
+						<ul class="flex flex-col gap-1">
+							{#each problemGroups as g (g.text)}
+								<li>
+									<details open={g.problems.length <= 3} class="group">
+										<summary class="row -mx-3 w-auto cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+											<Icon
+												name="chevron"
+												class="size-5 shrink-0 text-haze transition-transform group-open:rotate-90"
+											/>
+											<span class="min-w-0 flex-1 break-words">{g.text}</span>
+											<span class="shrink-0 text-sm text-haze tabular-nums">
+												{strings.fileCount(g.problems.length)}
+											</span>
+										</summary>
+										<ul class="flex flex-col gap-1 pt-1 pb-3 pl-8 text-sm text-haze">
+											{#each g.problems as p (`${p.libraryId}/${p.path}`)}
+												<li class="break-words">
+													{#if p.probeError}
+														<!-- ffprobe's own words help the host, but read like a crash: one click away. -->
+														<details>
+															<summary class="cursor-pointer break-words">{fullPath(p)}</summary>
+															<p class="mt-1 font-mono break-words">{p.probeError}</p>
+														</details>
+													{:else}
+														{fullPath(p)}
+													{/if}
+												</li>
+											{/each}
+										</ul>
+									</details>
 								</li>
 							{/each}
 						</ul>
@@ -372,7 +396,7 @@
 					<p class="text-sm text-haze">{strings.appleOnlyNote}</p>
 					<ul class="flex flex-col gap-1">
 						{#each problems.appleOnly as p (`${p.libraryId}/${p.path}`)}
-							<li class="break-all">{fullPath(p)}</li>
+							<li class="break-words">{fullPath(p)}</li>
 						{/each}
 					</ul>
 				</section>
@@ -388,12 +412,12 @@
 						<ul class="flex flex-col gap-3">
 							{#each jobs.jobs as j (j.key)}
 								<li class="flex flex-col">
-									<span class="break-all">{j.name}</span>
+									<span class="break-words">{j.name}</span>
 									<span class="text-sm {j.state === 'failed' ? 'text-ember' : 'text-haze'}">
 										{jobText(j)}
 									</span>
 									{#if j.detail}
-										<span class="font-mono text-sm break-all whitespace-pre-wrap text-haze">
+										<span class="font-mono text-sm break-words whitespace-pre-wrap text-haze">
 											{j.detail}
 										</span>
 									{/if}

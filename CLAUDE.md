@@ -250,7 +250,9 @@ how to open the guest port.
   (moved, renamed, a drive not mounted), not as the raw file error. An empty folder counts as gone
   while the library has videos that aren't missing: an unmounted drive leaves its mount point behind.
   So the scan never marks a library's last video missing; the host removes the library instead.
-- Files we can't use (skipped or unplayable), each with its reason, plus "Apple devices only" warnings.
+- Files we can't use (skipped or unplayable), grouped by reason with a count, so a hundred misnamed
+  files are one line with the fix. ffprobe's own message is one click away. Plus "Apple devices only"
+  warnings.
 - The job queue, with failed jobs and ffmpeg's error.
 - Language defaults for new picks.
 - Cache clean-up: cache size and free disk space, a "Clear cache" button (asks first) that deletes

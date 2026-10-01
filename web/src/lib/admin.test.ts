@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addLibrary, formatBytes, guessType, jobText, listFolders, problemText, removeLibrary } from './admin';
+import { addLibrary, formatBytes, groupProblems, guessType, jobText, listFolders, problemText, removeLibrary } from './admin';
 
 function respond(status: number, body: string | null, type = 'application/json') {
 	vi.stubGlobal(
@@ -152,5 +152,23 @@ describe('guessType', () => {
 		['Shortcuts', null] // a word that only starts like one
 	])('guesses %j as %s', (path, want) => {
 		expect(guessType(path)).toBe(want);
+	});
+});
+
+describe('groupProblems', () => {
+	it('groups by why, in the order each first came', () => {
+		const a = { libraryId: 1, path: 'a.mkv', reason: 'movie-no-year' };
+		const b = { libraryId: 1, path: 'b.mkv', reason: 'codec', codec: 'mpeg2video' };
+		const c = { libraryId: 2, path: 'c.mkv', reason: 'movie-no-year' };
+		const d = { libraryId: 2, path: 'd.mkv', reason: 'codec', codec: 'vc1' };
+		expect(groupProblems([a, b, c, d])).toEqual([
+			{ text: problemText(a), problems: [a, c] },
+			{ text: problemText(b), problems: [b] },
+			{ text: problemText(d), problems: [d] } // another codec is another fix
+		]);
+	});
+
+	it('gives nothing for no files', () => {
+		expect(groupProblems([])).toEqual([]);
 	});
 });

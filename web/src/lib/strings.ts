@@ -89,6 +89,7 @@ export const strings = {
 
 	cantUse: "Files we can't use",
 	allUsable: 'Every file is usable.',
+	fileCount: (n: number) => (n === 1 ? '1 file' : `${n} files`),
 	appleOnly: 'Apple devices only',
 	appleOnlyNote: 'Dolby Vision profile 5. Other screens show it purple and green.',
 
