@@ -72,7 +72,7 @@
 		<!-- Loading: show nothing rather than a flash of the name picker. -->
 	{:else if me.name === null}
 		<main class="flex min-h-dvh items-center justify-center p-4">
-			<NameForm />
+			<NameForm roomId={wide ? Number(page.params.id) : undefined} />
 		</main>
 	{:else if renaming}
 		<main class="flex min-h-dvh items-center justify-center p-4">

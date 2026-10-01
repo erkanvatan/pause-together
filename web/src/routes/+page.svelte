@@ -7,8 +7,7 @@
 	import { deleteRoom } from '$lib/admin';
 	import { createRoom, listRooms, setArchived, type Pick, type Result, type RoomCard } from '$lib/api';
 	import { me } from '$lib/me.svelte';
-	import { videoName } from '$lib/picker';
-	import { roomTitle, splitArchived } from '$lib/rooms';
+	import { roomSubtitle, roomTitle, splitArchived } from '$lib/rooms';
 	import { strings } from '$lib/strings';
 
 	// How often the room list is asked again while the tab is visible: others make, archive and
@@ -21,8 +20,12 @@
 	let visible = $state(true);
 	let picking = $state(false);
 	let confirming = $state<number | null>(null); // room whose Delete waits for a yes
+	// Archive and Delete show only while managing, so a guest sees rooms to join, not chores.
+	let managing = $state(false);
 
 	const parts = $derived(splitArchived(rooms ?? []));
+	// Someone is watching: joining them is the page's main action, not starting something new.
+	const busy = $derived(parts.active[0]?.watching.length ? parts.active[0] : null);
 
 	let refreshSeq = 0; // only the latest ask may show its answer
 
@@ -79,7 +82,8 @@
 </svelte:head>
 
 {#snippet card(r: RoomCard)}
-	<li class="relative flex flex-col gap-3 py-3 pl-5 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-4">
+	{@const subtitle = roomSubtitle(r)}
+	<li class="relative flex flex-col gap-3 py-3 pl-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
 		{#if r.watching.length > 0}
 			<!-- The lamp is on: someone is in this room. -->
 			<span class="absolute inset-y-3 left-0 w-1 rounded-full bg-lamp" aria-hidden="true"></span>
@@ -92,8 +96,8 @@
 			>
 				{roomTitle(r)}
 			</span>
-			{#if r.name}
-				<span class="mt-1 block break-words text-haze">{videoName(r.video)}</span>
+			{#if subtitle}
+				<span class="mt-1 block break-words text-haze">{subtitle}</span>
 			{/if}
 			{#if r.watching.length > 0}
 				<span class="mt-1 flex items-center gap-2 text-sm">
@@ -104,20 +108,30 @@
 				</span>
 			{/if}
 		</a>
-		<div class="flex flex-wrap gap-2">
-			<!-- Archive only an empty room. The server checks too: someone may just have joined. -->
-			{#if r.archived || r.watching.length === 0}
-				<button onclick={() => act(setArchived(r.id, !r.archived))} class="btn btn-quiet btn-small">
-					{r.archived ? strings.unarchive : strings.archive}
-				</button>
-			{/if}
-			{#if me.isAdmin}
-				<button onclick={() => (confirming = r.id)} class="btn btn-quiet btn-small">
-					{strings.deleteRoom}
-				</button>
-			{/if}
-		</div>
-		{#if confirming === r.id}
+		{#if managing}
+			<div class="flex flex-wrap gap-2">
+				<!-- Archive only an empty room. The server checks too: someone may just have joined. -->
+				{#if r.archived || r.watching.length === 0}
+					<button onclick={() => act(setArchived(r.id, !r.archived))} class="btn btn-quiet btn-small">
+						{r.archived ? strings.unarchive : strings.archive}
+					</button>
+				{/if}
+				{#if me.isAdmin}
+					<button onclick={() => (confirming = r.id)} class="btn btn-quiet btn-small">
+						{strings.deleteRoom}
+					</button>
+				{/if}
+			</div>
+		{:else if r.watching.length > 0 && !r.archived}
+			<a
+				href="/rooms/{r.id}"
+				aria-label={strings.joinRoom(roomTitle(r))}
+				class="btn self-start sm:self-center {r === busy ? 'btn-primary' : 'btn-quiet'}"
+			>
+				{strings.join}
+			</a>
+		{/if}
+		{#if managing && confirming === r.id}
 			<div class="flex basis-full flex-wrap items-center gap-2 text-sm">
 				<span>{strings.deleteRoomConfirm}</span>
 				<button
@@ -142,7 +156,7 @@
 >
 	<div class="flex flex-col items-start gap-6 lg:sticky lg:top-8 lg:self-start">
 		<h1 class="font-display text-3xl font-extrabold text-balance">{strings.tagline}</h1>
-		<button onclick={() => (picking = true)} class="btn btn-primary">
+		<button onclick={() => (picking = true)} class="btn {busy ? 'btn-quiet' : 'btn-primary'}">
 			<Icon name="play" class="size-5" />
 			{strings.watchSomething}
 		</button>
@@ -159,7 +173,21 @@
 	{#if rooms}
 		<div class="flex flex-col gap-10">
 			<section class="flex flex-col gap-2">
-				<h2 class="font-display text-xl font-bold text-haze">{strings.rooms}</h2>
+				<div class="flex items-center justify-between gap-4">
+					<h2 class="font-display text-xl font-bold text-haze">{strings.rooms}</h2>
+					{#if rooms.length > 0}
+						<button
+							onclick={() => {
+								managing = !managing;
+								confirming = null;
+							}}
+							aria-pressed={managing}
+							class="btn btn-quiet btn-small"
+						>
+							{managing ? strings.doneManaging : strings.manageRooms}
+						</button>
+					{/if}
+				</div>
 				{#if parts.active.length === 0}
 					<p class="text-haze">{strings.noRooms}</p>
 				{:else}

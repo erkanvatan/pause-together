@@ -7,6 +7,8 @@ export const strings = {
 	tagline: "Distance can't pause us.",
 
 	namePrompt: 'What should we call you?',
+	nameWhy: "Pick a name so the others know it's you.",
+	joining: (room: string) => `You're joining ${room}.`,
 	namePlaceholder: 'Your name',
 	save: 'Save',
 	cancel: 'Cancel',
@@ -108,6 +110,10 @@ export const strings = {
 	},
 
 	watchSomething: 'Watch something',
+	join: 'Join',
+	joinRoom: (title: string) => `Join ${title}`,
+	manageRooms: 'Manage',
+	doneManaging: 'Done',
 	rooms: 'Rooms',
 	noRooms: 'No rooms yet. Pick something to watch.',
 	archivedRooms: 'Archived',

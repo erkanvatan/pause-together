@@ -271,9 +271,12 @@ tall, transparent until hover (7% moonlight tint). Greyed to 45% when the device
 
 ### Room Cards
 Not boxed. A room is a list row with a title-size condensed name that underlines in lamp on hover,
-the video name in haze below a custom name, and a "watching" line with a lamp dot. When someone is in
-the room, a thin lamp bar lights its left edge: the lamp is on. Archived rooms show their title in
-haze.
+then a haze line: the video name below a custom name, or the version label ("1080p.BrRip.x264") below
+a video title. Release tags never sit in the condensed face. Then a "watching" line with a lamp dot.
+When someone is in the room, a thin lamp bar lights its left edge: the lamp is on. Rooms with people
+in them come first, and the first one gets the screen's lamp: a primary "Join" ("Watch something"
+turns quiet). Archive and Delete hide behind a quiet "Manage" toggle beside the Rooms heading.
+Archived rooms show their title in haze.
 
 ### Player (signature component)
 - **Video box:** black, softer corners (1rem) on wide screens, edge to edge on phones.

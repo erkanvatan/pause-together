@@ -34,7 +34,7 @@
 	} from '$lib/api';
 	import { nextEpisode, videoName } from '$lib/picker';
 	import type { Prepare, RoomState, ServerMessage } from '$lib/protocol';
-	import { needsConfirm, roomTitle } from '$lib/rooms';
+	import { needsConfirm, roomSubtitle, roomTitle } from '$lib/rooms';
 	import { RoomSocket } from '$lib/socket';
 	import { strings } from '$lib/strings';
 	import { target } from '$lib/sync/state';
@@ -390,8 +390,8 @@
 				</div>
 			</div>
 		{/if}
-		{#if room.name && !renaming}
-			<p class="-mt-3 break-words text-haze">{videoName(room.video)}</p>
+		{#if roomSubtitle(room) && !renaming}
+			<p class="-mt-3 break-words text-haze">{roomSubtitle(room)}</p>
 		{/if}
 
 		{#if error}

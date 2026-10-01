@@ -207,8 +207,9 @@ container mount for source files, and one name for two things gets mixed up in c
 ## Users
 
 - No accounts: one host (anyone on the admin port) plus anonymous guests.
-- First visit: pick a display name. The server creates a user with a random token in an `HttpOnly`
-  cookie (it rides along on the WebSocket upgrade too). The token keeps the name across visits.
+- First visit: pick a display name. The form says what the app is, and which room a room link leads to.
+  The server creates a user with a random token in an `HttpOnly` cookie (it rides along on the WebSocket
+  upgrade too). The token keeps the name across visits.
 - The cookie gets the longest life browsers allow (Chrome caps it at 400 days) and is refreshed on
   every visit.
 - Cookies are per host name: `localhost`, the Tailscale IP and the MagicDNS name each give a different
@@ -240,8 +241,8 @@ container mount for source files, and one name for two things gets mixed up in c
 - Cache clean-up: after how many days unused a prepared copy is deleted.
 - The page polls every 5 s while the tab is visible (every 1 s during a scan), and right away when it
   becomes visible again: the file watcher and the timed rescan change things behind its back.
-- Room delete is not here. It lives on the homepage room cards, shown only when `isAdmin`. The call
-  still goes to `/api/admin`.
+- Room delete is not here. It lives on the homepage room cards, behind "Manage", shown only when
+  `isAdmin`. The call still goes to `/api/admin`.
 
 ## Library
 
@@ -388,8 +389,10 @@ So each room's video is **prepared once**, then served as a plain file.
   none. Without one, show the current video.
 - A deleted room's id is never reused (`AUTOINCREMENT`), so an old link or open tab can't lead to
   another room.
-- The homepage lists every room with its current video and who's watching. It polls `GET /api/rooms`
-  every 5 s while the tab is visible, and right away when it becomes visible again.
+- The homepage lists every room with its current video and who's watching, rooms with people in them
+  first. While someone watches, "Join" on the first such room is the main action and "Watch something"
+  steps back. Archive and Delete wait behind "Manage". It polls `GET /api/rooms` every 5 s while the
+  tab is visible, and right away when it becomes visible again.
 - Rooms live until the host deletes them. Then the server sends "room deleted" to everyone in it, and
   their page goes home with a short note.
 - Archive is allowed only when nobody is watching. An archived room can't play, and its chat is

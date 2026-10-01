@@ -1,19 +1,30 @@
 // Room helpers for the homepage and the room page. Pure: no fetch, no DOM.
-import type { Room } from '$lib/api';
+import type { Room, Who } from '$lib/api';
 import { videoName } from '$lib/picker';
 import type { Wait } from '$lib/protocol';
 import { strings } from '$lib/strings';
 import { formatTime } from '$lib/time';
 
-// roomTitle names a room: its own name, or else its video's.
+// roomTitle names a room in big type: its own name, or else its video's without the version label
+// ("1080p.BrRip.x264"). Release tags are noise in a heading; roomSubtitle carries them.
 export function roomTitle(r: Room): string {
-	return r.name || videoName(r.video);
+	return r.name || videoName({ ...r.video, version: '' });
 }
 
-// splitArchived splits rooms into the ones in use and the archived ones, each in the order given.
-export function splitArchived<R extends Room>(rooms: R[]): { active: R[]; archived: R[] } {
+// roomSubtitle is the quiet line under a room's title: the whole video name under a room name, or
+// else the version label. '' when there's nothing more to say.
+export function roomSubtitle(r: Room): string {
+	return r.name ? videoName(r.video) : r.video.version;
+}
+
+// splitArchived splits rooms into the ones in use and the archived ones, each in the order given,
+// except that rooms with people in them come first: that's where a guest wants to go.
+export function splitArchived<R extends Room & { watching: Who[] }>(
+	rooms: R[]
+): { active: R[]; archived: R[] } {
+	const active = rooms.filter((r) => !r.archived);
 	return {
-		active: rooms.filter((r) => !r.archived),
+		active: [...active.filter((r) => r.watching.length > 0), ...active.filter((r) => !r.watching.length)],
 		archived: rooms.filter((r) => r.archived)
 	};
 }
