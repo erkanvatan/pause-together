@@ -14,7 +14,8 @@
 		| 'back'
 		| 'chevron'
 		| 'skip-back'
-		| 'skip-forward';
+		| 'skip-forward'
+		| 'offline';
 
 	let {
 		name,
@@ -72,5 +73,9 @@
 			<path d="M12 5a8 8 0 1 0 8 8M9.5 2.5 12 5l-2.5 2.5" />
 		{/if}
 		<text x="12" y="15.8" text-anchor="middle" font-size="7.5" font-weight="700" fill="currentColor" stroke="none">{step}</text>
+	{:else if name === 'offline'}
+		<!-- A crossed-out signal. -->
+		<path d="M2 8.8a15 15 0 0 1 20 0M5.5 12.4a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0M3 3l18 18" />
+		<circle cx="12" cy="19.5" r="1.2" fill="currentColor" stroke="none" />
 	{/if}
 </svg>

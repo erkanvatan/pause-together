@@ -30,7 +30,7 @@
 				"playing": true,
 				"positionMs": 90000,
 				"atMs": 4000,
-				"waiting": [{ "userId": 1, "name": "Alice" }],
+				"waiting": [{ "userId": 1, "name": "Alice", "reason": "away", "sinceMs": 2000 }],
 				"behind": [{ "userId": 2, "name": "Bob", "ms": 3000 }]
 			}
 		},

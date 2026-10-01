@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Room } from './api';
-import { needsConfirm, roomTitle, splitArchived } from './rooms';
+import type { Wait } from './protocol';
+import { needsConfirm, roomTitle, splitArchived, waitText, type WaitText } from './rooms';
 
 function room(id: number, over: Partial<Room> = {}): Room {
 	return {
@@ -67,5 +68,52 @@ describe('needsConfirm', () => {
 		['the video is missing: the swap keeps the position', 5000, hour, true, false]
 	])('%s', (_, positionMs, durationMs, missing, want) => {
 		expect(needsConfirm(positionMs, durationMs, missing)).toBe(want);
+	});
+});
+
+describe('waitText', () => {
+	const alice: Wait = { userId: 1, name: 'Alice', reason: 'away', sinceMs: 10_000 };
+	const bob: Wait = { userId: 2, name: 'Bob', reason: 'buffering', sinceMs: 18_000 };
+	const carol: Wait = { userId: 3, name: 'Carol', reason: 'left', sinceMs: 0 };
+	it.each([
+		[
+			'one other person: named once, with why and how long',
+			[alice],
+			{ headline: 'Waiting for Alice', lines: ['stepped away · 0:12'], action: 'Play without Alice' }
+		],
+		[
+			'several: a line each',
+			[alice, bob, carol],
+			{
+				headline: 'Waiting for Alice, Bob, and Carol',
+				lines: ['Alice: stepped away · 0:12', 'Bob: loading · 0:04', 'Carol: left the room · 0:22'],
+				action: 'Play without Alice, Bob, and Carol'
+			}
+		],
+		[
+			'me, loading',
+			[{ ...alice, userId: 9, reason: 'buffering' }],
+			{ headline: "Everyone's waiting for you", lines: ['Your video is still loading…'], action: "Don't wait for me" }
+		],
+		[
+			'me, away: "Tap to join" says the rest',
+			[{ ...alice, userId: 9 }],
+			{ headline: "Everyone's waiting for you", lines: [], action: "Don't wait for me" }
+		],
+		[
+			'me and Bob',
+			[bob, { ...alice, userId: 9, reason: 'buffering' }],
+			{
+				headline: "Everyone's waiting for you",
+				lines: ['Your video is still loading…', 'Bob: loading · 0:04'],
+				action: 'Play anyway'
+			}
+		]
+	] as [string, Wait[], WaitText][])('%s', (_, waiting, want) => {
+		expect(waitText(waiting, 9, 22_000)).toEqual(want);
+	});
+
+	it('leaves out times before the server clock is known', () => {
+		expect(waitText([alice], 9, null).lines).toEqual(['stepped away']);
 	});
 });

@@ -332,10 +332,9 @@
 		? 'portrait:pb-0'
 		: ''}"
 >
-	{#if offline}
-		<p class="rounded-control bg-lamp/15 px-3 py-2 text-lamp" role="status">
-			{strings.hostOffline}
-		</p>
+	<!-- An open room says it over the video, where fullscreen still shows it. -->
+	{#if offline && room?.archived}
+		<p class="text-haze" role="status">{strings.hostOffline}</p>
 	{/if}
 	{#if notFound}
 		<div class="flex flex-col items-start gap-6 pt-16">
@@ -370,11 +369,12 @@
 					<button onclick={startRename} class="btn btn-quiet btn-small">
 						{strings.renameRoom}
 					</button>
-					{#if !room.archived}
+					<!-- A missing video's pick sits in the player, in its place. -->
+					{#if !room.archived && !missing}
 						<button onclick={() => openPicker()} class="btn btn-quiet btn-small">
-							{missing ? strings.pickAnother : strings.switchVideo}
+							{strings.switchVideo}
 						</button>
-						{#if next && !missing}
+						{#if next}
 							<button onclick={() => openPicker(next ?? undefined)} class="btn btn-quiet btn-small">
 								{strings.nextEpisode}
 							</button>
@@ -385,9 +385,6 @@
 		{/if}
 		{#if room.name && !renaming}
 			<p class="-mt-3 break-words text-haze">{videoName(room.video)}</p>
-		{/if}
-		{#if missing}
-			<p class="text-ember">{strings.videoMissing}</p>
 		{/if}
 
 		{#if error}
@@ -401,8 +398,12 @@
 				{prepare}
 				bind:playState
 				{socket}
+				{userId}
 				{online}
+				{offline}
 				{note}
+				{missing}
+				onpick={() => openPicker()}
 				{next}
 				onnext={() => openPicker(next ?? undefined)}
 				bind:chatOpen

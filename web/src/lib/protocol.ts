@@ -20,6 +20,9 @@ export type ClientMessage =
 	| { type: 'chat'; text: string; replyTo: number | null } // replyTo: the message it answers
 	| { type: 'deleteChat'; id: number };
 
+// Someone the room waits for: why, and since when (server ms).
+export type Wait = Who & { reason: 'buffering' | 'away' | 'left'; sinceMs: number };
+
 // A room's playback state. Times are server ms.
 export type RoomState = {
 	videoId: number;
@@ -30,7 +33,7 @@ export type RoomState = {
 	playing: boolean; // what people asked for
 	positionMs: number; // at server time atMs
 	atMs: number;
-	waiting: Who[]; // who the room waits for
+	waiting: Wait[]; // who the room waits for
 	behind: (Who & { ms: number })[]; // skipped by "Play anyway", in whole seconds
 };
 

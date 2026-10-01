@@ -95,9 +95,6 @@
 			{#if r.name}
 				<span class="mt-1 block break-words text-haze">{videoName(r.video)}</span>
 			{/if}
-			{#if r.video.missing}
-				<span class="mt-1 block text-sm text-ember">{strings.videoMissing}</span>
-			{/if}
 			{#if r.watching.length > 0}
 				<span class="mt-1 flex items-center gap-2 text-sm">
 					<span class="size-2 shrink-0 rounded-full bg-lamp" aria-hidden="true"></span>

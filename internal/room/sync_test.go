@@ -73,9 +73,18 @@ func (sc *scene) leave(id int64)  { sc.e = sc.s.Leave(id, sc.now) }
 func (sc *scene) state() State    { return sc.s.State(sc.now) }
 func (sc *scene) pos() int64      { return sc.state().Position(sc.now) }
 func (sc *scene) running() bool   { st := sc.state(); return st.Playing && len(st.Waiting) == 0 }
-func (sc *scene) waiting() []Who  { return sc.state().Waiting }
+func (sc *scene) waits() []Wait   { return sc.state().Waiting }
 func (sc *scene) behind() []Lag   { return sc.state().Behind }
 func (sc *scene) wantPos(p int64) { sc.t.Helper(); sc.check("position", sc.pos(), p) }
+
+// waiting is who the room waits for, without why.
+func (sc *scene) waiting() []Who {
+	who := []Who{}
+	for _, w := range sc.waits() {
+		who = append(who, w.Who)
+	}
+	return who
+}
 
 func (sc *scene) check(what string, got, want any) {
 	sc.t.Helper()
@@ -165,6 +174,23 @@ func TestSync(t *testing.T) {
 		sc.status(a, Buffering)
 		sc.at(18_000)
 		sc.check("waiting", sc.waiting(), []Who{alice})
+	})
+
+	t.Run("the room says why it waits for each person, and since when", func(t *testing.T) {
+		sc, a, b := watching(t)
+		c := sc.join(carol)
+		sc.status(c, Ready)
+		sc.at(10_000).status(a, Buffering)
+		sc.at(11_000).status(b, Away)
+		sc.leave(c)
+		sc.at(15_000)
+		sc.check("waits", sc.waits(), []Wait{
+			{Who: alice, Reason: WaitBuffering, SinceMs: 10_000},
+			{Who: bob, Reason: WaitAway, SinceMs: 11_000},
+			{Who: carol, Reason: WaitLeft, SinceMs: 11_000},
+		})
+		sc.status(a, Away)
+		sc.check("buffering → away keeps the start", sc.waits()[0], Wait{Who: alice, Reason: WaitAway, SinceMs: 10_000})
 	})
 
 	t.Run("Alice left her tab hidden, Bob presses play → room waits for Alice at once", func(t *testing.T) {

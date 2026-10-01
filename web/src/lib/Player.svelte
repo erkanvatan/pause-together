@@ -16,6 +16,7 @@
 	} from '$lib/picker';
 	import { loadPlayerPrefs, savePlayerPrefs, SUBTITLE_SIZES } from '$lib/prefs';
 	import type { Prepare, RoomState } from '$lib/protocol';
+	import { waitText } from '$lib/rooms';
 	import type { RoomSocket } from '$lib/socket';
 	import { strings } from '$lib/strings';
 	import Subtitles from '$lib/Subtitles.svelte';
@@ -32,8 +33,12 @@
 		prepare,
 		playState = $bindable(),
 		socket,
+		userId,
 		online,
+		offline,
 		note,
+		missing,
+		onpick,
 		next,
 		onnext,
 		chatOpen = $bindable(),
@@ -45,8 +50,12 @@
 		prepare: Prepare | null;
 		playState: RoomState | null; // the server's, or ours applied on top until the next one arrives
 		socket: RoomSocket | null;
+		userId: number; // this user's, from hello
 		online: boolean; // the socket said hello and hasn't dropped since
+		offline: boolean; // the socket dropped: "Host is offline"; not before the first connect
 		note: string; // "Alice paused"
+		missing: boolean; // the video is gone, with no prepared copy: offer another pick
+		onpick: () => void;
 		next: VideoSummary | null; // the next episode, offered at the end
 		onnext: () => void;
 		chatOpen: boolean;
@@ -85,6 +94,7 @@
 	let retryTimer: ReturnType<typeof setTimeout> | undefined;
 	let last: Report | null = null; // the last status sent on this connection
 	let shownMs = $state(0); // the room's position, for the seek bar
+	let serverMs = $state<number | null>(null); // the server's clock at the last tick; null before a pong
 	let dragMs = $state<number | null>(null); // the seek bar's thumb while it's held
 
 	// Why this device can't play the video: the codec check, or the video's own error event.
@@ -129,6 +139,13 @@
 	const atEnd = $derived(
 		playState !== null && !playState.playing && durationMs > 0 && playState.positionMs >= durationMs
 	);
+
+	const waits = $derived(
+		playState && playState.waiting.length > 0 ? waitText(playState.waiting, userId, serverMs) : null
+	);
+
+	// What a screen reader hears: the room's state changes that show only over the video.
+	const announce = $derived(offline ? strings.hostOffline : (waits?.headline ?? note));
 
 	// Back, play or pause, forward, over the video; not while something else holds its middle.
 	const transport = $derived(
@@ -199,6 +216,7 @@
 		if (!video) return;
 		const now = performance.now();
 		const server = socket?.clock.serverNow(now) ?? null;
+		serverMs = server;
 		const s = playState;
 		const run = s !== null && running(s);
 		const playing = s?.playing ?? false;
@@ -255,6 +273,12 @@
 		blocked = false;
 		play();
 		tick();
+	}
+
+	// togglePlay is the play button. Pressed before "Tap to join", it joins too: it's the same tap.
+	function togglePlay() {
+		if (src && !joined) join();
+		intent({ type: playState?.playing ? 'pause' : 'play' });
 	}
 
 	// intent applies one of our controls at once, and sends it. The server's next state replaces ours.
@@ -319,6 +343,11 @@
 	function nextEpisode() {
 		exitFullscreen();
 		onnext();
+	}
+
+	function pickAnother() {
+		exitFullscreen();
+		onpick();
 	}
 
 	function failed() {
@@ -429,7 +458,7 @@
 
 			<div
 				bind:this={stage}
-				class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center"
+				class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center @max-md:p-2"
 			>
 				{#if transport}
 					<div
@@ -444,7 +473,7 @@
 							<Icon name="skip-back" step={skipMs / 1000} class="size-7 sm:size-8" />
 						</button>
 						<button
-							onclick={() => intent({ type: playState?.playing ? 'pause' : 'play' })}
+							onclick={togglePlay}
 							disabled={!online || !playState}
 							aria-label={playState?.playing ? strings.pause : strings.play}
 							class="transport transport-main size-16 sm:size-20"
@@ -486,15 +515,36 @@
 						{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
 					</button>
 				{/if}
-				{#if playState && playState.waiting.length > 0}
-					<div class="flex flex-col items-center gap-3 rounded-panel bg-dusk/90 px-5 py-4">
-						<p class="break-words">{strings.waitingFor(playState.waiting.map((w) => w.name))}</p>
+				{#if missing}
+					<!-- Compact on a phone's small video box, so it never spills out of it. -->
+					<div
+						class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 p-5 @max-md:gap-2 @max-md:p-3"
+					>
+						<p class="text-lg text-ember">{strings.videoMissing}</p>
+						<p class="break-words @max-md:text-sm">
+							{strings.videoGone(shownMs >= 1000 ? formatTime(shownMs) : '')}
+						</p>
+						<button onclick={pickAnother} disabled={!online} class="btn btn-primary">
+							{strings.pickAnother}
+						</button>
+					</div>
+				{/if}
+				{#if waits}
+					<div
+						class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 px-5 py-4 @max-md:gap-2 @max-md:p-3"
+					>
+						<div class="flex flex-col items-center gap-1">
+							<p class="text-lg break-words">{waits.headline}</p>
+							{#each waits.lines as line, i (i)}
+								<p class="text-sm break-words text-haze tabular-nums">{line}</p>
+							{/each}
+						</div>
 						<button
 							onclick={() => socket?.send({ type: 'playAnyway' })}
 							disabled={!online}
-							class="btn btn-quiet btn-small"
+							class="btn btn-quiet max-w-full break-words"
 						>
-							{strings.playAnyway}
+							{waits.action}
 						</button>
 					</div>
 				{/if}
@@ -503,6 +553,11 @@
 			<div
 				class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1"
 			>
+				{#if offline}
+					<p class="pill flex items-center gap-1.5 break-words">
+						<Icon name="offline" class="size-[0.9em] shrink-0 text-ember" />{strings.hostOffline}
+					</p>
+				{/if}
 				{#if note}
 					<p class="pill flex items-center gap-1.5 break-words">
 						<Icon name="pause" class="size-[0.9em] shrink-0 text-lamp" />{note}
@@ -515,6 +570,7 @@
 					{@render overlay()}
 				{/if}
 			</div>
+			<p role="status" class="sr-only">{announce}</p>
 		</div>
 
 		<!-- In fullscreen the controls lie over the video's foot on a dark fade, so hiding them never
@@ -599,7 +655,7 @@
 				<div class="@container/bar {full ? '' : 'bg-dusk'}">
 					<div class="flex flex-wrap items-center gap-x-1 px-1 py-1 @xl/bar:gap-x-2 @xl/bar:px-2">
 						<button
-							onclick={() => intent({ type: playState?.playing ? 'pause' : 'play' })}
+							onclick={togglePlay}
 							disabled={!online || !playState}
 							aria-label={playState?.playing ? strings.pause : strings.play}
 							class="icon-btn"

@@ -74,7 +74,7 @@ func TestProtocol(t *testing.T) {
 		HelloMsg{Type: MsgHello, BuildID: "1727000000000", UserID: 1},
 		StateMsg{Type: MsgState, State: State{VideoID: 7, Audio: stream(1), Subtitle: &Subtitle{Stream: stream(3)},
 			SubtitleOffsetMs: 500, DurationMs: 3_600_000, Playing: true, PositionMs: 90_000, AtMs: 4000,
-			Waiting: []Who{alice}, Behind: []Lag{{Who: bob, Ms: 3000}}}},
+			Waiting: []Wait{{Who: alice, Reason: WaitAway, SinceMs: 2000}}, Behind: []Lag{{Who: bob, Ms: 3000}}}},
 		RoomMsg{Type: MsgRoom, Room: heat},
 		PresenceMsg{Type: MsgPresence, Watching: []Who{alice}},
 		PrepareMsg{Type: MsgPrepare, Prepare: Prepare{State: "queued", Place: 2, Subtitles: []int{}}},

@@ -17,6 +17,21 @@ type Lag struct {
 	Ms int64 `json:"ms"`
 }
 
+// Wait is someone the room waits for, and why.
+type Wait struct {
+	Who
+	Reason string `json:"reason"` // WaitBuffering, WaitAway or WaitLeft
+	// SinceMs is the server time their stall began, so the room can show how long it has waited.
+	SinceMs int64 `json:"sinceMs"`
+}
+
+// Why the room waits for someone.
+const (
+	WaitBuffering = "buffering"
+	WaitAway      = "away"
+	WaitLeft      = "left" // their socket closed: they left the room
+)
+
 // Status is what a client reports about its player. It can make the room wait, but never changes
 // Playing: only intents do.
 type Status int
@@ -41,7 +56,7 @@ type State struct {
 	PositionMs int64 `json:"positionMs"`
 	AtMs       int64 `json:"atMs"`
 	// Waiting lists who the room waits for, once per user, only while Playing. Never nil, so it's sent as [].
-	Waiting []Who `json:"waiting"`
+	Waiting []Wait `json:"waiting"`
 	// Behind lists the clients skipped by "Play anyway", once per user. Never nil, like Waiting.
 	Behind []Lag `json:"behind"`
 }
@@ -87,7 +102,7 @@ type Sync struct {
 	playing          bool
 	running          bool // the clock runs: playing and nobody to wait for
 	positionMs, atMs int64
-	waiting          []Who
+	waiting          []Wait
 	clients          []*client // in join order
 	savedAt          int64
 	sent             State
@@ -119,7 +134,7 @@ func (s *Sync) State(now int64) State {
 		Playing:          s.playing,
 		PositionMs:       s.positionMs,
 		AtMs:             s.atMs,
-		Waiting:          append([]Who{}, s.waiting...),
+		Waiting:          append([]Wait{}, s.waiting...),
 		Behind:           []Lag{},
 	}
 	room := s.pos(now)
@@ -281,8 +296,8 @@ func (s *Sync) settle(now int64, e Effect) Effect {
 	}
 	s.waiting = nil
 	for _, c := range s.clients {
-		if s.blocks(c, now) && !slices.ContainsFunc(s.waiting, func(w Who) bool { return w.UserID == c.who.UserID }) {
-			s.waiting = append(s.waiting, c.who)
+		if s.blocks(c, now) && !slices.ContainsFunc(s.waiting, func(w Wait) bool { return w.UserID == c.who.UserID }) {
+			s.waiting = append(s.waiting, Wait{Who: c.who, Reason: c.waitReason(), SinceMs: c.since})
 		}
 	}
 	if running := s.playing && len(s.waiting) == 0; running != s.running {
@@ -311,6 +326,19 @@ func (s *Sync) settle(now int64, e Effect) Effect {
 // skipped, and has been buffering or away for longer than StallGraceMs.
 func (s *Sync) blocks(c *client, now int64) bool {
 	return s.playing && c.readyOnce && !c.skipped && stalled(c.status) && now-c.since > StallGraceMs
+}
+
+// waitReason says why the room waits for c. Someone who left counts as away to the rules, but the
+// room says they left: they can't come back on their own, and "Play anyway" forgets them.
+func (c *client) waitReason() string {
+	switch {
+	case c.gone:
+		return WaitLeft
+	case c.status == Buffering:
+		return WaitBuffering
+	default:
+		return WaitAway
+	}
 }
 
 func stalled(st Status) bool { return st == Buffering || st == Away }

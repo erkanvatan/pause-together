@@ -116,6 +116,11 @@ export const strings = {
 	deleteRoom: 'Delete',
 	deleteRoomConfirm: 'Delete this room for good?',
 	videoMissing: 'Video missing',
+	// The "Video missing" panel: the new pick resumes where the room was.
+	videoGone: (at: string) =>
+		at
+			? `The file is gone from the host's library. Pick another video and everyone carries on from ${at}.`
+			: "The file is gone from the host's library. Pick another video to watch.",
 	roomNotFound: 'This room is gone.',
 	roomArchived: 'This room is archived. Unarchive it to watch.',
 	switchVideo: 'Switch video',
@@ -142,7 +147,16 @@ export const strings = {
 	volume: 'Volume',
 	position: 'Position',
 	playAnyway: 'Play anyway',
+	playWithout: (names: string[]) => `Play without ${list(names)}`,
+	dontWaitForMe: "Don't wait for me",
 	waitingFor: (names: string[]) => `Waiting for ${list(names)}`,
+	waitingForYou: "Everyone's waiting for you",
+	yourVideoLoading: 'Your video is still loading…',
+	// Why the room waits for someone (protocol Wait reasons), and for how long: "stepped away · 0:12".
+	waitReasons: { buffering: 'loading', away: 'stepped away', left: 'left the room' },
+	waitLine: (reason: string, time: string) => (time ? `${reason} · ${time}` : reason),
+	waitLineNamed: (name: string, reason: string, time: string) =>
+		time ? `${name}: ${reason} · ${time}` : `${name}: ${reason}`,
 	behind: (name: string, ms: number) => `${name} is ${Math.round(ms / 1000)} s behind`,
 	pausedBy: (name: string) => `${name} paused`,
 	hostOffline: 'Host is offline, reconnecting…',

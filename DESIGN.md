@@ -284,11 +284,17 @@ haze.
   video on a black-to-transparent fade (80% black at the bottom), and fades out with the transport
   (300ms). Subtitles slide up while it shows.
 - **Holds the middle:** "Tap to join" (a large round primary button), "Preparing… 42%" (a pill with a
-  thin lamp progress bar on dusk), and "Waiting for …" (a dusk panel at 90% with a quiet "Play anyway").
+  thin lamp progress bar on dusk), "Waiting for …" and "Video missing". Both are dusk panels at 90%,
+  compact on a phone's small video box.
+  - "Waiting for Alice" in body large, then why and for how long in haze label ("stepped away · 0:12"),
+    then a quiet button that names its effect ("Play without Alice"). The person the room waits for
+    reads "Everyone's waiting for you" and "Don't wait for me".
+  - "Video missing" in ember, a line saying the pick resumes where the room was, and a lamp "Pick
+    another video".
 
 ### Pills
-A short line over the video: "Alice paused" (with a small lamp pause icon), "Alice is 3 s behind",
-chat toasts. Midnight at 82%, gentle corners, sized with the video width (at least 1rem), so they stay
+A short line over the video: "Host is offline, reconnecting…" (with a small ember signal icon), "Alice
+paused" (with a small lamp pause icon), "Alice is 3 s behind", chat toasts. Midnight at 82%, gentle corners, sized with the video width (at least 1rem), so they stay
 readable in fullscreen.
 
 ### Chat

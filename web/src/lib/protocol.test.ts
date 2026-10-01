@@ -61,7 +61,7 @@ const server: ServerMessage[] = [
 			playing: true,
 			positionMs: 90000,
 			atMs: 4000,
-			waiting: [alice],
+			waiting: [{ ...alice, reason: 'away', sinceMs: 2000 }],
 			behind: [{ ...bob, ms: 3000 }]
 		}
 	},
