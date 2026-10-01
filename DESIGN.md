@@ -220,8 +220,10 @@ labels.
   hold about 100 characters.
 - The room page goes full width. Wide landscape screens put the chat beside the video (18rem, 20rem
   from `lg`). Portrait screens put the chat under the video, filling the rest of the screen.
-- On phones the video runs edge to edge (it cancels the gutter). On a tall window the video box stops
-  growing where the control bar still fits, between black bars.
+- On phones the video runs edge to edge (it cancels the gutter). A landscape window at least 30rem
+  tall (the `fit` variant in `app.css`) never scrolls: the player fills what's left of the screen,
+  and the video box is the largest 16:9 that fits above the control bar, between black bars. A phone
+  held sideways is shorter, so its page scrolls instead of shrinking the video to a strip.
 - Fullscreen fills the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   real fullscreen isn't available, the wrapper fills the window with CSS.
 - Spacing steps: 0.5rem inside lists and stacks, 1.5rem between groups, 2.5rem between sections,
