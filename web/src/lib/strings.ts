@@ -253,6 +253,7 @@ export const strings = {
 	switchAction: 'Switch',
 	pickAnother: 'Pick another video',
 	theEnd: 'The end',
+	episodeEnded: (code: string) => `End of ${code}`,
 	watchSomethingElse: 'Watch something else',
 	pickVideo: 'Pick a video',
 	close: 'Close',

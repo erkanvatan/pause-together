@@ -602,9 +602,20 @@ Compact on a phone's small video box, so it never spills out of it. -->
 							<p class="text-sm text-balance text-haze">{strings.preparingWhy}</p>
 						</div>
 					{:else if middle === 'next' && next}
-						<button onclick={nextEpisode} class="btn btn-primary max-w-full break-words">
-							{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
-						</button>
+						<!-- An episode's end gets its own title card too: the evening may go on, or stop here. -->
+						<div class="flex max-w-full flex-col items-center gap-4 @max-md:gap-2">
+							<p class="font-display text-3xl font-bold @max-md:text-2xl">
+								{strings.episodeEnded(episodeCode(room.video))}
+							</p>
+							<div class="flex max-w-full flex-col items-center gap-2">
+								<button onclick={nextEpisode} class="btn btn-primary max-w-full break-words">
+									{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
+								</button>
+								<button onclick={pickAnother} disabled={!online} class="btn btn-quiet">
+									{strings.watchSomethingElse}
+								</button>
+							</div>
+						</div>
 					{:else if middle === 'end'}
 						<!-- A film's last frame is the room's last shared moment: a title card, and what's next. -->
 						<div class="flex flex-col items-center gap-4 @max-md:gap-2">

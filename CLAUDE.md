@@ -432,8 +432,8 @@ So each room's video is **prepared once**, then served as a plain file.
 - Before a switch, the switcher confirms: "You're at 1:40:00. Switch to …?" Nobody else is asked. Not
   asked when nothing is lost: at 0:00, at the end, or the "Video missing" swap.
 - At the end of a video, the server (it knows the duration) pauses the room there. TV episodes show
-  "Next episode"; anything else (a film, a show's last episode) shows "The end" and "Watch something
-  else". No autoplay.
+  "End of S01E04", "Next episode" and "Watch something else"; anything else (a film, a show's last
+  episode) shows "The end" and "Watch something else". No autoplay.
 - Progress is per room only: the position is saved on pause, seek and switch, and every 5 s while
   playing. No per-user progress.
 - Presence: "watching now" only: an open socket, plus a 15 s reconnect grace so flaky phones don't
