@@ -6,4 +6,4 @@ web/.svelte-kit/
 web/build/*
 !web/build/.gitkeep
 testdata/media/
-.impeccable/critique
+.impeccable
