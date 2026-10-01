@@ -462,7 +462,8 @@ So each room's video is **prepared once**, then served as a plain file.
 - No native `controls` attribute. Set `disableRemotePlayback` and `disablePictureInPicture`: AirPlay,
   Chromecast and Picture-in-Picture take the video out of the page, away from our subtitles, controls
   and sync. Not in v1.
-- Browsers block autoplay with sound, so entering a room shows a "Tap to join" button first.
+- Browsers block autoplay with sound, so entering a room shows a "Tap to join" button first ("Click to
+  join" where the pointer is a mouse).
 - While the copy is prepared, the player shows "Preparing… 42%" with a progress bar, or its place in line.
 - Fullscreen the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   `document.fullscreenEnabled` is false (iPhone Safari), fill the window with CSS instead.

@@ -87,6 +87,8 @@
 	})();
 
 	let joined = $state(false); // pressed "Tap to join"
+	// A finger taps, a mouse clicks: the join button names the one this device uses.
+	const coarse = matchMedia('(pointer: coarse)').matches;
 	let blocked = $state(false); // the browser refused play(): needs a fresh tap
 	let hidden = $state(document.hidden);
 	let decodeFailed = $state(false); // the video's error event says this device can't decode it
@@ -523,12 +525,12 @@
 				{:else if src && (!joined || blocked)}
 					<button onclick={join} class="btn btn-primary min-h-14 rounded-full px-7 text-lg">
 						<Icon name="play" class="size-6" />
-						{strings.tapToJoin}
+						{coarse ? strings.tapToJoin : strings.clickToJoin}
 					</button>
 				{/if}
 				{#if preparing}
 					<div class="flex w-full max-w-64 flex-col items-center gap-3">
-						<p class="pill whitespace-nowrap {prepare?.state === 'failed' ? 'text-ember' : ''}">
+						<p class="pill text-balance {prepare?.state === 'failed' ? 'text-ember' : ''}">
 							{preparing}
 						</p>
 						{#if prepare?.state === 'running'}
@@ -619,25 +621,29 @@
 					<div
 						class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm"
 					>
-						<select
-							aria-label={strings.subtitle}
-							value={subtitleKey}
-							disabled={!online || !playState}
-							onchange={(e) =>
-								setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
-							class="field max-w-full min-w-0 py-1"
-						>
-							<option value="">{strings.subtitleOff}</option>
-							{#each options as o (o.key)}
-								{@const missing =
-									'stream' in o.choice &&
-									prepare?.state === 'ready' &&
-									!prepare.subtitles.includes(o.choice.stream)}
-								<option value={o.key} disabled={o.unavailable !== '' || missing}>
-									{missing ? strings.withNote(subtitleLabel(o), strings.notInCopy) : subtitleLabel(o)}
-								</option>
-							{/each}
-						</select>
+						<label class="flex max-w-full min-w-0 items-center gap-2">
+							<span class="text-haze">{strings.subtitle}</span>
+							<select
+								value={subtitleKey}
+								disabled={!online || !playState}
+								onchange={(e) =>
+									setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
+								class="field max-w-full min-w-0 py-1"
+							>
+								<option value="">{strings.subtitleOff}</option>
+								{#each options as o (o.key)}
+									{@const missing =
+										'stream' in o.choice &&
+										prepare?.state === 'ready' &&
+										!prepare.subtitles.includes(o.choice.stream)}
+									<option value={o.key} disabled={o.unavailable !== '' || missing}>
+										{missing
+											? strings.withNote(subtitleLabel(o, options), strings.notInCopy)
+											: subtitleLabel(o, options)}
+									</option>
+								{/each}
+							</select>
+						</label>
 						<div class="flex items-center gap-1">
 							<span class="mr-1 text-haze">{strings.subtitleTiming}</span>
 							<button

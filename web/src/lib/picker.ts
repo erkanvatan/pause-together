@@ -270,20 +270,23 @@ export function langName(code: string): string {
 	}
 }
 
-// audioLabel: "English · 5.1 · Director's commentary".
+// audioLabel: "English · 5.1 · Director's commentary". A track with no language leaves it out when
+// the rest names it ("Stereo"): "Unknown language" is noise in a list of one or two.
 export function audioLabel(t: AudioTrack): string {
-	return [langName(t.lang), strings.channels(t.channels), t.title].filter(Boolean).join(' · ');
+	const label = [t.lang ? langName(t.lang) : '', strings.channels(t.channels), t.title];
+	return label.filter(Boolean).join(' · ') || strings.unknownLanguage;
 }
 
-// subtitleLabel: "English · Forced · SDH · Signs".
-export function subtitleLabel(o: SubtitleOption): string {
-	return [
-		langName(o.lang),
-		o.forced ? strings.forced : '',
-		o.sdh ? strings.sdh : '',
-		o.title,
-		'sidecar' in o.choice ? strings.sidecarFile : ''
-	]
+// subtitleLabel: "English · Forced · SDH · Signs". A subtitle from a separate file says so only when
+// another option in all would read the same: otherwise where it comes from is no news to a guest.
+export function subtitleLabel(o: SubtitleOption, all: SubtitleOption[]): string {
+	const label = plainSubtitleLabel(o);
+	const twin = all.some((x) => x.key !== o.key && plainSubtitleLabel(x) === label);
+	return twin && 'sidecar' in o.choice ? `${label} · ${strings.sidecarFile}` : label;
+}
+
+function plainSubtitleLabel(o: SubtitleOption): string {
+	return [langName(o.lang), o.forced ? strings.forced : '', o.sdh ? strings.sdh : '', o.title]
 		.filter(Boolean)
 		.join(' · ');
 }

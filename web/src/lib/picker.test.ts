@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AudioTrack, Languages, VideoDetail, VideoSummary } from './api';
 import {
+	audioLabel,
 	canPlay,
 	codecName,
 	defaultAudio,
@@ -12,6 +13,7 @@ import {
 	searchIndex,
 	searchKey,
 	shelves,
+	subtitleLabel,
 	subtitleOptions,
 	videoName,
 	whyUnplayable,
@@ -313,5 +315,41 @@ describe('nextEpisode', () => {
 		['two files of one episode: the first added', s1e1, [ep(12, 1, 2), ep(11, 1, 2)], ep(11, 1, 2)]
 	])('%s', (_, current, videos, want) => {
 		expect(nextEpisode(current, videos)).toEqual(want);
+	});
+});
+
+describe('audioLabel', () => {
+	it.each([
+		['language and channels', { ...audio(1, 'en'), channels: 6, title: 'Commentary' }, 'English · 5.1 · Commentary'],
+		['no language: the rest names it', audio(1, ''), 'Stereo'],
+		['nothing at all', { ...audio(1, ''), channels: 0 }, 'Unknown language']
+	])('%s', (_, t, want) => {
+		expect(audioLabel(t)).toBe(want);
+	});
+});
+
+describe('subtitleLabel', () => {
+	const opt = (key: string, lang: string, sidecar: boolean, over: Partial<SubtitleOption> = {}): SubtitleOption => ({
+		key,
+		choice: sidecar ? { sidecar: 1 } : { stream: 3 },
+		lang,
+		title: '',
+		default: false,
+		forced: false,
+		sdh: false,
+		unavailable: '',
+		...over
+	});
+	const embedded = opt('s3', 'tr', false);
+	const file = opt('f1', 'tr', true);
+	const english = opt('f2', 'en', true, { forced: true, sdh: true });
+
+	it.each([
+		['flags in order', english, [english], 'English · Forced · SDH'],
+		['a lone file: where it comes from is no news', file, [file, english], 'Turkish'],
+		['a file beside an embedded twin is marked', file, [embedded, file], 'Turkish · Separate file'],
+		['the embedded twin stays plain', embedded, [embedded, file], 'Turkish']
+	])('%s', (_, o, all, want) => {
+		expect(subtitleLabel(o, all)).toBe(want);
 	});
 });

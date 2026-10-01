@@ -144,6 +144,7 @@ export const strings = {
 	watchingNow: 'Watching now',
 	watchingList: (names: string) => `Watching: ${names}`,
 	tapToJoin: 'Tap to join',
+	clickToJoin: 'Click to join',
 	play: 'Play',
 	pause: 'Pause',
 	skipBack: (s: number) => `Back ${s} seconds`,
@@ -231,7 +232,7 @@ export const strings = {
 	unknownLanguage: 'Unknown language',
 	forced: 'Forced',
 	sdh: 'SDH',
-	sidecarFile: 'File',
+	sidecarFile: 'Separate file',
 	channels: (n: number) =>
 		({ 1: 'Mono', 2: 'Stereo', 6: '5.1', 8: '7.1' })[n] ?? (n > 0 ? `${n} channels` : ''),
 

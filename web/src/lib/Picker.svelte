@@ -255,8 +255,11 @@
 			<div class="flex flex-1 flex-col gap-5 overflow-y-auto p-4">
 				<label class="flex flex-col gap-1.5">
 					<span class="text-sm text-haze">{strings.audio}</span>
+					<!-- One track is no choice: say what it is. -->
 					{#if picked.audio.length === 0}
 						<span>{strings.noAudio}</span>
+					{:else if picked.audio.length === 1}
+						<span>{audioLabel(picked.audio[0])}</span>
 					{:else}
 						<select bind:value={audio} onchange={audioChanged} class="field">
 							{#each picked.audio as t (t.stream)}
@@ -272,7 +275,7 @@
 						{#each options as o (o.key)}
 							{@const why = (strings.subtitleUnavailable as Record<string, string>)[o.unavailable]}
 							<option value={o.key} disabled={o.unavailable !== ''}>
-								{o.unavailable ? strings.withNote(subtitleLabel(o), why ?? o.unavailable) : subtitleLabel(o)}
+								{o.unavailable ? strings.withNote(subtitleLabel(o, options), why ?? o.unavailable) : subtitleLabel(o, options)}
 							</option>
 						{/each}
 					</select>
