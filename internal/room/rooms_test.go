@@ -454,6 +454,38 @@ func TestPlayableKey(t *testing.T) {
 	}
 }
 
+func TestGone(t *testing.T) {
+	ctx := context.Background()
+	r, cache := newTestRoomsCache(t)
+	for _, tt := range []struct {
+		name  string
+		video int64
+		ready bool // make its copy first
+		want  bool
+	}{
+		{"there", 1, false, false},
+		{"gone, no copy", 3, false, true},
+		{"gone, copy ready", 3, true, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.ready {
+				makeReady(t, cache, key(t, r, tt.video, stream(1)))
+			}
+			v, err := r.Library.Video(ctx, tt.video)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := r.Gone(ctx, Room{Video: v, Audio: stream(1)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("Gone = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDelete(t *testing.T) {
 	ctx := context.Background()
 	r := newTestRooms(t)

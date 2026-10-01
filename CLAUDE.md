@@ -404,8 +404,9 @@ So each room's video is **prepared once**, then served as a plain file.
   none. Without one, show the current video.
 - A deleted room's id is never reused (`AUTOINCREMENT`), so an old link or open tab can't lead to
   another room.
-- The homepage lists every room with its current video and who's watching, rooms with people in them
-  first. While someone watches, "Join" on the first such room is the main action and "Watch something"
+- The homepage lists every room with its current video, where it is in it ("Video missing" when it
+  can't play: the file is gone and no prepared copy is left), and who's watching, rooms with people in
+  them first. While someone watches, "Join" on the first such room is the main action and "Watch something"
   steps back. Archive and Delete wait behind "Manage". It polls `GET /api/rooms` every 5 s while the
   tab is visible, and right away when it becomes visible again.
 - Rooms live until the host deletes them. Then the server sends "room deleted" to everyone in it, and

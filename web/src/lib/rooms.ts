@@ -17,6 +17,18 @@ export function roomSubtitle(r: Room): string {
 	return r.name ? videoName(r.video) : r.video.version;
 }
 
+// roomProgress says where a room is in its video, for the homepage: "1:02:13 of 2:34:27", "Not
+// started" or "Finished". So rooms with the same video tell apart, and a guest sees where they left off.
+export function roomProgress(r: Room): string {
+	const { positionMs } = r;
+	const { durationMs } = r.video;
+	if (positionMs < 1000) return strings.notStarted;
+	if (durationMs > 0 && positionMs >= durationMs) return strings.finished;
+	return durationMs > 0
+		? strings.positionOf(formatTime(positionMs), formatTime(durationMs))
+		: formatTime(positionMs);
+}
+
 // splitArchived splits rooms into the ones in use and the archived ones, each in the order given.
 // busyFirst puts rooms with people in them first: that's where a guest wants to go. Not while
 // managing: a room jumping up as someone joins would put another room's Archive under the finger.

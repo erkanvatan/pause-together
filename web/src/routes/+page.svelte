@@ -7,7 +7,7 @@
 	import { deleteRoom } from '$lib/admin';
 	import { createRoom, listRooms, setArchived, type Pick, type Result, type RoomCard } from '$lib/api';
 	import { me } from '$lib/me.svelte';
-	import { roomSubtitle, roomTitle, splitArchived } from '$lib/rooms';
+	import { roomProgress, roomSubtitle, roomTitle, splitArchived } from '$lib/rooms';
 	import { strings } from '$lib/strings';
 
 	// How often the room list is asked again while the tab is visible: others make, archive and
@@ -101,14 +101,22 @@
 				{#if subtitle}
 					<span class="mt-1 block break-words text-haze">{subtitle}</span>
 				{/if}
-				{#if joinable}
-					<span class="mt-1 flex items-center gap-2 text-sm">
-						<span class="size-2 shrink-0 rounded-full bg-lamp" aria-hidden="true"></span>
-						<span class="min-w-0 break-words">
-							{strings.watchingList(r.watching.map((w) => w.name).join(', '))}
+				<!-- Where the room is, so a guest sees where they left off before opening it, and who's there. -->
+				<span class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+					{#if r.gone}
+						<span class="text-ember">{strings.videoMissing}</span>
+					{:else}
+						<span class="text-haze tabular-nums">{roomProgress(r)}</span>
+					{/if}
+					{#if joinable}
+						<span class="flex min-w-0 items-center gap-2">
+							<span class="size-2 shrink-0 rounded-full bg-lamp" aria-hidden="true"></span>
+							<span class="min-w-0 break-words">
+								{strings.watchingList(r.watching.map((w) => w.name).join(', '))}
+							</span>
 						</span>
-					</span>
-				{/if}
+					{/if}
+				</span>
 			</span>
 			<!-- A room with nobody in it has no Join button: the chevron says the row opens it. -->
 			{#if !managing && !joinable}

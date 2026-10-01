@@ -19,10 +19,11 @@ const (
 	errRoomNotFound = "not-found"
 )
 
-// roomCard is a room on the homepage, with who's watching it.
+// roomCard is a room on the homepage, with who's watching it, and whether it can't play.
 type roomCard struct {
 	room.Room
 	Watching []room.Who `json:"watching"`
+	Gone     bool       `json:"gone"` // the video is gone, with no prepared copy
 }
 
 func (s *server) listRooms(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +34,12 @@ func (s *server) listRooms(w http.ResponseWriter, r *http.Request) {
 	}
 	cards := make([]roomCard, len(rooms))
 	for i, rm := range rooms {
-		cards[i] = roomCard{Room: rm, Watching: s.Hub.Watching(rm.ID)}
+		gone, err := s.Rooms.Gone(r.Context(), rm)
+		if err != nil {
+			internalError(w, "list rooms", err)
+			return
+		}
+		cards[i] = roomCard{Room: rm, Watching: s.Hub.Watching(rm.ID), Gone: gone}
 	}
 	writeJSON(w, cards)
 }

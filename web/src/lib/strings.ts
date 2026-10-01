@@ -131,6 +131,9 @@ export const strings = {
 	deleteRoom: 'Delete',
 	deleteRoomConfirm: 'Delete this room for good?',
 	videoMissing: 'Video missing',
+	// Where a room is in its video, on the homepage; otherwise positionOf: "1:02:13 of 2:34:27".
+	notStarted: 'Not started',
+	finished: 'Finished',
 	// The "Video missing" panel: the new pick resumes where the room was.
 	videoGone: (at: string) =>
 		at

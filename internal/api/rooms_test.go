@@ -50,7 +50,7 @@ func TestRooms(t *testing.T) {
 			`{"error":"bad-pick"}`},
 		{"create, bad JSON", guest, http.MethodPost, "/api/rooms", `{`, http.StatusBadRequest, `{"error":"bad-request"}`},
 		{"list", guest, http.MethodGet, "/api/rooms", "", http.StatusOK,
-			`[{"id":1,"name":"",` + heat + `,"audio":1,"subtitle":null,"positionMs":0,"subtitleOffsetMs":0,"archived":false,"watching":[]}]`},
+			`[{"id":1,"name":"",` + heat + `,"audio":1,"subtitle":null,"positionMs":0,"subtitleOffsetMs":0,"archived":false,"watching":[],"gone":false}]`},
 		{"open", guest, http.MethodGet, "/api/rooms/1", "", http.StatusOK, ""},
 		{"open unknown", guest, http.MethodGet, "/api/rooms/2", "", http.StatusNotFound, `{"error":"not-found"}`},
 		{"open malformed", guest, http.MethodGet, "/api/rooms/x", "", http.StatusNotFound, `{"error":"not-found"}`},

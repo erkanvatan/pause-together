@@ -289,6 +289,16 @@ func (r *Rooms) playableKey(ctx context.Context, videoID int64, audio *int) (str
 	return j.Key(), nil
 }
 
+// Gone says whether a room can't play: its video is gone, with no prepared copy. The room page then
+// offers another pick, and the homepage says "Video missing".
+func (r *Rooms) Gone(ctx context.Context, rm Room) (bool, error) {
+	if !rm.Video.Missing {
+		return false, nil
+	}
+	key, err := r.playableKey(ctx, rm.Video.ID, rm.Audio)
+	return key == "", err
+}
+
 // release cancels the prepare of a video and audio track if no room that isn't archived still has
 // them. It runs after the room's own change, so the room no longer counts.
 func (r *Rooms) release(ctx context.Context, videoID int64, audio *int) error {

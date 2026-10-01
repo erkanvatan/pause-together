@@ -3,6 +3,7 @@ import type { Room, RoomCard } from './api';
 import type { Wait } from './protocol';
 import {
 	needsConfirm,
+	roomProgress,
 	roomSubtitle,
 	roomTitle,
 	splitArchived,
@@ -67,8 +68,22 @@ describe('roomSubtitle', () => {
 	});
 });
 
+describe('roomProgress', () => {
+	const at = (positionMs: number, durationMs: number) =>
+		room(1, { positionMs, video: { ...room(1).video, durationMs } });
+	it.each([
+		['not started at 0:00', at(0, 6_000_000), 'Not started'],
+		['not started under a second in', at(999, 6_000_000), 'Not started'],
+		['where it is, of how long', at(3_733_000, 9_267_000), '1:02:13 of 2:34:27'],
+		['finished at the end', at(6_000_000, 6_000_000), 'Finished'],
+		['only where it is without a duration', at(65_000, 0), '1:05']
+	])('says %s', (_, r, want) => {
+		expect(roomProgress(r)).toBe(want);
+	});
+});
+
 describe('splitArchived', () => {
-	const card = (id: number, over: Partial<RoomCard> = {}): RoomCard => ({ ...room(id), watching: [], ...over });
+	const card = (id: number, over: Partial<RoomCard> = {}): RoomCard => ({ ...room(id), watching: [], gone: false, ...over });
 	const ann = [{ userId: 1, name: 'Ann' }];
 
 	it('keeps the order in each part', () => {
