@@ -529,6 +529,11 @@ Compact on a phone's small video box, so it never spills out of it. -->
 					/>
 				{/if}
 
+				<!-- The end cards sit on black, not on whatever the last frame happens to be. -->
+				{#if middle === 'next' || middle === 'end'}
+					<div class="fade-out-video absolute inset-0 bg-black"></div>
+				{/if}
+
 				<div
 					bind:this={stage}
 					class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center @max-md:p-2"

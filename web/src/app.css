@@ -236,6 +236,11 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 		animation: appear 200ms 600ms both;
 	}
 
+	/* The end of a video: a slow fade to black, like a film's. */
+	.fade-out-video {
+		animation: appear 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+
 	/* Fingers need 44 px. */
 	@media (pointer: coarse) {
 		.btn,
