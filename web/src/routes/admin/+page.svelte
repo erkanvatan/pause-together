@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import FolderPicker from '$lib/FolderPicker.svelte';
+	import GuestLink from '$lib/GuestLink.svelte';
 	import { getLanguages, type LibraryType } from '$lib/api';
 	import {
 		addLibrary,
@@ -192,7 +193,14 @@
 {:else}
 	<main class="mx-auto w-full max-w-6xl px-4 pt-2 pb-16">
 		<div class="flex max-w-3xl flex-col gap-12">
-			<h1 class="font-display text-2xl font-bold">{strings.admin}</h1>
+			<div class="flex flex-col gap-2">
+				<h1 class="font-display text-2xl font-bold">{strings.admin}</h1>
+				{#if me.guestUrl}
+					<GuestLink />
+				{:else}
+					<p class="text-sm text-haze">{strings.guestsCantReach}</p>
+				{/if}
+			</div>
 
 			{#if loadFailed || actionFailed}
 				<p class="text-ember" role="alert">

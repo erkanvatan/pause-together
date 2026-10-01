@@ -3,14 +3,16 @@
 export const me = $state({
 	loaded: false,
 	name: null as string | null, // null until the visitor picks a name
-	isAdmin: false
+	isAdmin: false,
+	guestUrl: '' // the address to give guests, host only; '' when they can't reach it yet
 });
 
-type MeResponse = { name: string | null; isAdmin: boolean };
+type MeResponse = { name: string | null; isAdmin: boolean; guestUrl?: string };
 
 function apply(r: MeResponse) {
 	me.name = r.name;
 	me.isAdmin = r.isAdmin;
+	me.guestUrl = r.guestUrl ?? '';
 	me.loaded = true;
 }
 

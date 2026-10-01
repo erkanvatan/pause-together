@@ -159,7 +159,8 @@ You set it up once on the host. Each guest installs the app, accepts your invite
 3. Open the host's address in a browser, with `http://` and the port: `http://100.101.102.103:8420`.
    Pick a name, then bookmark the page.
 
-Give every guest the same address, the Tailscale IP. Each address (`localhost`, the IP, the MagicDNS
+Give every guest the same address, the Tailscale IP. The admin page shows it as the guest link, and
+each room shows its own link to copy into a message. Each address (`localhost`, the IP, the MagicDNS
 name) gives a guest a different identity, so switching loses their name.
 
 > [!NOTE]

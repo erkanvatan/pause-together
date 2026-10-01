@@ -42,6 +42,17 @@ func (s *server) currentUser(r *http.Request) (u user.User, token string, ok boo
 type meResponse struct {
 	Name    *string `json:"name"` // null until the visitor picks a name
 	IsAdmin bool    `json:"isAdmin"`
+	// GuestURL is the address to give guests, on the admin port only; "" when they can't reach it yet.
+	GuestURL string `json:"guestUrl,omitempty"`
+}
+
+// me is the answer to /api/me for the user with this name: nil for a new visitor.
+func (s *server) me(name *string) meResponse {
+	resp := meResponse{Name: name, IsAdmin: s.admin}
+	if s.admin {
+		resp.GuestURL = s.GuestURL
+	}
+	return resp
 }
 
 // getMe says who the visitor is, and refreshes their cookie so it never expires while in use.
@@ -51,7 +62,7 @@ func (s *server) getMe(w http.ResponseWriter, r *http.Request) {
 		internalError(w, "look up user", err)
 		return
 	}
-	resp := meResponse{IsAdmin: s.admin}
+	resp := s.me(nil)
 	if ok {
 		s.setTokenCookie(w, token)
 		resp.Name = &u.Name
@@ -89,7 +100,7 @@ func (s *server) postMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setTokenCookie(w, token)
-	writeJSON(w, meResponse{Name: &name, IsAdmin: s.admin})
+	writeJSON(w, s.me(&name))
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

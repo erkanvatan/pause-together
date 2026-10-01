@@ -102,6 +102,9 @@ Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env`
 - Go reads `GUEST_ADDR`, `ADMIN_ADDR`, `DATA_DIR` and `TOKEN_COOKIE` (defaults `:8080`, `:8081`,
   `/data`, `pt_token`). Dev sets `TOKEN_COOKIE=pt_token_dev`: cookies ignore the port, so dev
   (`localhost:5173`) and prod (`localhost:8421`) would otherwise overwrite each other's user.
+- Go also reads `PUBLIC_BIND` and `GUEST_PORT`, which `compose.yml` passes in from `.env`, to show the
+  host the guest link (`http://{PUBLIC_BIND}:{GUEST_PORT}`). A loopback or `0.0.0.0` bind gives no link.
+  Dev passes neither, so dev shows the "Guests can't reach this server yet" note instead.
 - Go also reads `BUILD_ID`; without it, the ID comes from the embedded web build. Dev sets
   `BUILD_ID=dev` on both containers (`svelte.config.js` reads it too), or Vite's pages would never
   match Go's ID and would reload forever.
@@ -121,7 +124,7 @@ cmd/pausetogether/   main: config, wiring, both HTTP listeners
 internal/api/        HTTP handlers, guest vs admin routes (admin API registered on the admin port only);
                      server.go (routes, both listeners), spa.go (SPA serving), host.go (admin Host check),
                      me.go (user cookie), rooms.go, videos.go (picker), admin.go (admin API),
-                     ws.go (room socket join), stream.go (/stream files)
+                     ws.go (room socket join), stream.go (/stream files), guest.go (the guest link)
 internal/room/       rooms (create, switch, rename, archive, delete) and the prepare jobs they need;
                      sync.go: one room's sync rules, pure (clock passed in); timing.go: its timing constants;
                      hub.go (sockets, one loop per room with people in it), loop.go (a room's goroutine),
@@ -142,7 +145,7 @@ web/src/app.css      design tokens (@theme), shared classes, font imports
 web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode),
                      Picker.svelte, Dialog.svelte (modals on the browser's <dialog>: focus, Escape, inert page),
-                     FolderPicker.svelte, NameForm.svelte, rooms.ts (pure room helpers), strings.ts,
+                     FolderPicker.svelte, NameForm.svelte, GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), strings.ts,
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID),
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
                      fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
@@ -213,13 +216,18 @@ container mount for source files, and one name for two things gets mixed up in c
 - The cookie gets the longest life browsers allow (Chrome caps it at 400 days) and is refreshed on
   every visit.
 - Cookies are per host name: `localhost`, the Tailscale IP and the MagicDNS name each give a different
-  user. Give guests one address to use.
+  user. Give guests one address to use: the host's pages show it (the guest link, below).
 - Names: 1–32 runes, trimmed, at least one letter or number. No control characters, no invisible
   format characters (zero-width, text direction), no Unicode line breaks, no emoji. Emoji live in
   Unicode's "other symbol" class with `♥ ★ ©`, so those go too. Rename from a menu. Duplicates are
   allowed (no accounts, so no way to reclaim a name).
 - `GET /api/me` returns `{name, isAdmin}` (`name` is null for a new visitor) and refreshes the cookie.
   The admin listener sets `isAdmin`. The page hides admin links when it's false.
+- The admin listener also sends `guestUrl`, the address guests open, built from the guest port's bind
+  IP. The host browses on `localhost`, so no URL they could copy works for a guest. The room page shows
+  the host "Guest link: http://100.101.102.103:8420/rooms/15" with a Copy button (`localhost` is a
+  secure context, so the clipboard works there), and the admin page shows the bare address, or, when
+  `PUBLIC_BIND` is still loopback, how to open the guest port.
 - `POST /api/me {name}` renames a known user, or creates one (and sets the cookie) when the token is
   missing or unknown.
 - The cookie (`pt_token`) is `SameSite=Lax` and never `Secure`: guests use plain HTTP, and their
@@ -232,7 +240,8 @@ container mount for source files, and one name for two things gets mixed up in c
 
 ### Admin page
 
-In this order: what needs the host's hand first, settings last.
+In this order: what needs the host's hand first, settings last. Under the title: the guest link, or
+how to open the guest port.
 
 - Libraries: add, remove, rescan with progress. A library whose folder is gone says so in plain words
   (moved, renamed, a drive not mounted), not as the raw file error.

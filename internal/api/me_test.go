@@ -31,8 +31,9 @@ func deps(users *user.Store) Deps {
 }
 
 type meBody struct {
-	Name    *string `json:"name"`
-	IsAdmin bool    `json:"isAdmin"`
+	Name     *string `json:"name"`
+	IsAdmin  bool    `json:"isAdmin"`
+	GuestURL string  `json:"guestUrl"`
 }
 
 // meRequest builds a request to /api/me that passes the Host check and CrossOriginProtection.
@@ -219,6 +220,27 @@ func TestMeIsAdmin(t *testing.T) {
 			if b := decodeMe(t, serve(tt.h, meRequest(http.MethodGet, "", tok))); b.IsAdmin != tt.want {
 				t.Errorf("%s (token %q): isAdmin = %v, want %v", tt.name, tok, b.IsAdmin, tt.want)
 			}
+		}
+	}
+}
+
+// Only the host is shown the guest link.
+func TestMeGuestURL(t *testing.T) {
+	users := testUsers(t)
+	build := fakeBuild()
+	d := deps(users)
+	d.GuestURL = "http://100.101.102.103:8420"
+	tests := []struct {
+		name string
+		h    http.Handler
+		want string
+	}{
+		{"guest", Guest(build, d), ""},
+		{"admin", Admin(build, d), d.GuestURL},
+	}
+	for _, tt := range tests {
+		if b := decodeMe(t, serve(tt.h, meRequest(http.MethodGet, "", ""))); b.GuestURL != tt.want {
+			t.Errorf("%s: guestUrl = %q, want %q", tt.name, b.GuestURL, tt.want)
 		}
 	}
 }

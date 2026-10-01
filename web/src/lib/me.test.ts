@@ -10,13 +10,19 @@ afterEach(() => {
 	me.loaded = false;
 	me.name = null;
 	me.isAdmin = false;
+	me.guestUrl = '';
 });
 
 describe('saveName', () => {
 	it('stores the name the server returns', async () => {
-		respond(200, '{"name":"Alice","isAdmin":true}');
+		respond(200, '{"name":"Alice","isAdmin":true,"guestUrl":"http://100.101.102.103:8420"}');
 		expect(await saveName('  Alice  ')).toBe('ok');
-		expect(me).toEqual({ loaded: true, name: 'Alice', isAdmin: true });
+		expect(me).toEqual({
+			loaded: true,
+			name: 'Alice',
+			isAdmin: true,
+			guestUrl: 'http://100.101.102.103:8420'
+		});
 	});
 
 	it('reports a name the server refused', async () => {
@@ -50,7 +56,7 @@ describe('loadMe', () => {
 	it('loads a new visitor', async () => {
 		respond(200, '{"name":null,"isAdmin":false}');
 		await loadMe();
-		expect(me).toEqual({ loaded: true, name: null, isAdmin: false });
+		expect(me).toEqual({ loaded: true, name: null, isAdmin: false, guestUrl: '' });
 	});
 
 	it('throws on a server error, so the page retries', async () => {

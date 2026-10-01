@@ -22,6 +22,8 @@ type Deps struct {
 	Jobs        *media.Jobs    // prepared videos and subtitles, served under /stream
 	Rooms       *room.Rooms
 	Hub         *room.Hub // room sockets, and who's watching
+	// GuestURL is the address guests open, shown to the host only; "" when guests can't reach it yet.
+	GuestURL string
 }
 
 // Guest returns the handler for the guest port: the whole app except the admin API.

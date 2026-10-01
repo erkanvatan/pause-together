@@ -41,6 +41,9 @@ type config struct {
 	// buildID tells open pages from another build to reload. Dev sets one fixed ID for Go and Vite,
 	// or its pages would reload forever.
 	buildID string
+	// guestURL is the address guests open, from the guest port's bind IP and host port that compose
+	// passes in; "" when guests can't reach it yet.
+	guestURL string
 }
 
 func loadConfig(build fs.FS) config {
@@ -50,6 +53,7 @@ func loadConfig(build fs.FS) config {
 		dataDir:     envOr("DATA_DIR", "/data"),
 		tokenCookie: envOr("TOKEN_COOKIE", "pt_token"),
 		buildID:     envOr("BUILD_ID", web.BuildID(build)),
+		guestURL:    api.GuestURL(os.Getenv("PUBLIC_BIND"), os.Getenv("GUEST_PORT")),
 	}
 }
 
@@ -146,6 +150,7 @@ func run() error {
 		Jobs:        jobs,
 		Rooms:       rooms,
 		Hub:         hub,
+		GuestURL:    cfg.guestURL,
 	}
 	servers := []*http.Server{
 		newServer(cfg.guestAddr, api.Guest(build, deps)),

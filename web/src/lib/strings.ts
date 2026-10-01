@@ -18,6 +18,11 @@ export const strings = {
 	loadFailed: "Can't reach the server. Retrying…",
 
 	admin: 'Admin',
+	guestLink: 'Guest link',
+	copy: 'Copy',
+	copied: 'Copied',
+	guestsCantReach:
+		"Guests can't reach this server yet. Set PUBLIC_BIND in .env to this machine's Tailscale IP, then run task up.",
 	hostOnly: 'Only the host can open this page.',
 	backHome: 'Back home',
 	actionFailed: "That didn't work. Try again.",

@@ -5,6 +5,8 @@
 	import { fade } from 'svelte/transition';
 	import Chat from '$lib/Chat.svelte';
 	import Dialog from '$lib/Dialog.svelte';
+	import GuestLink from '$lib/GuestLink.svelte';
+	import { me } from '$lib/me.svelte';
 	import {
 		CHAT_PAGE_SIZE,
 		TOAST_MS,
@@ -392,6 +394,9 @@
 		{/if}
 		{#if roomSubtitle(room) && !renaming}
 			<p class="-mt-3 break-words text-haze">{roomSubtitle(room)}</p>
+		{/if}
+		{#if me.isAdmin && !room.archived}
+			<div class="-mt-2"><GuestLink path="/rooms/{room.id}" /></div>
 		{/if}
 
 		{#if error}
