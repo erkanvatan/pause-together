@@ -231,6 +231,7 @@ export const strings = {
 	send: 'Send',
 	reply: 'Reply',
 	deleteMessage: 'Delete',
+	deleteMessageConfirm: 'Delete for everyone?',
 	deletedMessage: 'Deleted message',
 	replyingTo: (name: string) => `Replying to ${name}`,
 	cancelReply: 'Cancel reply',

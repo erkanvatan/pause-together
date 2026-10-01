@@ -13,6 +13,7 @@
 		| 'close'
 		| 'back'
 		| 'more'
+		| 'reply'
 		| 'chevron'
 		| 'skip-back'
 		| 'skip-forward'
@@ -68,6 +69,8 @@
 		<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
 		<circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
 		<circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
+	{:else if name === 'reply'}
+		<path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 6 6v1" />
 	{:else if name === 'chevron'}
 		<path d="M9 5l7 7-7 7" />
 	{:else if name === 'skip-back' || name === 'skip-forward'}

@@ -320,7 +320,9 @@ readable in fullscreen.
 A panel with a title-small header, then the "watching now" list in label size (at most two lines),
 then messages. Messages are not bubbles: each is a row with the name in bold (yours in lamp), the
 video time in haze, then the text. Replies quote with a 2px line border on the left. The reply being
-written shows a lamp left border instead.
+written shows a lamp left border instead. A small haze reply arrow on hover and focus (and on a
+touch screen's newest message) hints that a message opens Reply. Delete your own message asks
+"Delete for everyone?" inline, with the danger button.
 
 ### Subtitles
 White text on a black 65% backing with small corners, sized from the video width. Only `<i>` and

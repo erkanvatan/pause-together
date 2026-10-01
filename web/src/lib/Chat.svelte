@@ -44,6 +44,7 @@
 	let list: HTMLOListElement;
 	let input = $state<HTMLInputElement>();
 	let selected = $state<number | null>(null); // the tapped message, showing its time and actions
+	let confirming = $state(false); // the selected message's Delete was pressed: ask before deleting
 	// The one message in the tab order; the arrow keys move it. null: the newest.
 	let current = $state<number | null>(null);
 	const focusable = $derived(
@@ -121,6 +122,11 @@
 		tick().then(() => list.querySelector<HTMLElement>(`[data-message="${to.id}"]`)?.focus());
 	}
 
+	function select(id: number) {
+		selected = selected === id ? null : id;
+		confirming = false;
+	}
+
 	function reply(m: ChatMessage) {
 		selected = null;
 		replyTo = m;
@@ -167,15 +173,15 @@
 		{#if messages.length === 0}
 			<li class="m-auto text-haze">{strings.noMessages}</li>
 		{/if}
-		{#each messages as m (m.id)}
+		{#each messages as m, i (m.id)}
 			<li class="rounded-control {selected === m.id ? 'bg-midnight/60' : ''}">
 				<button
 					data-message={m.id}
 					tabindex={m.id === focusable ? 0 : -1}
 					onfocus={() => (current = m.id)}
-					onclick={() => (selected = selected === m.id ? null : m.id)}
+					onclick={() => select(m.id)}
 					title={strings.sentAt(m.sentAt)}
-					class="flex w-full flex-col gap-0.5 rounded-control px-2 py-1.5 text-left hover:bg-midnight/40"
+					class="group flex w-full flex-col gap-0.5 rounded-control px-2 py-1.5 text-left hover:bg-midnight/40"
 				>
 					<span class="flex flex-wrap items-baseline gap-x-2 text-sm">
 						<span class="font-bold break-all {m.from.userId === userId ? 'text-lamp' : ''}">
@@ -187,6 +193,17 @@
 						{/if}
 						{#if m.video.id !== videoId}
 							<span class="min-w-0 break-words text-haze">{videoName(m.video)}</span>
+						{/if}
+						<!-- A hint that a message opens Reply: on hover and focus, and on a touch screen's newest
+						message, where nothing hovers. -->
+						{#if !readOnly && selected !== m.id}
+							<Icon
+								name="reply"
+								class="ml-auto size-4 shrink-0 self-center text-haze opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 {i ===
+								messages.length - 1
+									? 'pointer-coarse:opacity-100'
+									: ''}"
+							/>
 						{/if}
 					</span>
 					{#if m.replyTo}
@@ -208,13 +225,29 @@
 								{strings.reply}
 							</button>
 							{#if m.from.userId === userId}
-								<button
-									onclick={() => ondelete(m.id)}
-									disabled={!online}
-									class="btn btn-quiet btn-small text-ember"
-								>
-									{strings.deleteMessage}
-								</button>
+								{#if confirming}
+									<span class="flex basis-full flex-wrap items-center gap-2">
+										<span>{strings.deleteMessageConfirm}</span>
+										<button
+											onclick={() => ondelete(m.id)}
+											disabled={!online}
+											class="btn btn-danger btn-small"
+										>
+											{strings.deleteMessage}
+										</button>
+										<button onclick={() => (confirming = false)} class="btn btn-quiet btn-small">
+											{strings.cancel}
+										</button>
+									</span>
+								{:else}
+									<button
+										onclick={() => (confirming = true)}
+										disabled={!online}
+										class="btn btn-quiet btn-small text-ember"
+									>
+										{strings.deleteMessage}
+									</button>
+								{/if}
 							{/if}
 						{/if}
 					</div>
