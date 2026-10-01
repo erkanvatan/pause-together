@@ -147,9 +147,11 @@ export const strings = {
 	videoMissing: 'Video missing',
 	// The homepage's folded group of rooms whose video is gone.
 	videoMissingRooms: (n: number) => `Video missing (${n})`,
+	noPlayableRooms: 'None of the rooms can play right now.',
 	// When a room was last used, on its homepage card.
 	ago: (n: number, unit: Intl.RelativeTimeFormatUnit) =>
-		new Intl.RelativeTimeFormat(strings.locale, { numeric: 'auto' }).format(-n, unit),
+		// 'always': a floored day count of 1 can be two calendar days back, so never "yesterday".
+		new Intl.RelativeTimeFormat(strings.locale, { numeric: 'always' }).format(-n, unit),
 	justNow: 'just now',
 	// Where a room is in its video, on the homepage; otherwise positionOf: "1:02:13 of 2:34:27".
 	notStarted: 'Not started',
@@ -263,8 +265,9 @@ export const strings = {
 	sortTitle: 'A–Z',
 	sortRecent: 'Recently added',
 	noVideos: 'No videos yet. Ask the host to add some.',
-	noVideosHost: 'No videos yet. Show PauseTogether the folders that hold your movies and shows.',
-	addVideos: 'Add your videos',
+	noVideosHost:
+		"No videos yet. Add the folders that hold your movies and shows on the admin page. It also lists files it couldn't use.",
+	addVideos: 'Open the admin page',
 	noMatches: 'Nothing matches.',
 	season: (n: number) => (n === 0 ? 'Specials' : `Season ${n}`),
 	seasonCount: (n: number) => (n === 1 ? '1 season' : `${n} seasons`),

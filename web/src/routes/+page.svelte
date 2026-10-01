@@ -22,10 +22,12 @@
 	let visible = $state(true);
 	let picking = $state(false);
 	let confirming = $state<number | null>(null); // room whose Delete waits for a yes
-	// Archive and Delete show only while managing, so a guest sees rooms to join, not chores.
-	let managing = $state(false);
+	// Archive and Delete show only while managing, so a guest sees rooms to join, not chores. Managing
+	// freezes the order shown, so rows don't move under the finger: the room ids in that order.
+	let frozen = $state<number[] | null>(null);
+	const managing = $derived(frozen !== null);
 
-	const parts = $derived(splitRooms(rooms ?? [], managing));
+	const parts = $derived(splitRooms(rooms ?? [], frozen));
 	// Someone is watching: joining them is the page's main action, not starting something new.
 	const busy = $derived(parts.active.find((r) => r.watching.length > 0) ?? null);
 
@@ -198,7 +200,9 @@
 					{#if rooms.length > 0}
 						<button
 							onclick={() => {
-								managing = !managing;
+								frozen = managing
+									? null
+									: [...parts.active, ...parts.gone, ...parts.archived].map((r) => r.id);
 								confirming = null;
 							}}
 							aria-pressed={managing}
@@ -208,9 +212,9 @@
 						</button>
 					{/if}
 				</div>
-				{#if parts.active.length === 0 && parts.gone.length === 0}
-					<p class="text-haze">{strings.noRooms}</p>
-				{:else if parts.active.length > 0}
+				{#if parts.active.length === 0}
+					<p class="text-haze">{parts.gone.length > 0 ? strings.noPlayableRooms : strings.noRooms}</p>
+				{:else}
 					<ul class="flex flex-col gap-2">
 						{#each parts.active as r (r.id)}
 							{@render card(r)}
@@ -219,8 +223,7 @@
 				{/if}
 			</section>
 
-			<!-- Rooms that can't play fold away, so they don't crowd the ones that can. Manage shows them
-			among the rest, to archive. -->
+			<!-- Rooms that can't play fold away, so they don't crowd the ones that can. -->
 			{#if parts.gone.length > 0}
 				<details class="group/gone flex flex-col gap-2">
 					<summary

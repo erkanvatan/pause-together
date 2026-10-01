@@ -221,7 +221,8 @@ func (r *Rooms) Rename(ctx context.Context, id int64, name string) (Room, error)
 
 // SetArchived archives or unarchives a room. Archiving cancels its prepare unless another room still
 // needs it. Unarchiving queues it again, as opening does: the cache clean-up doesn't count archived rooms.
-// The room comes back either way, with the error of the queueing.
+// It also marks the room used: it's back to be watched. The room comes back either way, with the error
+// of the queueing.
 func (r *Rooms) SetArchived(ctx context.Context, id int64, archived bool) (Room, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -229,7 +230,8 @@ func (r *Rooms) SetArchived(ctx context.Context, id int64, archived bool) (Room,
 	if err != nil {
 		return Room{}, err
 	}
-	if _, err := r.DB.ExecContext(ctx, "UPDATE rooms SET archived = ? WHERE id = ?", archived, id); err != nil {
+	if _, err := r.DB.ExecContext(ctx, "UPDATE rooms SET archived = ?, used_at = IIF(?, used_at, ?) WHERE id = ?",
+		archived, archived, r.now(), id); err != nil {
 		return Room{}, err
 	}
 	if archived {
@@ -259,17 +261,19 @@ func (r *Rooms) Delete(ctx context.Context, id int64) error {
 	return r.release(ctx, rw.videoID, rw.Audio)
 }
 
-// SaveState stores the room state the loop keeps: position (st.PositionMs, as is), subtitle and offset,
-// and marks the room used.
+// SaveState stores the room state the loop keeps: position (st.PositionMs, as is), subtitle and offset.
+// A new position marks the room used. The same one doesn't: the save at shutdown would otherwise mark
+// every open room used, even one nobody played.
 // It writes only while the room still plays st's video, so a save that lands after a switch can't
 // carry the old video's position over. A sidecar the scan has deleted since is saved as off.
 func (r *Rooms) SaveState(ctx context.Context, id int64, st State) error {
 	stream, sidecar := Pick{Subtitle: st.Subtitle}.subtitle()
 	_, err := r.DB.ExecContext(ctx, `
 		UPDATE rooms SET position_ms = ?, subtitle_stream = ?,
-			subtitle_sidecar = (SELECT id FROM sidecar_subtitles WHERE id = ?), subtitle_offset_ms = ?, used_at = ?
-		WHERE id = ? AND video_id = ?`, st.PositionMs, stream, sidecar, st.SubtitleOffsetMs, r.now(), id,
-		st.VideoID)
+			subtitle_sidecar = (SELECT id FROM sidecar_subtitles WHERE id = ?), subtitle_offset_ms = ?,
+			used_at = IIF(position_ms = ?, used_at, ?)
+		WHERE id = ? AND video_id = ?`, st.PositionMs, stream, sidecar, st.SubtitleOffsetMs, st.PositionMs, r.now(),
+		id, st.VideoID)
 	return err
 }
 

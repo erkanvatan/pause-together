@@ -361,8 +361,8 @@ func TestSwitchResetsPosition(t *testing.T) {
 	}
 }
 
-// A room is marked used when it's made, switched, or saves its state, but not when it's renamed or
-// opened.
+// A room is marked used when it's made, switched, unarchived, or saves a new position, but not when
+// it's renamed, opened, archived, or saves the position it had.
 func TestUsedAt(t *testing.T) {
 	ctx := context.Background()
 	r := newTestRooms(t)
@@ -400,6 +400,18 @@ func TestUsedAt(t *testing.T) {
 		t.Fatal(err)
 	}
 	used("save for the video before the switch", 3000)
+	if err := r.SaveState(ctx, 1, State{VideoID: 2, PositionMs: 5000, SubtitleOffsetMs: 500}); err != nil {
+		t.Fatal(err)
+	}
+	used("save at the same position", 3000)
+	if _, err := r.SetArchived(ctx, 1, true); err != nil {
+		t.Fatal(err)
+	}
+	used("archive", 3000)
+	if _, err := r.SetArchived(ctx, 1, false); err != nil {
+		t.Fatal(err)
+	}
+	used("unarchive", 4000)
 }
 
 // The "Video missing" swap: a room whose video is gone, with no prepared copy, can't play. The new

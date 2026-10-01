@@ -96,14 +96,14 @@ describe('splitRooms', () => {
 
 	it('splits active, gone and archived', () => {
 		const rooms = [card(4), card(3, { archived: true }), card(2, { gone: true }), card(1, { archived: true, gone: true })];
-		const { active, gone, archived } = splitRooms(rooms, false);
+		const { active, gone, archived } = splitRooms(rooms, null);
 		expect(ids(active)).toEqual([4]);
 		expect(ids(gone)).toEqual([2]);
 		expect(ids(archived)).toEqual([3, 1]);
 	});
 
 	it('keeps a gone room with people in it active: they may be swapping its video', () => {
-		const { active, gone } = splitRooms([card(2, { gone: true, watching: ann })], false);
+		const { active, gone } = splitRooms([card(2, { gone: true, watching: ann })], null);
 		expect(ids(active)).toEqual([2]);
 		expect(gone).toEqual([]);
 	});
@@ -117,14 +117,12 @@ describe('splitRooms', () => {
 			card(5),
 			card(6, { usedAt: 300, watching: ann })
 		];
-		expect(ids(splitRooms(rooms, false).active)).toEqual([6, 2, 3, 1, 5, 4]);
+		expect(ids(splitRooms(rooms, null).active)).toEqual([6, 2, 3, 1, 5, 4]);
 	});
 
-	it('keeps the newest first while managing, gone rooms among the rest', () => {
-		const rooms = [card(1, { usedAt: 900 }), card(3, { gone: true }), card(2, { watching: ann })];
-		const { active, gone } = splitRooms(rooms, true);
-		expect(ids(active)).toEqual([3, 2, 1]);
-		expect(gone).toEqual([]);
+	it('keeps a frozen order while managing, rooms not in it first', () => {
+		const rooms = [card(1, { usedAt: 900 }), card(2, { watching: ann }), card(3), card(4), card(5)];
+		expect(ids(splitRooms(rooms, [3, 1, 2]).active)).toEqual([5, 4, 3, 1, 2]);
 	});
 });
 
@@ -137,11 +135,12 @@ describe('usedAgo', () => {
 		[now + 5 * min, 'just now'], // a clock a little ahead
 		[now - 5 * min, '5 minutes ago'],
 		[now - 3 * 60 * min, '3 hours ago'],
-		[now - 30 * 60 * min, 'yesterday'],
+		[now - 30 * 60 * min, '1 day ago'], // never "yesterday": 30 h may be two calendar days back
 		[now - 3 * 24 * 60 * min, '3 days ago'],
 		[now - 15 * 24 * 60 * min, '2 weeks ago'],
 		[now - 70 * 24 * 60 * min, '2 months ago'],
-		[now - 400 * 24 * 60 * min, 'last year']
+		[now - 360 * 24 * 60 * min, '11 months ago'],
+		[now - 400 * 24 * 60 * min, '1 year ago']
 	])('%i → %s', (usedAt, want) => {
 		expect(usedAgo(usedAt, now)).toBe(want);
 	});

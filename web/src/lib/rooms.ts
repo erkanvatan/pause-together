@@ -1,5 +1,5 @@
 // Room helpers for the homepage and the room page. Pure: no fetch, no DOM.
-import type { Room, Who } from '$lib/api';
+import type { Room, RoomCard } from '$lib/api';
 import { videoName, videoTitle } from '$lib/picker';
 import type { Wait } from '$lib/protocol';
 import { strings } from '$lib/strings';
@@ -29,24 +29,22 @@ export function roomProgress(r: Room): string {
 		: formatTime(positionMs);
 }
 
-type Card = Room & { watching: Who[]; gone: boolean; usedAt: number };
-
 // splitRooms sorts rooms into the homepage's groups: active, gone (can't play, nobody in it) and
 // archived. Rooms with people in them come first, then the most recently used: that's where a guest
 // wants to go. Not while managing: a room jumping up as someone joins would put another room's Archive
-// under the finger. So managing keeps the newest room first, and shows gone rooms among the rest,
-// where they can be archived.
-export function splitRooms<R extends Card>(
+// under the finger. So frozen, the room ids in the order shown when Manage was pressed, keeps that
+// order; a room not in it (new, or just unarchived) comes first.
+export function splitRooms<R extends RoomCard>(
 	rooms: R[],
-	managing: boolean
+	frozen: number[] | null
 ): { active: R[]; gone: R[]; archived: R[] } {
 	const busy = (r: R) => r.watching.length > 0;
 	const sorted = [...rooms].sort((a, b) =>
-		managing
-			? b.id - a.id
+		frozen
+			? frozen.indexOf(a.id) - frozen.indexOf(b.id) || b.id - a.id
 			: Number(busy(b)) - Number(busy(a)) || b.usedAt - a.usedAt || b.id - a.id
 	);
-	const folded = (r: R) => !managing && r.gone && !busy(r);
+	const folded = (r: R) => r.gone && !busy(r);
 	return {
 		active: sorted.filter((r) => !r.archived && !folded(r)),
 		gone: sorted.filter((r) => !r.archived && folded(r)),
@@ -60,7 +58,7 @@ export function usedAgo(usedAt: number, now: number): string {
 	const minutes = Math.max(0, Math.floor((now - usedAt) / 60_000));
 	const steps: [Intl.RelativeTimeFormatUnit, number][] = [
 		['year', 365 * 24 * 60],
-		['month', 30 * 24 * 60],
+		['month', 30.44 * 24 * 60], // an average month, so 360 days isn't "12 months ago"
 		['week', 7 * 24 * 60],
 		['day', 24 * 60],
 		['hour', 60],
