@@ -238,6 +238,8 @@ export const strings = {
 	cancelReply: 'Cancel reply',
 	chatReadOnly: 'This room is archived. Its chat is read-only.',
 	olderFailed: "Couldn't load older messages.",
+	// Where the video was when a message was sent.
+	inVideoAt: (at: string) => `At ${at} in the video`,
 	// When a message was sent, on the wall clock: "Sep 28, 2026, 9:41 PM".
 	sentAt: (ms: number) =>
 		new Intl.DateTimeFormat(strings.locale, { dateStyle: 'medium', timeStyle: 'short' }).format(ms),

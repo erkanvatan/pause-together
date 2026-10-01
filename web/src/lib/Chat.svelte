@@ -188,9 +188,15 @@
 						<span class="font-bold break-all {m.from.userId === userId ? 'text-lamp' : ''}">
 							{m.from.name}
 						</span>
-						<!-- Not before the video starts: every such message would say 0:00. -->
+						<!-- Not before the video starts: every such message would say 0:00. The play mark says it's a
+						spot in the video: a bare 18:16 reads as a time of day. -->
 						{#if m.positionMs >= 1000}
-							<span class="text-haze tabular-nums">{formatTime(m.positionMs)}</span>
+							{@const at = strings.inVideoAt(formatTime(m.positionMs))}
+							<span title={at} class="flex items-center gap-1 self-center text-haze tabular-nums">
+								<Icon name="play" class="size-3 shrink-0" />
+								<span aria-hidden="true">{formatTime(m.positionMs)}</span>
+								<span class="sr-only">{at}</span>
+							</span>
 						{/if}
 						{#if m.video.id !== videoId}
 							<span class="min-w-0 break-words text-haze">{videoName(m.video)}</span>
