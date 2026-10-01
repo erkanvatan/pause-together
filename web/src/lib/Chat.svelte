@@ -3,6 +3,7 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import type { ChatMessage, Who } from '$lib/api';
 	import { canSend, MAX_MESSAGE_CHARS, messageLength } from '$lib/chat';
+	import Confirm from '$lib/Confirm.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import { videoName } from '$lib/picker';
 	import { strings } from '$lib/strings';
@@ -44,7 +45,7 @@
 	let list: HTMLOListElement;
 	let input = $state<HTMLInputElement>();
 	let selected = $state<number | null>(null); // the tapped message, showing its time and actions
-	let confirming = $state(false); // the selected message's Delete was pressed: ask before deleting
+	let confirming = $state<number | null>(null); // the message whose Delete waits for a yes
 	// The one message in the tab order; the arrow keys move it. null: the newest.
 	let current = $state<number | null>(null);
 	const focusable = $derived(
@@ -124,7 +125,7 @@
 
 	function select(id: number) {
 		selected = selected === id ? null : id;
-		confirming = false;
+		confirming = null;
 	}
 
 	function reply(m: ChatMessage) {
@@ -225,23 +226,18 @@
 								{strings.reply}
 							</button>
 							{#if m.from.userId === userId}
-								{#if confirming}
-									<span class="flex basis-full flex-wrap items-center gap-2">
-										<span>{strings.deleteMessageConfirm}</span>
-										<button
-											onclick={() => ondelete(m.id)}
-											disabled={!online}
-											class="btn btn-danger btn-small"
-										>
-											{strings.deleteMessage}
-										</button>
-										<button onclick={() => (confirming = false)} class="btn btn-quiet btn-small">
-											{strings.cancel}
-										</button>
-									</span>
+								{#if confirming === m.id}
+									<Confirm
+										message={strings.deleteMessageConfirm}
+										action={strings.deleteMessage}
+										onconfirm={() => ondelete(m.id)}
+										oncancel={() => (confirming = null)}
+										disabled={!online}
+										class="basis-full"
+									/>
 								{:else}
 									<button
-										onclick={() => (confirming = true)}
+										onclick={() => (confirming = m.id)}
 										disabled={!online}
 										class="btn btn-quiet btn-small text-ember"
 									>

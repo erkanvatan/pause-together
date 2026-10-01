@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
+	import Confirm from '$lib/Confirm.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import Picker from '$lib/Picker.svelte';
 	import { deleteRoom } from '$lib/admin';
@@ -147,21 +148,16 @@
 			</a>
 		{/if}
 		{#if managing && confirming === r.id}
-			<div class="flex basis-full flex-wrap items-center gap-2 text-sm">
-				<span>{strings.deleteRoomConfirm}</span>
-				<button
-					onclick={() => {
-						confirming = null;
-						act(deleteRoom(r.id));
-					}}
-					class="btn btn-danger btn-small"
-				>
-					{strings.deleteRoom}
-				</button>
-				<button onclick={() => (confirming = null)} class="btn btn-quiet btn-small">
-					{strings.cancel}
-				</button>
-			</div>
+			<Confirm
+				message={strings.deleteRoomConfirm}
+				action={strings.deleteRoom}
+				onconfirm={() => {
+					confirming = null;
+					act(deleteRoom(r.id));
+				}}
+				oncancel={() => (confirming = null)}
+				class="basis-full"
+			/>
 		{/if}
 	</li>
 {/snippet}

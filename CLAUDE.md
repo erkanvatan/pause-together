@@ -146,7 +146,8 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      Brand.svelte (the app name with its pause mark: header, welcome),
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode),
                      Picker.svelte, Dialog.svelte (modals on the browser's <dialog>: focus, Escape, inert page),
-                     FolderPicker.svelte, NameForm.svelte, Menu.svelte (a button with a panel of rows), GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), strings.ts,
+                     FolderPicker.svelte, NameForm.svelte, Menu.svelte (a button with a panel of rows), Confirm.svelte
+                     (an inline "Are you sure?" row), GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), strings.ts,
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID),
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
                      fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
@@ -418,8 +419,8 @@ So each room's video is **prepared once**, then served as a plain file.
 - Archive is allowed only when nobody is watching. An archived room can't play, and its chat is
   read-only. Archived rooms sit in their own homepage section and can be unarchived.
 - A room plays one video at a time. Anyone can switch it with the library picker, and TV episodes also
-  get a "Next episode" button, which never lands on a special. A switch starts at 0:00; only the "Video
-  missing" swap keeps the position.
+  get "Next episode" (in the room's "⋯" menu, and on the end card), which never lands on a special. A
+  switch starts at 0:00; only the "Video missing" swap keeps the position.
 - Before a switch, the switcher confirms: "You're at 1:40:00. Switch to …?" Nobody else is asked. Not
   asked when nothing is lost: at 0:00, at the end, or the "Video missing" swap.
 - At the end of a video, the server (it knows the duration) pauses the room there. TV episodes show

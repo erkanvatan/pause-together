@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import Confirm from '$lib/Confirm.svelte';
 	import FolderPicker from '$lib/FolderPicker.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import GuestLink from '$lib/GuestLink.svelte';
@@ -12,6 +13,7 @@
 		groupProblems,
 		guessType,
 		jobText,
+		librarySummary,
 		listJobs,
 		listLibraries,
 		listProblems,
@@ -243,12 +245,7 @@
 								<div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
 									<div class="min-w-0">
 										<p class="font-semibold break-words">{lib.path}</p>
-										<!-- A folder named after its type ("Movies") doesn't say it twice. -->
-										<p class="text-sm text-haze">
-											{lib.path.split('/').at(-1) === strings.libraryTypes[lib.type]
-												? strings.videoCount(lib.videos)
-												: strings.libraryLine(strings.libraryTypes[lib.type], strings.videoCount(lib.videos))}
-										</p>
+										<p class="text-sm text-haze">{librarySummary(lib)}</p>
 									</div>
 									<div class="flex gap-2">
 										<button
@@ -290,21 +287,15 @@
 									</p>
 								{/if}
 								{#if confirming === lib.id}
-									<div class="flex flex-wrap items-center gap-2 text-sm">
-										<span>{strings.removeConfirm}</span>
-										<button
-											onclick={() => {
-												confirming = null;
-												act(removeLibrary(lib.id));
-											}}
-											class="btn btn-danger btn-small"
-										>
-											{strings.remove}
-										</button>
-										<button onclick={() => (confirming = null)} class="btn btn-quiet btn-small">
-											{strings.cancel}
-										</button>
-									</div>
+									<Confirm
+										message={strings.removeConfirm}
+										action={strings.remove}
+										onconfirm={() => {
+											confirming = null;
+											act(removeLibrary(lib.id));
+										}}
+										oncancel={() => (confirming = null)}
+									/>
 								{/if}
 							</div>
 						{:else}
@@ -554,21 +545,16 @@
 									</button>
 								{/if}
 								{#if confirmingClear}
-									<div class="mt-3 flex flex-wrap items-center gap-2 text-sm" role="alert">
-										<span>{strings.clearCacheConfirm}</span>
-										<button
-											onclick={() => {
-												confirmingClear = false;
-												act(clearCache());
-											}}
-											class="btn btn-danger btn-small"
-										>
-											{strings.clearCache}
-										</button>
-										<button onclick={() => (confirmingClear = false)} class="btn btn-quiet btn-small">
-											{strings.cancel}
-										</button>
-									</div>
+									<Confirm
+										message={strings.clearCacheConfirm}
+										action={strings.clearCache}
+										onconfirm={() => {
+											confirmingClear = false;
+											act(clearCache());
+										}}
+										oncancel={() => (confirmingClear = false)}
+										class="mt-3"
+									/>
 								{/if}
 							{/if}
 						</section>

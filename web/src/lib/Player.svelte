@@ -583,7 +583,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 					<!-- Late, so a quick connect never flashes it. -->
 					<p class="pill appear-late">{strings.gettingReady}</p>
 				{:else if middle === 'preparing'}
-					<div class="flex w-full max-w-64 flex-col items-center gap-3">
+					<div class="flex w-full max-w-64 flex-col items-center gap-3 @max-md:gap-1.5">
 						<p class="pill text-balance">{preparing}</p>
 						{#if prepare?.state === 'running'}
 							<div class="h-1 w-full overflow-hidden rounded-full bg-dusk">

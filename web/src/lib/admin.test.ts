@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addLibrary, formatBytes, groupProblems, guessType, jobText, listFolders, problemText, removeLibrary } from './admin';
+import {
+	addLibrary,
+	formatBytes,
+	groupProblems,
+	guessType,
+	jobText,
+	librarySummary,
+	listFolders,
+	problemText,
+	removeLibrary
+} from './admin';
 
 function respond(status: number, body: string | null, type = 'application/json') {
 	vi.stubGlobal(
@@ -156,6 +166,19 @@ describe('guessType', () => {
 		['Movies/Extras', null]
 	])('guesses %j as %s', (path, want) => {
 		expect(guessType(path)).toBe(want);
+	});
+});
+
+describe('librarySummary', () => {
+	it.each([
+		['Movies', 'movies', 2, '2 videos'], // the folder says the type
+		['media/tv_shows', 'tv', 1, '1 video'],
+		['Filmler', 'movies', 3, '3 videos'],
+		['TV', 'movies', 2, 'Movies, 2 videos'], // a name that says another type
+		['Other', 'other', 5, 'Other Videos, 5 videos'],
+		['Anime', 'tv', 0, 'TV Shows, 0 videos']
+	] as const)('sums up %j as %s', (path, type, videos, want) => {
+		expect(librarySummary({ path, type, videos })).toBe(want);
 	});
 });
 

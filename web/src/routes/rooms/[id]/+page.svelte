@@ -391,7 +391,7 @@
 							{strings.switchVideo}
 						</button>
 					{/if}
-					<Menu label={strings.roomActions} buttonClass="btn btn-quiet btn-small px-2">
+					<Menu label={strings.roomActions} buttonClass="btn btn-quiet btn-small px-2 pointer-coarse:min-w-11">
 						{#snippet button()}
 							<Icon name="more" class="size-5" />
 						{/snippet}

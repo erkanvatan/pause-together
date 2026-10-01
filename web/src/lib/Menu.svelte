@@ -30,11 +30,23 @@
 	function outside(e: PointerEvent) {
 		if (open && !root.contains(e.target as Node)) open = false;
 	}
+
+	// Tab past the last row closes it too. Only when focus went somewhere: Safari doesn't focus a
+	// clicked button, so a click on a row would close the panel before the click lands.
+	function focusOut(e: FocusEvent) {
+		const to = e.relatedTarget as Node | null;
+		if (to && !root.contains(to)) open = false;
+	}
+
+	// The arrows stay in the menu: on the room page they'd skip the whole room's video.
+	function arrows(e: KeyboardEvent) {
+		if (open && e.key.startsWith('Arrow')) e.stopPropagation();
+	}
 </script>
 
 <svelte:window onkeydown={key} onpointerdown={outside} />
 
-<div bind:this={root} class="relative min-w-0">
+<div bind:this={root} onfocusout={focusOut} onkeydown={arrows} role="none" class="relative min-w-0">
 	<button
 		bind:this={trigger}
 		onclick={() => (open = !open)}

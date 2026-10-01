@@ -115,6 +115,14 @@ export function guessType(path: string): LibraryType | null {
 	return null;
 }
 
+// librarySummary is the line under a library's folder: its type and video count, or just the count
+// when the folder's name already says the type ("Movies", "tv_shows").
+export function librarySummary(lib: Pick<Library, 'path' | 'type' | 'videos'>): string {
+	const videos = strings.videoCount(lib.videos);
+	if (guessType(lib.path) === lib.type) return videos;
+	return strings.libraryLine(strings.libraryTypes[lib.type], videos);
+}
+
 // jobText says where a job, or a room's prepared copy, stands; '' when it's ready or there's none.
 // Unknown failure codes show as they are.
 export function jobText(j: Pick<Prepare, 'state' | 'place' | 'progress' | 'error'>): string {
