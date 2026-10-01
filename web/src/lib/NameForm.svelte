@@ -83,7 +83,7 @@
 	{/if}
 	<div class="flex gap-2">
 		<button type="submit" disabled={saving || name.trim() === ''} class="btn btn-primary flex-1">
-			{strings.save}
+			{welcome ? strings.continue : strings.save}
 		</button>
 		{#if oncancel}
 			<button type="button" onclick={oncancel} class="btn btn-quiet flex-1">

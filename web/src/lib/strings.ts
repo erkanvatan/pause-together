@@ -11,6 +11,7 @@ export const strings = {
 	joining: (room: string) => `You're joining ${room}.`,
 	namePlaceholder: 'Your name',
 	save: 'Save',
+	continue: 'Continue',
 	cancel: 'Cancel',
 	rename: 'Change name',
 	nameInvalid,
@@ -104,6 +105,8 @@ export const strings = {
 	jobRunning: (percent: number) => `Preparing… ${percent}%`,
 	jobQueued: (place: number) =>
 		place === 1 ? 'Queued, next in line' : `Queued, ${ordinal(place)} in line`,
+	// Under "Preparing…" in the video box: what the wait is, for a guest who never heard of prepare jobs.
+	preparingWhy: "The host's computer is getting this video ready to stream. You can chat meanwhile.",
 	// Why a prepare job failed (media.FailNoSpace, media.FailPrepare).
 	jobErrors: {
 		'no-space': 'Not enough free disk space.',

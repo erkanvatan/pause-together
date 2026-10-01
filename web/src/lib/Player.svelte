@@ -590,6 +590,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 								<div class="h-full bg-lamp" style:width="{prepare.progress * 100}%"></div>
 							</div>
 						{/if}
+						<p class="text-sm text-balance text-haze">{strings.preparingWhy}</p>
 					</div>
 				{:else if middle === 'next' && next}
 					<button onclick={nextEpisode} class="btn btn-primary max-w-full break-words">
