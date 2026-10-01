@@ -56,7 +56,7 @@
 		note: string; // "Alice paused"
 		missing: boolean; // the video is gone, with no prepared copy: offer another pick
 		onpick: () => void;
-		next: VideoSummary | null; // the next episode, offered at the end
+		next: VideoSummary | null | undefined; // the next episode, offered at the end; undefined while looked up
 		onnext: () => void;
 		chatOpen: boolean;
 		// The chat panel: beside the video in landscape, under it in portrait.
@@ -154,10 +154,17 @@
 	// What a screen reader hears: the room's state changes that show only over the video.
 	const announce = $derived(offline ? strings.hostOffline : (waits?.headline ?? note));
 
-	// Back, play or pause, forward, over the video; not while something else holds its middle.
-	const transport = $derived(
-		src !== '' && joined && !blocked && !cantPlay && !atEnd && !playState?.waiting.length
-	);
+	// What holds the video's middle, one thing at a time, the first that applies. "Waiting for …" is the
+	// room's, not this screen's: it can sit under any of them. 'transport' is back, play or pause, forward.
+	const middle = $derived.by(() => {
+		if (missing) return 'missing';
+		if (cantPlay) return 'cantPlay';
+		if (src === '') return connecting ? 'connecting' : preparing ? 'preparing' : '';
+		if (needsTap) return 'tap';
+		// While the next episode is still looked up (undefined), neither card: a film's would flash.
+		if (atEnd) return next ? 'next' : next === null ? 'end' : '';
+		return playState?.waiting.length ? '' : 'transport';
+	});
 
 	// Only src changes, never the element: a new one may need a fresh tap on iOS.
 	$effect(() => {
@@ -498,7 +505,7 @@
 				bind:this={stage}
 				class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center @max-md:p-2"
 			>
-				{#if transport}
+				{#if middle === 'transport'}
 					<div
 						class="flex items-center gap-6 transition-[opacity,visibility] duration-300 sm:gap-10 {fade}"
 					>
@@ -530,20 +537,17 @@
 							<Icon name="skip-forward" step={skipMs / 1000} class="size-7 sm:size-8" />
 						</button>
 					</div>
-				{/if}
-				{#if cantPlay}
+				{:else if middle === 'cantPlay'}
 					<p class="pill">{unplayable}</p>
-				{:else if needsTap}
+				{:else if middle === 'tap'}
 					<button onclick={join} class="btn btn-primary min-h-14 rounded-full px-7 text-lg">
 						<Icon name="play" class="size-6" />
 						{coarse ? strings.tapToJoin : strings.clickToJoin}
 					</button>
-				{/if}
-				{#if connecting}
+				{:else if middle === 'connecting'}
 					<!-- Late, so a quick connect never flashes it. -->
 					<p class="pill appear-late">{strings.gettingReady}</p>
-				{/if}
-				{#if preparing}
+				{:else if middle === 'preparing'}
 					<div class="flex w-full max-w-64 flex-col items-center gap-3">
 						<p class="pill text-balance {prepare?.state === 'failed' ? 'text-ember' : ''}">
 							{preparing}
@@ -554,12 +558,11 @@
 							</div>
 						{/if}
 					</div>
-				{/if}
-				{#if atEnd && next}
+				{:else if middle === 'next' && next}
 					<button onclick={nextEpisode} class="btn btn-primary max-w-full break-words">
 						{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
 					</button>
-				{:else if atEnd && !missing && !needsTap && !cantPlay}
+				{:else if middle === 'end'}
 					<!-- A film's last frame is the room's last shared moment: a title card, and what's next. -->
 					<div class="flex flex-col items-center gap-4 @max-md:gap-2">
 						<p class="font-display text-3xl font-bold @max-md:text-2xl">{strings.theEnd}</p>
@@ -567,8 +570,7 @@
 							{strings.watchSomethingElse}
 						</button>
 					</div>
-				{/if}
-				{#if missing}
+				{:else if middle === 'missing'}
 					<!-- Compact on a phone's small video box, so it never spills out of it. -->
 					<div
 						class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 p-5 @max-md:gap-2 @max-md:p-3"
@@ -750,6 +752,7 @@
 								onkeydown={(e) => {
 									// An arrow skips 10 s, as everywhere else. The slider's own 1 s step would seek the
 									// whole room once per press.
+									if (e.ctrlKey || e.metaKey || e.altKey) return;
 									const back = e.key === 'ArrowLeft' || e.key === 'ArrowDown';
 									if (!back && e.key !== 'ArrowRight' && e.key !== 'ArrowUp') return;
 									e.preventDefault();

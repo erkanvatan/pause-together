@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"maps"
@@ -27,8 +28,8 @@ type Library struct {
 // ErrRemoved stops a scan whose library was removed while it ran.
 var ErrRemoved = errors.New("library removed")
 
-// ErrFolderGone is a scan's error when the library's folder no longer exists: moved, renamed, or a
-// drive that isn't mounted.
+// ErrFolderGone is a scan's error when the library's folder no longer exists (moved or renamed), or
+// is empty while the library has videos: a drive that isn't mounted leaves its mount point behind.
 var ErrFolderGone = errors.New("library folder is gone")
 
 // Prober reads a video file's technical facts. media.FFprobe is the real one.
@@ -70,13 +71,18 @@ type fileStat struct {
 // A file still being written (see Watcher) is not probed or converted, and not marked missing; the
 // watcher queues another scan once it stops growing.
 //
-// If the library folder itself is gone, can't be read, or leads outside the media folder, it returns
-// an error and marks nothing missing. A sub-folder that can't be read is logged, and nothing under it
+// If the media folder or the library folder is gone, the library folder can't be read, leads outside
+// the media folder, or is empty while the library has videos, it returns an error and marks nothing
+// missing. A sub-folder that can't be read is logged, and nothing under it
 // is marked missing. If the library is removed meanwhile, it stops with ErrRemoved.
 func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(done, total int)) error {
 	known, err := s.knownVideos(ctx, lib.ID)
 	if err != nil {
 		return err
+	}
+	// The media folder gone is not this library's doing: removing the library wouldn't help.
+	if _, err := os.Stat(s.Root); err != nil {
+		return fmt.Errorf("media folder: %w", err)
 	}
 	// Resolved, so a library folder that is itself a symlink gets walked. Folder links inside it still
 	// aren't. Checked on every scan: the link may point outside the media folder by now.
@@ -85,6 +91,15 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(do
 		return fmt.Errorf("%w: %w", ErrFolderGone, err)
 	} else if err != nil {
 		return err
+	}
+	empty, err := isEmptyDir(root)
+	if err != nil {
+		return err
+	}
+	for _, k := range known {
+		if empty && !k.missing {
+			return fmt.Errorf("%w: %s is empty", ErrFolderGone, root)
+		}
 	}
 	// Watches of folders that are gone are dropped before the walk: a folder moved inside the library
 	// keeps its old watch, and adding it again under its new name would find that old one.
@@ -317,4 +332,19 @@ func isUnder(rel string, dirs []string) bool {
 		}
 	}
 	return false
+}
+
+// isEmptyDir reports whether the folder dir has nothing in it.
+func isEmptyDir(dir string) (bool, error) {
+	f, err := os.Open(dir)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = f.Close() }()
+	if _, err := f.Readdirnames(1); errors.Is(err, io.EOF) {
+		return true, nil
+	} else if err != nil {
+		return false, err
+	}
+	return false, nil
 }

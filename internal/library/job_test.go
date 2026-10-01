@@ -77,6 +77,7 @@ func TestVideo(t *testing.T) {
 	ctx := context.Background()
 	l := newTestLib(t, Movies)
 	l.write("Heat (1995).mkv", "heat")
+	l.write("Ronin (1998).mkv", "ronin") // an emptied folder is a gone folder, not a missing video
 	l.scan()
 	id := l.videos()["Heat (1995).mkv"].ID
 	libs := &Libraries{DB: l.db, Root: l.scanner.Root}

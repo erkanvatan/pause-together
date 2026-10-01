@@ -59,7 +59,7 @@
 	let pickStart = $state<VideoSummary | undefined>(); // the picker opens on this video: "Next episode"
 	let confirming = $state<{ pick: Pick; text: string } | null>(null); // a switch waiting for a yes
 	let detail = $state<VideoDetail | null>(null); // the room's video with its tracks
-	let next = $state<VideoSummary | null>(null); // its next episode
+	let next = $state<VideoSummary | null | undefined>(null); // its next episode; undefined while looked up
 	let renaming = $state(false);
 	let name = $state('');
 	let watching = $state<Who[]>([]);
@@ -135,6 +135,7 @@
 		next = null;
 		if (vid === undefined) return;
 		const v = untrack(() => room!.video);
+		if (v.type === 'tv') next = undefined;
 		let stopped = false;
 		let timer: ReturnType<typeof setTimeout>;
 		const load = async () => {

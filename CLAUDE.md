@@ -143,6 +143,7 @@ docs/plan.md         build order in slices, and how to work one
 web/                 SvelteKit app; web/embed.go embeds its build (go:embed can't reach ../)
 web/src/app.css      design tokens (@theme), shared classes, font imports
 web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
+                     Brand.svelte (the app name with its pause mark: header, welcome),
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode),
                      Picker.svelte, Dialog.svelte (modals on the browser's <dialog>: focus, Escape, inert page),
                      FolderPicker.svelte, NameForm.svelte, GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), strings.ts,
@@ -244,7 +245,9 @@ In this order: what needs the host's hand first, settings last. Under the title:
 how to open the guest port.
 
 - Libraries: add, remove, rescan with progress. A library whose folder is gone says so in plain words
-  (moved, renamed, a drive not mounted), not as the raw file error.
+  (moved, renamed, a drive not mounted), not as the raw file error. An empty folder counts as gone
+  while the library has videos that aren't missing: an unmounted drive leaves its mount point behind.
+  So the scan never marks a library's last video missing; the host removes the library instead.
 - Files we can't use (skipped or unplayable), each with its reason, plus "Apple devices only" warnings.
 - The job queue, with failed jobs and ffmpeg's error.
 - Language defaults for new picks.

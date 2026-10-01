@@ -418,7 +418,8 @@
 					</section>
 				{/if}
 
-				{#if cacheLoaded}
+				{#if jobs || cacheLoaded}
+					<!-- Disk use comes with the jobs, the setting on its own: each shows once it has loaded. -->
 					<section class="flex flex-col gap-3">
 						{@render heading(strings.cacheCleanup)}
 						{#if jobs}
@@ -451,40 +452,42 @@
 								</div>
 							{/if}
 						{/if}
-						<form
-							onsubmit={saveCache}
-							oninput={() => {
-								cacheSaved = false;
-								cacheChanged = true;
-								cacheEdits++;
-							}}
-							class="flex flex-col gap-4"
-						>
-							<label class="flex flex-col gap-1.5">
-								<span>{strings.unusedDays}</span>
-								<input
-									type="number"
-									bind:value={unusedDays}
-									min={minUnusedDays}
-									max={maxUnusedDays}
-									step="1"
-									required
-									class="field w-24"
-								/>
-								<span class="text-sm text-haze">{strings.unusedDaysHint}</span>
-							</label>
-							<div class="flex items-center gap-3">
-								<button type="submit" disabled={savingCache || !cacheChanged} class="btn btn-primary">
-									{strings.save}
-								</button>
-								{#if cacheSaved}
-									<span class="text-sm text-haze">{strings.saved}</span>
+						{#if cacheLoaded}
+							<form
+								onsubmit={saveCache}
+								oninput={() => {
+									cacheSaved = false;
+									cacheChanged = true;
+									cacheEdits++;
+								}}
+								class="flex flex-col gap-4"
+							>
+								<label class="flex flex-col gap-1.5">
+									<span>{strings.unusedDays}</span>
+									<input
+										type="number"
+										bind:value={unusedDays}
+										min={minUnusedDays}
+										max={maxUnusedDays}
+										step="1"
+										required
+										class="field w-24"
+									/>
+									<span class="text-sm text-haze">{strings.unusedDaysHint}</span>
+								</label>
+								<div class="flex items-center gap-3">
+									<button type="submit" disabled={savingCache || !cacheChanged} class="btn btn-primary">
+										{strings.save}
+									</button>
+									{#if cacheSaved}
+										<span class="text-sm text-haze">{strings.saved}</span>
+									{/if}
+								</div>
+								{#if cacheError}
+									<p class="text-sm text-ember" role="alert">{cacheError}</p>
 								{/if}
-							</div>
-							{#if cacheError}
-								<p class="text-sm text-ember" role="alert">{cacheError}</p>
-							{/if}
-						</form>
+							</form>
+						{/if}
 					</section>
 				{/if}
 			</div>

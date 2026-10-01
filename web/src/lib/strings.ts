@@ -36,7 +36,8 @@ export const strings = {
 	scanLooking: 'Looking for files…',
 	scanProgress: (done: number, total: number) => `Scanning ${done} of ${total}…`,
 	scanFailed: 'Last scan failed:',
-	folderGone: "This folder is gone. Was it moved or renamed? Put it back, or remove this library.",
+	folderGone:
+		"This folder is gone or empty. Was it moved or renamed, or is its drive not mounted? Put it back, or remove this library.",
 	rescan: 'Rescan',
 	remove: 'Remove',
 	removeConfirm: 'Remove? Its videos stay, marked missing, until you add the folder again.',

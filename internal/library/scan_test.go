@@ -510,6 +510,7 @@ func TestScanNameFields(t *testing.T) {
 func TestScanMissingAndBack(t *testing.T) {
 	l := newTestLib(t, Movies)
 	l.write("Heat (1995).mkv", "heat")
+	l.write("Ronin (1998).mkv", "ronin") // an emptied folder is a gone folder, not a missing video
 	l.scan()
 	before := l.videos()["Heat (1995).mkv"]
 
@@ -712,6 +713,34 @@ func TestScanMissingRoot(t *testing.T) {
 	}
 	if v := l.videos()["Heat (1995).mkv"]; v.Missing {
 		t.Errorf("Heat = %+v, want not missing", v)
+	}
+}
+
+// An unmounted drive leaves its mount point behind, empty: that's a gone folder too, not a library
+// whose every video went missing.
+func TestScanEmptiedFolder(t *testing.T) {
+	l := newTestLib(t, Movies)
+	l.scan() // a new library may be empty
+	l.write("Heat (1995)/Heat (1995).mkv", "heat")
+	l.scan()
+	if err := os.RemoveAll(filepath.Join(l.dir, "Heat (1995)")); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.scanner.ScanLibrary(context.Background(), l.lib, nil); !errors.Is(err, ErrFolderGone) {
+		t.Errorf("scan of an emptied library folder: err = %v, want ErrFolderGone", err)
+	}
+	if v := l.videos()["Heat (1995)/Heat (1995).mkv"]; v.Missing {
+		t.Errorf("Heat = %+v, want not missing", v)
+	}
+}
+
+// The media folder gone is not the library's folder gone: removing the library wouldn't help.
+func TestScanMissingMediaFolder(t *testing.T) {
+	l := newTestLib(t, Movies)
+	l.scanner.Root = filepath.Join(l.scanner.Root, "away")
+	err := l.scanner.ScanLibrary(context.Background(), l.lib, nil)
+	if err == nil || errors.Is(err, ErrFolderGone) {
+		t.Errorf("err = %v, want an error that isn't ErrFolderGone", err)
 	}
 }
 

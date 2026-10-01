@@ -258,6 +258,7 @@ func missing(rel string) func(map[string]videoRow) bool {
 
 func TestWatchAddRenameDelete(t *testing.T) {
 	l := newWatchLib(t, Movies)
+	l.write("notes.txt", "") // an emptied folder is a gone folder, not a missing video
 
 	l.moveIn("Heat (1995).mkv", "heat")
 	l.eventually("moved in", present("Heat (1995).mkv"))
