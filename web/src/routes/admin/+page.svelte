@@ -240,8 +240,11 @@
 						<div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
 							<div class="min-w-0">
 								<p class="font-semibold break-words">{lib.path}</p>
+								<!-- A folder named after its type ("Movies") doesn't say it twice. -->
 								<p class="text-sm text-haze">
-									{strings.libraryTypes[lib.type]}, {strings.videoCount(lib.videos)}
+									{lib.path.split('/').at(-1) === strings.libraryTypes[lib.type]
+										? strings.videoCount(lib.videos)
+										: strings.libraryLine(strings.libraryTypes[lib.type], strings.videoCount(lib.videos))}
 								</p>
 							</div>
 							<div class="flex gap-2">

@@ -33,6 +33,7 @@ export const strings = {
 	noLibraries: 'No libraries yet. Pick the folder that holds your videos.',
 	libraryTypes: { movies: 'Movies', tv: 'TV Shows', other: 'Other Videos' },
 	videoCount: (n: number) => (n === 1 ? '1 video' : `${n} videos`),
+	libraryLine: (type: string, videos: string) => `${type}, ${videos}`,
 	scanQueued: 'Waiting to scan…',
 	scanLooking: 'Looking for files…',
 	scanProgress: (done: number, total: number) => `Scanning ${done} of ${total}…`,
@@ -110,7 +111,7 @@ export const strings = {
 	// Why a prepare job failed (media.FailNoSpace, media.FailPrepare).
 	jobErrors: {
 		'no-space': 'Not enough free disk space.',
-		failed: 'Prepare failed.'
+		failed: "Couldn't prepare this video. The file may be damaged: check that it plays on this computer."
 	} as Record<string, string>,
 
 	// Why a file can't be used: skipped by the scan (library.Reason) or unplayable (media.Unplayable).
@@ -128,7 +129,7 @@ export const strings = {
 		'no-video': 'No video stream.',
 		codec: "Browsers can't play this codec.",
 		'h264-profile': "H.264 that browsers can't decode (10-bit, 4:2:2 or 4:4:4).",
-		'probe-failed': "ffprobe couldn't read the file."
+		'probe-failed': "Couldn't read the file. It may be damaged, or still downloading: rescan once it's done."
 	},
 
 	watchSomething: 'Watch something',
