@@ -244,7 +244,9 @@ container mount for source files, and one name for two things gets mixed up in c
 In this order: what needs the host's hand first, settings last. Under the title: the guest link, or
 how to open the guest port.
 
-- Libraries: add, remove, rescan with progress. A library whose folder is gone says so in plain words
+- Libraries: add, remove, rescan with progress. Adding sits behind a button (open while there is no
+  library), guesses the type from the folder's name (`TV Shows` → TV Shows) and says each type's naming,
+  and its button names the result ("Add TV Shows as TV Shows"). A library whose folder is gone says so in plain words
   (moved, renamed, a drive not mounted), not as the raw file error. An empty folder counts as gone
   while the library has videos that aren't missing: an unmounted drive leaves its mount point behind.
   So the scan never marks a library's last video missing; the host removes the library instead.

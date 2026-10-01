@@ -8,6 +8,7 @@
 		clearCache,
 		formatBytes,
 		getCache,
+		guessType,
 		jobText,
 		listJobs,
 		listLibraries,
@@ -46,6 +47,16 @@
 	let type = $state<LibraryType>('movies');
 	let adding = $state(false);
 	let addError = $state('');
+	let addOpen = $state(false); // the add form, behind its button once there is a library
+	// With no library yet, adding one is the page's whole job: the form is open.
+	const showAdd = $derived(addOpen || (loaded && libraries.length === 0));
+	const folderName = $derived(path.split('/').pop() ?? '');
+
+	// Opening a folder named like a type picks that type; the host can still change it.
+	$effect(() => {
+		const guess = guessType(path);
+		if (guess) type = guess;
+	});
 
 	let confirming = $state<number | null>(null); // library whose Remove waits for a yes
 	let confirmingClear = $state(false); // Clear cache waits for a yes
@@ -141,7 +152,10 @@
 		const r = await addLibrary(path, type);
 		adding = false;
 		addError = r.ok ? '' : (strings.addErrors[r.error] ?? strings.addErrors.failed);
-		if (r.ok) path = '';
+		if (r.ok) {
+			path = '';
+			addOpen = false;
+		}
 		await refresh();
 	}
 
@@ -285,32 +299,50 @@
 						<p class="text-haze">{strings.noLibraries}</p>
 					{/if}
 				{/each}
-			</section>
-
-			<section class="flex flex-col gap-3">
-				{@render heading(strings.addLibrary)}
-				<form onsubmit={add} class="flex flex-col gap-3">
-					<FolderPicker bind:path />
-					<div class="flex flex-wrap items-center gap-3">
-						<label class="flex items-center gap-2">
-							<span class="text-haze">{strings.libraryType}</span>
-							<select bind:value={type} class="field">
-								{#each Object.entries(strings.libraryTypes) as [value, label] (value)}
-									<option {value}>{label}</option>
-								{/each}
-							</select>
+				{#if showAdd}
+					<form onsubmit={add} class="mt-3 flex flex-col gap-3">
+						<h3 class="font-semibold">{strings.addLibrary}</h3>
+						<FolderPicker bind:path />
+						<label class="flex flex-col gap-1.5">
+							<span class="flex items-center gap-2">
+								<span class="text-haze">{strings.libraryType}</span>
+								<select bind:value={type} class="field">
+									{#each Object.entries(strings.libraryTypes) as [value, label] (value)}
+										<option {value}>{label}</option>
+									{/each}
+								</select>
+							</span>
+							<span class="text-sm text-haze">{strings.libraryTypeHints[type]}</span>
 						</label>
-						<button type="submit" disabled={adding || path === ''} class="btn btn-primary">
-							{strings.add}
-						</button>
-						<span class="text-sm break-all text-haze">
-							{path === '' ? strings.openFolderHint : `/${path}`}
-						</span>
-					</div>
-					{#if addError}
-						<p class="text-sm text-ember" role="alert">{addError}</p>
-					{/if}
-				</form>
+						<div class="flex flex-wrap items-center gap-3">
+							<button type="submit" disabled={adding || path === ''} class="btn btn-primary max-w-full break-words">
+								{path === '' ? strings.add : strings.addAs(folderName, strings.libraryTypes[type])}
+							</button>
+							{#if libraries.length > 0}
+								<button
+									type="button"
+									onclick={() => {
+										addOpen = false;
+										addError = '';
+									}}
+									class="btn btn-quiet"
+								>
+									{strings.cancel}
+								</button>
+							{/if}
+							{#if path === ''}
+								<span class="text-sm text-haze">{strings.openFolderHint}</span>
+							{/if}
+						</div>
+						{#if addError}
+							<p class="text-sm text-ember" role="alert">{addError}</p>
+						{/if}
+					</form>
+				{:else if loaded}
+					<button onclick={() => (addOpen = true)} class="btn btn-quiet self-start">
+						{strings.addLibrary}
+					</button>
+				{/if}
 			</section>
 
 			{#if libraries.length > 0}
@@ -349,6 +381,7 @@
 			{#if jobs}
 				<section class="flex flex-col gap-3">
 					{@render heading(strings.jobs)}
+					<p class="text-sm text-haze">{strings.jobsNote}</p>
 					{#if jobs.jobs.length === 0}
 						<p class="text-haze">{strings.noJobs}</p>
 					{:else}

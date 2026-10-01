@@ -92,6 +92,15 @@ export function problemText(p: Problem): string {
 	return p.reason === 'codec' && p.codec ? `${text} (${p.codec})` : text;
 }
 
+// guessType guesses a library's type from its folder's name, so the add form starts on the likely one:
+// "TV Shows" and "Series" hold shows, "Movies" and "Films" movies. null: no guess.
+export function guessType(path: string): LibraryType | null {
+	const name = (path.split('/').pop() ?? '').toLowerCase();
+	if (/\b(tv|shows?|series|diziler|dizi)\b/.test(name)) return 'tv';
+	if (/\b(movies?|films?|filmler)\b/.test(name)) return 'movies';
+	return null;
+}
+
 // jobText says where a job, or a room's prepared copy, stands; '' when it's ready or there's none.
 // Unknown failure codes show as they are.
 export function jobText(j: Pick<Prepare, 'state' | 'place' | 'progress' | 'error'>): string {

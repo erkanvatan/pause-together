@@ -29,7 +29,7 @@ export const strings = {
 	actionFailed: "That didn't work. Try again.",
 
 	libraries: 'Libraries',
-	noLibraries: 'No libraries yet. Add a folder below.',
+	noLibraries: 'No libraries yet. Pick the folder that holds your videos.',
 	libraryTypes: { movies: 'Movies', tv: 'TV Shows', other: 'Other Videos' },
 	videoCount: (n: number) => (n === 1 ? '1 video' : `${n} videos`),
 	scanQueued: 'Waiting to scan…',
@@ -48,7 +48,14 @@ export const strings = {
 	foldersFailed: "Can't open this folder.",
 	libraryType: 'Type',
 	add: 'Add this folder',
-	openFolderHint: 'Open a folder to choose it.',
+	addAs: (folder: string, type: string) => `Add ${folder} as ${type}`,
+	openFolderHint: 'Open the folder that holds your videos, then add it.',
+	// How each type expects its files named. Files that don't fit show under "Files we can't use".
+	libraryTypeHints: {
+		movies: 'Names like "Title (Year).mkv", alone or in a "Title (Year)" folder.',
+		tv: 'A folder per show, with names like "Show/Season 01/Show - s01e02.mkv".',
+		other: 'Any names. Sub-folders become groups in the picker.'
+	},
 	addErrors: {
 		overlap: 'This folder is, holds, or sits inside another library.',
 		'not-folder': 'Pick a folder inside the media folder.',
@@ -86,6 +93,8 @@ export const strings = {
 	appleOnlyNote: 'Dolby Vision profile 5. Other screens show it purple and green.',
 
 	jobs: 'Prepare jobs',
+	jobsNote:
+		"Before a room can play, its video is copied once into the cache: same quality, in a form every browser can seek. One copy at a time.",
 	noJobs: 'Nothing to prepare.',
 	diskUsage: (cache: string, free: string) => `Cache ${cache}, with ${free} free on its disk`,
 	clearCache: 'Clear cache',

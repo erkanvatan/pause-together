@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addLibrary, formatBytes, jobText, listFolders, problemText, removeLibrary } from './admin';
+import { addLibrary, formatBytes, guessType, jobText, listFolders, problemText, removeLibrary } from './admin';
 
 function respond(status: number, body: string | null, type = 'application/json') {
 	vi.stubGlobal(
@@ -136,5 +136,21 @@ describe('jobText', () => {
 
 	it('shows an unknown failure code as it is', () => {
 		expect(jobText({ ...job, state: 'failed', error: 'new-code' })).toBe('new-code');
+	});
+});
+
+describe('guessType', () => {
+	it.each([
+		['TV Shows', 'tv'],
+		['media/Series', 'tv'],
+		['Diziler', 'tv'],
+		['Movies', 'movies'],
+		['films', 'movies'],
+		['Filmler', 'movies'],
+		['Family Videos', null],
+		['', null],
+		['Shortcuts', null] // a word that only starts like one
+	])('guesses %j as %s', (path, want) => {
+		expect(guessType(path)).toBe(want);
 	});
 });
