@@ -217,13 +217,13 @@
 	</main>
 {:else}
 	<main class="mx-auto w-full max-w-6xl px-4 pt-2 pb-16">
-		<div class="flex max-w-3xl flex-col gap-12">
+		<div class="flex flex-col gap-12">
 			<div class="flex flex-col gap-2">
 				<h1 class="font-display text-2xl font-bold">{strings.admin}</h1>
 				{#if me.guestUrl}
 					<GuestLink />
 				{:else}
-					<p class="max-w-[70ch] text-sm text-haze">{strings.noGuestLink}</p>
+					<p class="max-w-[48ch] text-sm text-haze">{strings.noGuestLink}</p>
 				{/if}
 			</div>
 
@@ -233,337 +233,347 @@
 				</p>
 			{/if}
 
-			<section class="flex flex-col gap-3">
-				{@render heading(strings.libraries)}
-				{#each libraries as lib (lib.id)}
-					<div class="flex flex-col gap-2 py-1">
-						<div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-							<div class="min-w-0">
-								<p class="font-semibold break-words">{lib.path}</p>
-								<!-- A folder named after its type ("Movies") doesn't say it twice. -->
-								<p class="text-sm text-haze">
-									{lib.path.split('/').at(-1) === strings.libraryTypes[lib.type]
-										? strings.videoCount(lib.videos)
-										: strings.libraryLine(strings.libraryTypes[lib.type], strings.videoCount(lib.videos))}
-								</p>
-							</div>
-							<div class="flex gap-2">
-								<button
-									onclick={() => act(rescanLibrary(lib.id))}
-									disabled={lib.scan.state !== ''}
-									class="btn btn-quiet btn-small"
-								>
-									{strings.rescan}
-								</button>
-								<button onclick={() => (confirming = lib.id)} class="btn btn-quiet btn-small">
-									{strings.remove}
-								</button>
-							</div>
-						</div>
-						{#if lib.scan.state === 'queued'}
-							<p class="text-sm text-haze">{strings.scanQueued}</p>
-						{:else if lib.scan.state === 'scanning'}
-							<div class="flex flex-col gap-1.5">
-								<p class="text-sm text-haze">
-									{lib.scan.total > 0
-										? strings.scanProgress(lib.scan.done, lib.scan.total)
-										: strings.scanLooking}
-								</p>
-								{#if lib.scan.total > 0}
-									<div class="h-1 max-w-80 overflow-hidden rounded-full bg-dusk">
-										<div
-											class="h-full bg-lamp"
-											style:width="{(lib.scan.done / lib.scan.total) * 100}%"
-										></div>
+			<!-- What needs the host's hand first, then the settings: two columns on a wide screen. -->
+			<div class="grid gap-12 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-16">
+				<div class="flex min-w-0 flex-col gap-12">
+					<section class="flex flex-col gap-3">
+						{@render heading(strings.libraries)}
+						{#each libraries as lib (lib.id)}
+							<div class="flex flex-col gap-2 py-1">
+								<div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+									<div class="min-w-0">
+										<p class="font-semibold break-words">{lib.path}</p>
+										<!-- A folder named after its type ("Movies") doesn't say it twice. -->
+										<p class="text-sm text-haze">
+											{lib.path.split('/').at(-1) === strings.libraryTypes[lib.type]
+												? strings.videoCount(lib.videos)
+												: strings.libraryLine(strings.libraryTypes[lib.type], strings.videoCount(lib.videos))}
+										</p>
+									</div>
+									<div class="flex gap-2">
+										<button
+											onclick={() => act(rescanLibrary(lib.id))}
+											disabled={lib.scan.state !== ''}
+											class="btn btn-quiet btn-small"
+										>
+											{strings.rescan}
+										</button>
+										<button onclick={() => (confirming = lib.id)} class="btn btn-quiet btn-small">
+											{strings.remove}
+										</button>
+									</div>
+								</div>
+								{#if lib.scan.state === 'queued'}
+									<p class="text-sm text-haze">{strings.scanQueued}</p>
+								{:else if lib.scan.state === 'scanning'}
+									<div class="flex flex-col gap-1.5">
+										<p class="text-sm text-haze">
+											{lib.scan.total > 0
+												? strings.scanProgress(lib.scan.done, lib.scan.total)
+												: strings.scanLooking}
+										</p>
+										{#if lib.scan.total > 0}
+											<div class="h-1 max-w-80 overflow-hidden rounded-full bg-dusk">
+												<div
+													class="h-full bg-lamp"
+													style:width="{(lib.scan.done / lib.scan.total) * 100}%"
+												></div>
+											</div>
+										{/if}
+									</div>
+								{/if}
+								{#if lib.scan.gone}
+									<p class="max-w-[48ch] text-sm text-ember">{strings.folderGone}</p>
+								{:else if lib.scan.error}
+									<p class="text-sm text-ember">
+										{strings.scanFailed} <span class="font-mono break-words">{lib.scan.error}</span>
+									</p>
+								{/if}
+								{#if confirming === lib.id}
+									<div class="flex flex-wrap items-center gap-2 text-sm">
+										<span>{strings.removeConfirm}</span>
+										<button
+											onclick={() => {
+												confirming = null;
+												act(removeLibrary(lib.id));
+											}}
+											class="btn btn-danger btn-small"
+										>
+											{strings.remove}
+										</button>
+										<button onclick={() => (confirming = null)} class="btn btn-quiet btn-small">
+											{strings.cancel}
+										</button>
 									</div>
 								{/if}
 							</div>
-						{/if}
-						{#if lib.scan.gone}
-							<p class="max-w-[70ch] text-sm text-ember">{strings.folderGone}</p>
-						{:else if lib.scan.error}
-							<p class="text-sm text-ember">
-								{strings.scanFailed} <span class="font-mono break-words">{lib.scan.error}</span>
-							</p>
-						{/if}
-						{#if confirming === lib.id}
-							<div class="flex flex-wrap items-center gap-2 text-sm">
-								<span>{strings.removeConfirm}</span>
-								<button
-									onclick={() => {
-										confirming = null;
-										act(removeLibrary(lib.id));
-									}}
-									class="btn btn-danger btn-small"
-								>
-									{strings.remove}
-								</button>
-								<button onclick={() => (confirming = null)} class="btn btn-quiet btn-small">
-									{strings.cancel}
-								</button>
-							</div>
-						{/if}
-					</div>
-				{:else}
-					{#if loaded}
-						<p class="text-haze">{strings.noLibraries}</p>
-					{/if}
-				{/each}
-				{#if showAdd}
-					<form onsubmit={add} class="mt-3 flex flex-col gap-3">
-						<h3 class="font-semibold">{strings.addLibrary}</h3>
-						<FolderPicker bind:path />
-						<label class="flex flex-col gap-1.5">
-							<span class="flex items-center gap-2">
-								<span class="text-haze">{strings.libraryType}</span>
-								<select bind:value={type} onchange={() => (typeChosen = true)} class="field">
-									{#each Object.entries(strings.libraryTypes) as [value, label] (value)}
-										<option {value}>{label}</option>
-									{/each}
-								</select>
-							</span>
-							<span class="text-sm text-haze">{strings.libraryTypeHints[type]}</span>
-						</label>
-						<div class="flex flex-wrap items-center gap-3">
-							<button type="submit" disabled={adding || path === ''} class="btn btn-primary max-w-full break-words">
-								{path === '' ? strings.add : strings.addAs(folderName, strings.libraryTypes[type])}
-							</button>
-							{#if libraries.length > 0}
-								<button
-									type="button"
-									onclick={() => {
-										addOpen = false;
-										addError = '';
-									}}
-									class="btn btn-quiet"
-								>
-									{strings.cancel}
-								</button>
+						{:else}
+							{#if loaded}
+								<p class="text-haze">{strings.noLibraries}</p>
 							{/if}
-							{#if path === ''}
-								<span class="text-sm text-haze">{strings.openFolderHint}</span>
-							{/if}
-						</div>
-						{#if addError}
-							<p class="text-sm text-ember" role="alert">{addError}</p>
-						{/if}
-					</form>
-				{:else if loaded}
-					<button onclick={() => (addOpen = true)} class="btn btn-quiet self-start">
-						{strings.addLibrary}
-					</button>
-				{/if}
-			</section>
-
-			{#if libraries.length > 0}
-				<section class="flex flex-col gap-3">
-					{@render heading(strings.cantUse)}
-					{#if problemGroups.length === 0}
-						<p class="text-haze">{strings.allUsable}</p>
-					{:else}
-						<!-- One line per reason with its count and fix; the files under it. A few are shown at once. -->
-						<ul class="flex flex-col gap-1">
-							{#each problemGroups as g (g.text)}
-								<li>
-									<details
-										open={groupOpen[g.text] ?? g.problems.length <= 3}
-										ontoggle={(e) => (groupOpen[g.text] = e.currentTarget.open)}
-										class="group"
-									>
-										<summary class="row -mx-3 w-auto cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-											<Icon
-												name="chevron"
-												class="size-5 shrink-0 text-haze transition-transform group-open:rotate-90"
-											/>
-											<span class="min-w-0 flex-1 break-words">{g.text}</span>
-											<span class="shrink-0 text-sm text-haze tabular-nums">
-												{strings.fileCount(g.problems.length)}
-											</span>
-										</summary>
-										<ul class="flex flex-col gap-1 pt-1 pb-3 pl-8 text-sm text-haze">
-											{#each g.problems as p (`${p.libraryId}/${p.path}`)}
-												<li class="break-words">
-													{#if p.probeError}
-														<!-- ffprobe's own words help the host, but read like a crash: one click away. -->
-														<details>
-															<summary
-																class="cursor-pointer break-words pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:items-center"
-															>
-																{fullPath(p)}
-															</summary>
-															<p class="mt-1 font-mono break-words">{p.probeError}</p>
-														</details>
-													{:else}
-														{fullPath(p)}
-													{/if}
-												</li>
-											{/each}
-										</ul>
-									</details>
-								</li>
-							{/each}
-						</ul>
-					{/if}
-				</section>
-			{/if}
-
-			{#if problems.appleOnly.length > 0}
-				<section class="flex flex-col gap-3">
-					{@render heading(strings.appleOnly)}
-					<p class="text-sm text-haze">{strings.appleOnlyNote}</p>
-					<ul class="flex flex-col gap-1">
-						{#each problems.appleOnly as p (`${p.libraryId}/${p.path}`)}
-							<li class="break-words">{fullPath(p)}</li>
 						{/each}
-					</ul>
-				</section>
-			{/if}
-
-			{#if jobs}
-				<section class="flex flex-col gap-3">
-					{@render heading(strings.jobs)}
-					<p class="text-sm text-haze">{strings.jobsNote}</p>
-					{#if jobs.jobs.length === 0}
-						<p class="text-haze">{strings.noJobs}</p>
-					{:else}
-						<ul class="flex flex-col gap-3">
-							{#each jobs.jobs as j (j.key)}
-								<li class="flex flex-col">
-									<span class="break-words">{j.name}</span>
-									<span class="text-sm {j.state === 'failed' ? 'text-ember' : 'text-haze'}">
-										{jobText(j)}
+						{#if showAdd}
+							<form onsubmit={add} class="mt-3 flex flex-col gap-3">
+								<h3 class="font-semibold">{strings.addLibrary}</h3>
+								<FolderPicker bind:path />
+								<label class="flex flex-col gap-1.5">
+									<span class="flex items-center gap-2">
+										<span class="text-haze">{strings.libraryType}</span>
+										<select bind:value={type} onchange={() => (typeChosen = true)} class="field">
+											{#each Object.entries(strings.libraryTypes) as [value, label] (value)}
+												<option {value}>{label}</option>
+											{/each}
+										</select>
 									</span>
-									{#if j.detail}
-										<span class="font-mono text-sm break-words whitespace-pre-wrap text-haze">
-											{j.detail}
-										</span>
+									<span class="text-sm text-haze">{strings.libraryTypeHints[type]}</span>
+								</label>
+								<div class="flex flex-wrap items-center gap-3">
+									<button type="submit" disabled={adding || path === ''} class="btn btn-primary max-w-full break-words">
+										{path === '' ? strings.add : strings.addAs(folderName, strings.libraryTypes[type])}
+									</button>
+									{#if libraries.length > 0}
+										<button
+											type="button"
+											onclick={() => {
+												addOpen = false;
+												addError = '';
+											}}
+											class="btn btn-quiet"
+										>
+											{strings.cancel}
+										</button>
 									{/if}
-								</li>
-							{/each}
-						</ul>
-					{/if}
-				</section>
-			{/if}
-
-			<div class="grid gap-12 md:grid-cols-2">
-				{#if langsLoaded}
-					<section class="flex flex-col gap-3">
-						{@render heading(strings.languageDefaults)}
-						<p class="text-sm text-haze">{strings.languageDefaultsNote}</p>
-						<form
-							onsubmit={saveLanguages}
-							oninput={() => {
-								langsSaved = false;
-								langsChanged = true;
-								langsEdits++;
-							}}
-							class="flex flex-col gap-4"
-						>
-							<label class="flex flex-col gap-1.5">
-								<span>{strings.audioLanguage}</span>
-								<input bind:value={audioLang} placeholder={strings.original} class="field max-w-xs" />
-								<span class="text-sm text-haze">{strings.audioLanguageHint}</span>
-								<span class="text-sm">
-									{strings.readsAs(audioLang.trim() ? langName(audioLang.trim()) : strings.original)}
-								</span>
-							</label>
-							<label class="flex flex-col gap-1.5">
-								<span>{strings.subtitleLanguages}</span>
-								<input bind:value={subtitleLangs} placeholder="tr, en" class="field max-w-xs" />
-								<span class="text-sm text-haze">{strings.subtitleLanguagesHint}</span>
-								<span class="text-sm">
-									{strings.readsAs(
-										subtitleCodes.length > 0 ? subtitleCodes.map(langName).join(', ') : strings.none
-									)}
-								</span>
-							</label>
-							<div class="flex items-center gap-3">
-								<button type="submit" disabled={savingLangs || !langsChanged} class="btn btn-primary">
-									{strings.save}
-								</button>
-								{#if langsSaved}
-									<span class="text-sm text-haze">{strings.saved}</span>
-								{/if}
-							</div>
-							{#if langsError}
-								<p class="text-sm text-ember" role="alert">{langsError}</p>
-							{/if}
-						</form>
-					</section>
-				{/if}
-
-				{#if jobs || cacheLoaded}
-					<!-- Disk use comes with the jobs, the setting on its own: each shows once it has loaded. -->
-					<section class="flex flex-col gap-3">
-						{@render heading(strings.cacheCleanup)}
-						{#if jobs}
-							<div class="flex flex-col items-start gap-3">
-								<p class="text-sm text-haze">
-									{strings.diskUsage(formatBytes(jobs.cacheBytes), formatBytes(jobs.freeBytes))}
-								</p>
-								{#if !confirmingClear}
-									<!-- Quiet until asked: ember belongs to the confirm step. -->
-									<button onclick={() => (confirmingClear = true)} class="btn btn-quiet btn-small">
-										{strings.clearCache}
-									</button>
-								{/if}
-							</div>
-							{#if confirmingClear}
-								<div class="flex flex-wrap items-center gap-2 text-sm" role="alert">
-									<span>{strings.clearCacheConfirm}</span>
-									<button
-										onclick={() => {
-											confirmingClear = false;
-											act(clearCache());
-										}}
-										class="btn btn-danger btn-small"
-									>
-										{strings.clearCache}
-									</button>
-									<button onclick={() => (confirmingClear = false)} class="btn btn-quiet btn-small">
-										{strings.cancel}
-									</button>
+									{#if path === ''}
+										<span class="text-sm text-haze">{strings.openFolderHint}</span>
+									{/if}
 								</div>
-							{/if}
+								{#if addError}
+									<p class="text-sm text-ember" role="alert">{addError}</p>
+								{/if}
+							</form>
+						{:else if loaded}
+							<button onclick={() => (addOpen = true)} class="btn btn-quiet self-start">
+								{strings.addLibrary}
+							</button>
 						{/if}
-						{#if cacheLoaded}
+					</section>
+
+					{#if libraries.length > 0}
+						<section class="flex flex-col gap-3">
+							{@render heading(strings.cantUse)}
+							{#if problemGroups.length === 0}
+								<p class="text-haze">{strings.allUsable}</p>
+							{:else}
+								<!-- One line per reason with its count and fix; the files under it. A few are shown at once. -->
+								<ul class="flex flex-col gap-1">
+									{#each problemGroups as g (g.text)}
+										<li>
+											<details
+												open={groupOpen[g.text] ?? g.problems.length <= 3}
+												ontoggle={(e) => (groupOpen[g.text] = e.currentTarget.open)}
+												class="group"
+											>
+												<summary class="row -mx-3 w-auto cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+													<Icon
+														name="chevron"
+														class="size-5 shrink-0 text-haze transition-transform group-open:rotate-90"
+													/>
+													<span class="min-w-0 flex-1 break-words">{g.text}</span>
+													<span class="shrink-0 text-sm text-haze tabular-nums">
+														{strings.fileCount(g.problems.length)}
+													</span>
+												</summary>
+												<ul class="flex flex-col gap-1 pt-1 pb-3 pl-8 text-sm text-haze">
+													{#each g.problems as p (`${p.libraryId}/${p.path}`)}
+														<li class="break-words">
+															{#if p.probeError}
+																<!-- ffprobe's own words help the host, but read like a crash: one click away. -->
+																<details>
+																	<summary
+																		class="cursor-pointer break-words pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:items-center"
+																	>
+																		{fullPath(p)}
+																	</summary>
+																	<p class="mt-1 font-mono break-words">{p.probeError}</p>
+																</details>
+															{:else}
+																{fullPath(p)}
+															{/if}
+														</li>
+													{/each}
+												</ul>
+											</details>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</section>
+					{/if}
+
+					{#if problems.appleOnly.length > 0}
+						<section class="flex flex-col gap-3">
+							{@render heading(strings.appleOnly)}
+							<p class="max-w-[48ch] text-sm text-haze">{strings.appleOnlyNote}</p>
+							<ul class="flex flex-col gap-1">
+								{#each problems.appleOnly as p (`${p.libraryId}/${p.path}`)}
+									<li class="break-words">{fullPath(p)}</li>
+								{/each}
+							</ul>
+						</section>
+					{/if}
+
+					{#if jobs}
+						<section class="flex flex-col gap-3">
+							{@render heading(strings.jobs)}
+							<p class="max-w-[48ch] text-sm text-haze">{strings.jobsNote}</p>
+							{#if jobs.jobs.length === 0}
+								<p class="text-haze">{strings.noJobs}</p>
+							{:else}
+								<ul class="flex flex-col gap-3">
+									{#each jobs.jobs as j (j.key)}
+										<li class="flex flex-col">
+											<span class="break-words">{j.name}</span>
+											<span class="text-sm {j.state === 'failed' ? 'text-ember' : 'text-haze'}">
+												{jobText(j)}
+											</span>
+											{#if j.detail}
+												<span class="font-mono text-sm break-words whitespace-pre-wrap text-haze">
+													{j.detail}
+												</span>
+											{/if}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</section>
+					{/if}
+				</div>
+
+				<!-- Settings last: beside the rest on a wide screen. -->
+				<div class="grid content-start gap-12 md:grid-cols-2 lg:grid-cols-1">
+					{#if langsLoaded}
+						<section class="flex flex-col gap-3">
+							{@render heading(strings.languageDefaults)}
+							<p class="max-w-[48ch] text-sm text-haze">{strings.languageDefaultsNote}</p>
 							<form
-								onsubmit={saveCache}
+								onsubmit={saveLanguages}
 								oninput={() => {
-									cacheSaved = false;
-									cacheChanged = true;
-									cacheEdits++;
+									langsSaved = false;
+									langsChanged = true;
+									langsEdits++;
 								}}
 								class="flex flex-col gap-4"
 							>
 								<label class="flex flex-col gap-1.5">
-									<span>{strings.unusedDays}</span>
-									<input
-										type="number"
-										bind:value={unusedDays}
-										min={minUnusedDays}
-										max={maxUnusedDays}
-										step="1"
-										required
-										class="field w-24"
-									/>
-									<span class="text-sm text-haze">{strings.unusedDaysHint}</span>
+									<span>{strings.audioLanguage}</span>
+									<input bind:value={audioLang} placeholder={strings.original} class="field max-w-xs" />
+									<span class="text-sm text-haze">{strings.audioLanguageHint}</span>
+									<span class="text-sm">
+										{strings.readsAs(audioLang.trim() ? langName(audioLang.trim()) : strings.original)}
+									</span>
+								</label>
+								<label class="flex flex-col gap-1.5">
+									<span>{strings.subtitleLanguages}</span>
+									<input bind:value={subtitleLangs} placeholder="tr, en" class="field max-w-xs" />
+									<span class="text-sm text-haze">{strings.subtitleLanguagesHint}</span>
+									<span class="text-sm">
+										{strings.readsAs(
+											subtitleCodes.length > 0 ? subtitleCodes.map(langName).join(', ') : strings.none
+										)}
+									</span>
 								</label>
 								<div class="flex items-center gap-3">
-									<button type="submit" disabled={savingCache || !cacheChanged} class="btn btn-primary">
+									<button type="submit" disabled={savingLangs || !langsChanged} class="btn btn-primary">
 										{strings.save}
 									</button>
-									{#if cacheSaved}
+									{#if langsSaved}
 										<span class="text-sm text-haze">{strings.saved}</span>
 									{/if}
 								</div>
-								{#if cacheError}
-									<p class="text-sm text-ember" role="alert">{cacheError}</p>
+								{#if langsError}
+									<p class="text-sm text-ember" role="alert">{langsError}</p>
 								{/if}
 							</form>
-						{/if}
-					</section>
-				{/if}
+						</section>
+					{/if}
+
+					{#if jobs || cacheLoaded}
+						<!-- How full the cache is, the setting that keeps it small, then emptying it by hand. Disk use
+						comes with the jobs, the setting on its own: each shows once it has loaded. -->
+						<section class="flex flex-col gap-3">
+							{@render heading(strings.cacheCleanup)}
+							{#if jobs}
+								<p class="text-sm text-haze">
+									{strings.diskUsage(formatBytes(jobs.cacheBytes), formatBytes(jobs.freeBytes))}
+								</p>
+							{/if}
+							{#if cacheLoaded}
+								<form
+									onsubmit={saveCache}
+									oninput={() => {
+										cacheSaved = false;
+										cacheChanged = true;
+										cacheEdits++;
+									}}
+									class="flex flex-col gap-4"
+								>
+									<label class="flex flex-col gap-1.5">
+										<span>{strings.unusedDays}</span>
+										<input
+											type="number"
+											bind:value={unusedDays}
+											min={minUnusedDays}
+											max={maxUnusedDays}
+											step="1"
+											required
+											class="field w-24"
+										/>
+										<span class="text-sm text-haze">{strings.unusedDaysHint}</span>
+									</label>
+									<div class="flex items-center gap-3">
+										<button type="submit" disabled={savingCache || !cacheChanged} class="btn btn-primary">
+											{strings.save}
+										</button>
+										{#if cacheSaved}
+											<span class="text-sm text-haze">{strings.saved}</span>
+										{/if}
+									</div>
+									{#if cacheError}
+										<p class="text-sm text-ember" role="alert">{cacheError}</p>
+									{/if}
+								</form>
+							{/if}
+							{#if jobs}
+								{#if !confirmingClear}
+									<!-- Quiet until asked: ember belongs to the confirm step. -->
+									<button
+										onclick={() => (confirmingClear = true)}
+										class="btn btn-quiet btn-small mt-3 self-start"
+									>
+										{strings.clearCache}
+									</button>
+								{/if}
+								{#if confirmingClear}
+									<div class="mt-3 flex flex-wrap items-center gap-2 text-sm" role="alert">
+										<span>{strings.clearCacheConfirm}</span>
+										<button
+											onclick={() => {
+												confirmingClear = false;
+												act(clearCache());
+											}}
+											class="btn btn-danger btn-small"
+										>
+											{strings.clearCache}
+										</button>
+										<button onclick={() => (confirmingClear = false)} class="btn btn-quiet btn-small">
+											{strings.cancel}
+										</button>
+									</div>
+								{/if}
+							{/if}
+						</section>
+					{/if}
+				</div>
 			</div>
 		</div>
 	</main>

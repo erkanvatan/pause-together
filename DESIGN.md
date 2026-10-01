@@ -215,6 +215,9 @@ labels.
 - Pages sit in a centered column, at most 72rem wide, with a 1rem side gutter.
 - The homepage is two columns from `lg` (tagline and "Watch something" on the left, sticky; rooms on
   the right, 2:3), and one column below.
+- The admin page is two columns from `lg` (what needs the host's hand on the left, the settings on the
+  right, 3:2), and one column below. Notes and hints stop at 48ch: Atkinson's wide "0" makes 70ch
+  hold about 100 characters.
 - The room page goes full width. Wide landscape screens put the chat beside the video (18rem, 20rem
   from `lg`). Portrait screens put the chat under the video, filling the rest of the screen.
 - On phones the video runs edge to edge (it cancels the gutter). On a tall window the video box stops
