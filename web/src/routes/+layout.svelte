@@ -74,7 +74,7 @@
 					<a
 						href="/admin"
 						aria-current={page.route.id === '/admin' ? 'page' : undefined}
-						class="btn btn-quiet shrink-0 px-3 font-normal text-haze hover:text-moonlight aria-[current=page]:text-moonlight"
+						class="btn shrink-0 px-3 font-normal text-haze hover:text-moonlight aria-[current=page]:text-moonlight"
 					>
 						{strings.admin}
 					</a>
