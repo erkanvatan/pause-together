@@ -190,9 +190,10 @@ Two lamp-colored things fighting on one screen means one of them is wrong.
 Both are bundled with the app, never loaded from a CDN, and both include latin-ext for Turkish.
 
 ### Hierarchy
-- **Display** (800, 3.5rem, 0.95): the homepage tagline only. Balanced wrapping.
-- **Headline** (700, 2.5rem, 1): page titles: the room title, Admin, "What should we call you?",
-  "Room not found".
+- **Display** (800, 3.5rem, 0.95): the homepage tagline only, from `lg`; Headline size below, so it
+  never pushes the rooms off a phone. Balanced wrapping.
+- **Headline** (700, 2.5rem, 1): page titles: the room title (Title size on a phone), Admin, "What
+  should we call you?", "Room not found".
 - **Title** (700, 1.75rem, 1.05): room card titles, homepage and admin section headings, the app
   name in the header.
 - **Title Small** (700, 1.25rem, 1.3): chat panel header, picker header and group headings.
@@ -328,6 +329,10 @@ White text on a black 65% backing with small corners, sized from the video width
 ### Navigation
 A plain header row: the lamp pause icon and the app name on the left, your name as a quiet text
 button with a chevron on the right. Its menu is a dusk panel with a line border, holding rows.
+
+The room page's title sits with the video's name right under it, and its actions beside it: a quiet
+"Switch video", and a "⋯" menu (the same panel) with "Next episode" and "Rename room". Nothing else
+stands between the title and the video, so the video starts high on a phone.
 
 ## Do's and Don'ts
 

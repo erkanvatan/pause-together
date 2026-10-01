@@ -170,7 +170,7 @@
 	class="mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 px-4 pt-8 pb-16 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-16 lg:pt-16"
 >
 	<div class="flex flex-col items-start gap-6 lg:sticky lg:top-8 lg:self-start">
-		<h1 class="font-display text-3xl font-extrabold text-balance">{strings.tagline}</h1>
+		<h1 class="font-display text-2xl font-extrabold text-balance lg:text-3xl">{strings.tagline}</h1>
 		<button onclick={() => (picking = true)} class="btn {busy ? 'btn-quiet' : 'btn-primary'}">
 			<Icon name="play" class="size-5" />
 			{strings.watchSomething}

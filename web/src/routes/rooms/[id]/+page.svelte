@@ -5,6 +5,7 @@
 	import { fade } from 'svelte/transition';
 	import Chat from '$lib/Chat.svelte';
 	import Dialog from '$lib/Dialog.svelte';
+	import Icon from '$lib/Icon.svelte';
 	import GuestLink from '$lib/GuestLink.svelte';
 	import { me } from '$lib/me.svelte';
 	import {
@@ -17,6 +18,7 @@
 		withToast
 	} from '$lib/chat';
 	import Picker from '$lib/Picker.svelte';
+	import Menu from '$lib/Menu.svelte';
 	import Player from '$lib/Player.svelte';
 	import {
 		getVideo,
@@ -337,7 +339,7 @@
 
 <!-- In portrait, the player with its chat fills the screen down to the bottom edge. -->
 <main
-	class="flex w-full flex-1 flex-col gap-4 px-4 pt-2 pb-16 {chatOpen && room && !room.archived
+	class="flex w-full flex-1 flex-col gap-4 px-4 pt-2 pb-6 {chatOpen && room && !room.archived
 		? 'portrait:pb-0'
 		: ''}"
 >
@@ -373,28 +375,51 @@
 				</div>
 			</form>
 		{:else}
-			<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-				<h1 class="min-w-0 font-display text-2xl font-bold break-words">{roomTitle(room)}</h1>
-				<div class="flex flex-wrap gap-2">
-					<button onclick={startRename} class="btn btn-quiet btn-small">
-						{strings.renameRoom}
-					</button>
+			<!-- The title with its video name under it, and the room's few actions beside it, so the video
+			starts high on a phone. -->
+			<div class="flex items-start gap-3">
+				<div class="min-w-0 flex-1">
+					<h1 class="font-display text-xl font-bold break-words sm:text-2xl">{roomTitle(room)}</h1>
+					{#if roomSubtitle(room)}
+						<p class="break-words text-haze">{roomSubtitle(room)}</p>
+					{/if}
+				</div>
+				<div class="flex shrink-0 items-center gap-2 pt-1">
 					<!-- A missing video's pick sits in the player, in its place. -->
 					{#if !room.archived && !missing}
 						<button onclick={() => openPicker()} class="btn btn-quiet btn-small">
 							{strings.switchVideo}
 						</button>
-						{#if next}
-							<button onclick={() => openPicker(next ?? undefined)} class="btn btn-quiet btn-small">
-								{strings.nextEpisode}
-							</button>
-						{/if}
 					{/if}
+					<Menu label={strings.roomActions} buttonClass="btn btn-quiet btn-small px-2">
+						{#snippet button()}
+							<Icon name="more" class="size-5" />
+						{/snippet}
+						{#snippet items(close)}
+							{#if next && !room?.archived && !missing}
+								<button
+									onclick={() => {
+										close();
+										openPicker(next ?? undefined);
+									}}
+									class="row"
+								>
+									{strings.nextEpisode}
+								</button>
+							{/if}
+							<button
+								onclick={() => {
+									close();
+									startRename();
+								}}
+								class="row"
+							>
+								{strings.renameRoom}
+							</button>
+						{/snippet}
+					</Menu>
 				</div>
 			</div>
-		{/if}
-		{#if roomSubtitle(room) && !renaming}
-			<p class="-mt-3 break-words text-haze">{roomSubtitle(room)}</p>
 		{/if}
 		<!-- Only the admin port sends a guest link: guests never see this. -->
 		{#if me.guestUrl && !room.archived}

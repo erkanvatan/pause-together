@@ -155,7 +155,8 @@ export const strings = {
 	roomNotFound: 'This room is gone.',
 	roomArchived: 'This room is archived. Unarchive it to watch.',
 	switchVideo: 'Switch video',
-	renameRoom: 'Rename',
+	renameRoom: 'Rename room',
+	roomActions: 'More',
 	roomName: 'Room name',
 	roomNameHint: "Leave it blank to show the video's name.",
 	// Why a room change failed (the room API's error codes). Others show actionFailed.

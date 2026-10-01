@@ -146,7 +146,7 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      Brand.svelte (the app name with its pause mark: header, welcome),
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode),
                      Picker.svelte, Dialog.svelte (modals on the browser's <dialog>: focus, Escape, inert page),
-                     FolderPicker.svelte, NameForm.svelte, GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), strings.ts,
+                     FolderPicker.svelte, NameForm.svelte, Menu.svelte (a button with a panel of rows), GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), strings.ts,
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID),
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
                      fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),

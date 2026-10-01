@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import Brand from '$lib/Brand.svelte';
 	import Icon from '$lib/Icon.svelte';
+	import Menu from '$lib/Menu.svelte';
 	import NameForm from '$lib/NameForm.svelte';
 	import { loadMe, me } from '$lib/me.svelte';
 	import { strings } from '$lib/strings';
@@ -15,7 +16,6 @@
 	const wide = $derived(page.route.id === '/rooms/[id]');
 
 	let loadFailed = $state(false);
-	let menuOpen = $state(false);
 	let renaming = $state(false);
 
 	// The page loaded, so the server was just up: a failure is likely brief (a restart, a busy
@@ -42,23 +42,7 @@
 	function closeRename() {
 		renaming = false;
 	}
-
-	// The name menu closes on Escape, giving focus back to its button, and on a press anywhere outside it.
-	let menu = $state<HTMLDivElement>();
-	let menuButton = $state<HTMLButtonElement>();
-
-	function menuKey(e: KeyboardEvent) {
-		if (!menuOpen || e.key !== 'Escape') return;
-		menuOpen = false;
-		menuButton?.focus();
-	}
-
-	function menuOutside(e: PointerEvent) {
-		if (menuOpen && !menu?.contains(e.target as Node)) menuOpen = false;
-	}
 </script>
-
-<svelte:window onkeydown={menuKey} onpointerdown={menuOutside} />
 
 <svelte:head>
 	<meta name="theme-color" content={themeColor} />
@@ -84,37 +68,26 @@
 			<a href="/" class="-mx-1 flex min-h-11 items-center gap-1.5 rounded-control px-1">
 				<Brand />
 			</a>
-			<div bind:this={menu} class="relative min-w-0">
-				<button
-					bind:this={menuButton}
-					onclick={() => (menuOpen = !menuOpen)}
-					aria-expanded={menuOpen}
-					class="btn max-w-full px-3 font-normal text-haze hover:text-moonlight"
-				>
+			<Menu buttonClass="btn max-w-full px-3 font-normal text-haze hover:text-moonlight">
+				{#snippet button()}
 					<span class="truncate">{me.name}</span>
 					<Icon name="chevron" class="size-4 shrink-0 rotate-90" />
-				</button>
-				{#if menuOpen}
-					<div
-						class="absolute right-0 z-20 mt-1 min-w-48 rounded-control border border-line bg-dusk p-1"
+				{/snippet}
+				{#snippet items(close)}
+					<button
+						onclick={() => {
+							close();
+							renaming = true;
+						}}
+						class="row"
 					>
-						<button
-							onclick={() => {
-								menuOpen = false;
-								renaming = true;
-							}}
-							class="row"
-						>
-							{strings.rename}
-						</button>
-						{#if me.isAdmin}
-							<a href="/admin" onclick={() => (menuOpen = false)} class="row">
-								{strings.admin}
-							</a>
-						{/if}
-					</div>
-				{/if}
-			</div>
+						{strings.rename}
+					</button>
+					{#if me.isAdmin}
+						<a href="/admin" onclick={close} class="row">{strings.admin}</a>
+					{/if}
+				{/snippet}
+			</Menu>
 		</header>
 		{@render children()}
 	{/if}

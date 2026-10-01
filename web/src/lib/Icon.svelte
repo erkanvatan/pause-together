@@ -12,6 +12,7 @@
 		| 'shrink'
 		| 'close'
 		| 'back'
+		| 'more'
 		| 'chevron'
 		| 'skip-back'
 		| 'skip-forward'
@@ -63,6 +64,10 @@
 		<path d="M6 6l12 12M18 6L6 18" />
 	{:else if name === 'back'}
 		<path d="M15 5l-7 7 7 7" />
+	{:else if name === 'more'}
+		<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
+		<circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+		<circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
 	{:else if name === 'chevron'}
 		<path d="M9 5l7 7-7 7" />
 	{:else if name === 'skip-back' || name === 'skip-forward'}
