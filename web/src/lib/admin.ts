@@ -98,17 +98,20 @@ export function groupProblems(problems: Problem[]): { text: string; problems: Pr
 	const groups = new Map<string, Problem[]>();
 	for (const p of problems) {
 		const text = problemText(p);
-		groups.set(text, [...(groups.get(text) ?? []), p]);
+		const group = groups.get(text);
+		if (group) group.push(p);
+		else groups.set(text, [p]);
 	}
 	return [...groups].map(([text, problems]) => ({ text, problems }));
 }
 
 // guessType guesses a library's type from its folder's name, so the add form starts on the likely one:
-// "TV Shows" and "Series" hold shows, "Movies" and "Films" movies. null: no guess.
+// "TV Shows" and "Series" hold shows, "Movies" and "Films" movies. The whole name only: "Home Movies"
+// and "Talk Show Clips" are likely Other Videos. null: no guess.
 export function guessType(path: string): LibraryType | null {
-	const name = (path.split('/').pop() ?? '').toLowerCase();
-	if (/\b(tv|shows?|series|diziler|dizi)\b/.test(name)) return 'tv';
-	if (/\b(movies?|films?|filmler)\b/.test(name)) return 'movies';
+	const name = (path.split('/').pop() ?? '').toLowerCase().replace(/[-_.]+/g, ' ').trim();
+	if (/^(tv|tv shows?|shows?|series|tv series|diziler|dizi)$/.test(name)) return 'tv';
+	if (/^(movies?|films?|filmler)$/.test(name)) return 'movies';
 	return null;
 }
 

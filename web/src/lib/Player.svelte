@@ -161,8 +161,9 @@
 	// room's, not this screen's: it can sit under any of them. 'transport' is back, play or pause, forward.
 	const middle = $derived.by(() => {
 		if (missing) return 'missing';
-		if (cantPlay) return 'cantPlay';
+		// A failed prepare first: it's everyone's, and another pick is what helps.
 		if (prepare?.state === 'failed') return 'failed';
+		if (cantPlay) return 'cantPlay';
 		if (src === '') return connecting ? 'connecting' : preparing ? 'preparing' : '';
 		if (needsTap) return 'tap';
 		// While the next episode is still looked up (undefined), neither card: a film's would flash.

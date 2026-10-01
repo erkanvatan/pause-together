@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -34,10 +35,10 @@ func (s *server) listRooms(w http.ResponseWriter, r *http.Request) {
 	}
 	cards := make([]roomCard, len(rooms))
 	for i, rm := range rooms {
+		// Only one card's label is at stake: log it, and list the room as it stands.
 		gone, err := s.Rooms.Gone(r.Context(), rm)
 		if err != nil {
-			internalError(w, "list rooms", err)
-			return
+			slog.Error("list rooms: is the video gone", "room", rm.ID, "err", err)
 		}
 		cards[i] = roomCard{Room: rm, Watching: s.Hub.Watching(rm.ID), Gone: gone}
 	}

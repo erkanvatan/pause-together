@@ -149,7 +149,11 @@ describe('guessType', () => {
 		['Filmler', 'movies'],
 		['Family Videos', null],
 		['', null],
-		['Shortcuts', null] // a word that only starts like one
+		['tv_shows', 'tv'],
+		['Shortcuts', null], // a word that only starts like one
+		['Home Movies', null], // other videos, by the look of it
+		['Talk Show Clips', null],
+		['Movies/Extras', null]
 	])('guesses %j as %s', (path, want) => {
 		expect(guessType(path)).toBe(want);
 	});

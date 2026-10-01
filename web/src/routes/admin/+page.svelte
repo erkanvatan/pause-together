@@ -53,11 +53,16 @@
 	const showAdd = $derived(addOpen || (loaded && libraries.length === 0));
 	const folderName = $derived(path.split('/').pop() ?? '');
 
-	// Opening a folder named like a type picks that type; the host can still change it.
+	// Opening a folder named like a type picks that type, until the host picks one.
+	let typeChosen = false;
 	$effect(() => {
 		const guess = guessType(path);
-		if (guess) type = guess;
+		if (guess && !typeChosen) type = guess;
 	});
+
+	// Groups of files we can't use the host opened or closed. The rest start open when small. Kept here,
+	// not left to the element: each poll would set it back.
+	let groupOpen = $state<Record<string, boolean>>({});
 
 	let confirming = $state<number | null>(null); // library whose Remove waits for a yes
 	let confirmingClear = $state(false); // Clear cache waits for a yes
@@ -156,6 +161,7 @@
 		if (r.ok) {
 			path = '';
 			addOpen = false;
+			typeChosen = false;
 		}
 		await refresh();
 	}
@@ -307,7 +313,7 @@
 						<label class="flex flex-col gap-1.5">
 							<span class="flex items-center gap-2">
 								<span class="text-haze">{strings.libraryType}</span>
-								<select bind:value={type} class="field">
+								<select bind:value={type} onchange={() => (typeChosen = true)} class="field">
 									{#each Object.entries(strings.libraryTypes) as [value, label] (value)}
 										<option {value}>{label}</option>
 									{/each}
@@ -356,7 +362,11 @@
 						<ul class="flex flex-col gap-1">
 							{#each problemGroups as g (g.text)}
 								<li>
-									<details open={g.problems.length <= 3} class="group">
+									<details
+										open={groupOpen[g.text] ?? g.problems.length <= 3}
+										ontoggle={(e) => (groupOpen[g.text] = e.currentTarget.open)}
+										class="group"
+									>
 										<summary class="row -mx-3 w-auto cursor-pointer list-none [&::-webkit-details-marker]:hidden">
 											<Icon
 												name="chevron"
@@ -373,7 +383,11 @@
 													{#if p.probeError}
 														<!-- ffprobe's own words help the host, but read like a crash: one click away. -->
 														<details>
-															<summary class="cursor-pointer break-words">{fullPath(p)}</summary>
+															<summary
+																class="cursor-pointer break-words pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:items-center"
+															>
+																{fullPath(p)}
+															</summary>
 															<p class="mt-1 font-mono break-words">{p.probeError}</p>
 														</details>
 													{:else}
