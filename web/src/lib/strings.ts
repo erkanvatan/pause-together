@@ -239,6 +239,16 @@ export const strings = {
 	season: (n: number) => (n === 0 ? 'Specials' : `Season ${n}`),
 	seasonCount: (n: number) => (n === 1 ? '1 season' : `${n} seasons`),
 	cantPlayHere: (codec: string) => `This device can't play ${codec}.`,
+	// Under "can't play" in the video box: what's left to do. A device that can't play never holds up
+	// the room.
+	cantPlayHereWhy: "Try another device, like a computer. The room won't wait for this one, and chat still works.",
+	cantPlayAnywhere: 'No screen can play this file. Pick another video to watch.',
+	// A room's prepare failed (media.FailNoSpace, media.FailPrepare), in the video box.
+	prepareFailed: "Couldn't get this video ready",
+	prepareFailedWhy: {
+		'no-space': "The host's computer is out of disk space. Pick another video, or ask the host to free some.",
+		failed: "Something went wrong on the host's computer. Pick another video, or ask the host to check the admin page."
+	} as Record<string, string>,
 	appleOnlyPick: 'Dolby Vision 5: only Apple devices show the right colors.',
 	audio: 'Audio',
 	noAudio: 'No audio',

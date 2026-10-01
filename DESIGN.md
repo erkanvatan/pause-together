@@ -291,14 +291,17 @@ Archived rooms show their title in haze.
   video on a black-to-transparent fade (80% black at the bottom), and fades out with the transport
   (300ms). Subtitles slide up while it shows.
 - **Holds the middle:** "Tap to join" (a large round primary button), "Preparing… 42%" (a pill with a
-  thin lamp progress bar on dusk), "Waiting for …", "Video missing", "Getting the room ready…" (a pill,
-  after a moment), and the end. The waiting and missing ones are dusk panels at 90%, compact on a
-  phone's small video box.
+  thin lamp progress bar on dusk), "Waiting for …", "Video missing", "Can't play", "Couldn't get this video ready", "Getting the room
+  ready…" (a pill, after a moment), and the end. The waiting panel and the three problems are dusk
+  panels at 90%, compact on a phone's small video box.
   - "Waiting for Alice" in body large, then why and for how long in haze label ("stepped away · 0:12"),
     then a quiet button that names its effect ("Play without Alice"). The person the room waits for
     reads "Everyone's waiting for you" and "Don't wait for me".
-  - "Video missing" in ember, a line saying the pick resumes where the room was, and a lamp "Pick
-    another video".
+  - The problems share one panel: a body-large headline, a line saying what's left to do, and a lamp
+    "Pick another video" when another pick helps. "Video missing" (the pick resumes where the room
+    was) and "Couldn't get this video ready" are ember. "This device can't play HEVC" is moonlight:
+    it's a limit, not an error. It says to try another device, that the room won't wait for this one,
+    and that chat still works. No pick there: the others can still watch.
   - The end: a TV episode offers a lamp "Next episode". Anything else gets a title card, "The end" in
     the display face (3xl, 2xl on a phone's box), over a lamp "Watch something else".
 - **Subtitle panel:** a dusk strip over the bar, in two labelled groups: "For everyone" (subtitle,

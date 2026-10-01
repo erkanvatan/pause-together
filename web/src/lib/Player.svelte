@@ -159,6 +159,7 @@
 	const middle = $derived.by(() => {
 		if (missing) return 'missing';
 		if (cantPlay) return 'cantPlay';
+		if (prepare?.state === 'failed') return 'failed';
 		if (src === '') return connecting ? 'connecting' : preparing ? 'preparing' : '';
 		if (needsTap) return 'tap';
 		// While the next episode is still looked up (undefined), neither card: a film's would flash.
@@ -445,6 +446,22 @@
 	}}
 />
 
+<!-- A problem that holds the video's middle: what happened, what's left to do, and maybe another pick.
+Compact on a phone's small video box, so it never spills out of it. -->
+{#snippet notice(headline: string, why: string, error: boolean, pick: boolean)}
+	<div
+		class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 p-5 @max-md:gap-2 @max-md:p-3"
+	>
+		<p class="text-lg break-words {error ? 'text-ember' : ''}">{headline}</p>
+		<p class="break-words @max-md:text-sm">{why}</p>
+		{#if pick}
+			<button onclick={pickAnother} disabled={!online} class="btn btn-primary">
+				{strings.pickAnother}
+			</button>
+		{/if}
+	</div>
+{/snippet}
+
 <div
 	bind:this={wrapper}
 	class="flex overflow-hidden bg-black portrait:flex-col {full
@@ -538,7 +555,21 @@
 						</button>
 					</div>
 				{:else if middle === 'cantPlay'}
-					<p class="pill">{unplayable}</p>
+					<!-- Unplayable for the server is unplayable for everyone: only another pick helps. -->
+					{@const everywhere = room.video.unplayable !== ''}
+					{@render notice(
+						unplayable,
+						everywhere ? strings.cantPlayAnywhere : strings.cantPlayHereWhy,
+						false,
+						everywhere
+					)}
+				{:else if middle === 'failed' && prepare}
+					{@render notice(
+						strings.prepareFailed,
+						strings.prepareFailedWhy[prepare.error] ?? strings.prepareFailedWhy.failed,
+						true,
+						true
+					)}
 				{:else if middle === 'tap'}
 					<button onclick={join} class="btn btn-primary min-h-14 rounded-full px-7 text-lg">
 						<Icon name="play" class="size-6" />
@@ -549,9 +580,7 @@
 					<p class="pill appear-late">{strings.gettingReady}</p>
 				{:else if middle === 'preparing'}
 					<div class="flex w-full max-w-64 flex-col items-center gap-3">
-						<p class="pill text-balance {prepare?.state === 'failed' ? 'text-ember' : ''}">
-							{preparing}
-						</p>
+						<p class="pill text-balance">{preparing}</p>
 						{#if prepare?.state === 'running'}
 							<div class="h-1 w-full overflow-hidden rounded-full bg-dusk">
 								<div class="h-full bg-lamp" style:width="{prepare.progress * 100}%"></div>
@@ -571,18 +600,12 @@
 						</button>
 					</div>
 				{:else if middle === 'missing'}
-					<!-- Compact on a phone's small video box, so it never spills out of it. -->
-					<div
-						class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 p-5 @max-md:gap-2 @max-md:p-3"
-					>
-						<p class="text-lg text-ember">{strings.videoMissing}</p>
-						<p class="break-words @max-md:text-sm">
-							{strings.videoGone(shownMs >= 1000 ? formatTime(shownMs) : '')}
-						</p>
-						<button onclick={pickAnother} disabled={!online} class="btn btn-primary">
-							{strings.pickAnother}
-						</button>
-					</div>
+					{@render notice(
+						strings.videoMissing,
+						strings.videoGone(shownMs >= 1000 ? formatTime(shownMs) : ''),
+						true,
+						true
+					)}
 				{/if}
 				{#if waits}
 					<div
