@@ -69,12 +69,13 @@
 				<Brand />
 			</a>
 			<div class="flex min-w-0 items-center gap-1">
-				<!-- In plain sight, not in the name menu: a host who just set this up looks for it first. -->
+				<!-- In plain sight, not only in the name menu: a host who just set this up looks for it first. A
+				narrow window keeps it in the menu, so the name has room. -->
 				{#if me.isAdmin}
 					<a
 						href="/admin"
 						aria-current={page.route.id === '/admin' ? 'page' : undefined}
-						class="btn shrink-0 px-3 font-normal text-haze hover:text-moonlight aria-[current=page]:text-moonlight"
+						class="btn hidden shrink-0 px-3 font-normal text-haze hover:text-moonlight aria-[current=page]:text-moonlight sm:inline-flex"
 					>
 						{strings.admin}
 					</a>
@@ -94,6 +95,9 @@
 						>
 							{strings.rename}
 						</button>
+						{#if me.isAdmin}
+							<a href="/admin" onclick={close} class="row sm:hidden">{strings.admin}</a>
+						{/if}
 					{/snippet}
 				</Menu>
 			</div>
