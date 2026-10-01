@@ -68,26 +68,35 @@
 			<a href="/" class="-mx-1 flex min-h-11 items-center gap-1.5 rounded-control px-1">
 				<Brand />
 			</a>
-			<Menu buttonClass="btn max-w-full px-3 font-normal text-haze hover:text-moonlight">
-				{#snippet button()}
-					<span class="truncate">{me.name}</span>
-					<Icon name="chevron" class="size-4 shrink-0 rotate-90" />
-				{/snippet}
-				{#snippet items(close)}
-					<button
-						onclick={() => {
-							close();
-							renaming = true;
-						}}
-						class="row"
+			<div class="flex min-w-0 items-center gap-1">
+				<!-- In plain sight, not in the name menu: a host who just set this up looks for it first. -->
+				{#if me.isAdmin}
+					<a
+						href="/admin"
+						aria-current={page.route.id === '/admin' ? 'page' : undefined}
+						class="btn btn-quiet shrink-0 px-3 font-normal text-haze hover:text-moonlight aria-[current=page]:text-moonlight"
 					>
-						{strings.rename}
-					</button>
-					{#if me.isAdmin}
-						<a href="/admin" onclick={close} class="row">{strings.admin}</a>
-					{/if}
-				{/snippet}
-			</Menu>
+						{strings.admin}
+					</a>
+				{/if}
+				<Menu buttonClass="btn max-w-full px-3 font-normal text-haze hover:text-moonlight">
+					{#snippet button()}
+						<span class="truncate">{me.name}</span>
+						<Icon name="chevron" class="size-4 shrink-0 rotate-90" />
+					{/snippet}
+					{#snippet items(close)}
+						<button
+							onclick={() => {
+								close();
+								renaming = true;
+							}}
+							class="row"
+						>
+							{strings.rename}
+						</button>
+					{/snippet}
+				</Menu>
+			</div>
 		</header>
 		{@render children()}
 	{/if}

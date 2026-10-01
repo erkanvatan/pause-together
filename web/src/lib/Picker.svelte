@@ -12,6 +12,7 @@
 	} from '$lib/api';
 	import Dialog from '$lib/Dialog.svelte';
 	import Icon from '$lib/Icon.svelte';
+	import { me } from '$lib/me.svelte';
 	import {
 		audioLabel,
 		defaultAudio,
@@ -338,7 +339,15 @@
 						{/each}
 					</ul>
 				{:else if !shelf}
-					<p class="p-3 text-haze">{strings.noVideos}</p>
+					<!-- The host's first visit lands here: point them at the one place that fixes it. -->
+					{#if me.isAdmin}
+						<div class="flex flex-col items-start gap-4 p-3">
+							<p class="text-haze">{strings.noVideosHost}</p>
+							<a href="/admin" class="btn btn-primary">{strings.addVideos}</a>
+						</div>
+					{:else}
+						<p class="p-3 text-haze">{strings.noVideos}</p>
+					{/if}
 				{:else if shelf.type === 'movies'}
 					<ul>
 						{#each shelf.movies as v (v.id)}
