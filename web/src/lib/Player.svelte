@@ -384,7 +384,7 @@
 		onpointerleave={(e) => e.pointerType === 'mouse' && rest()}
 		class="relative flex min-w-0 flex-1 flex-col {full && chatOpen ? 'portrait:pb-[50dvh]' : ''}"
 	>
-		<!-- The container for the subtitles' cqi sizes. Not the wrapper: a container is the box its fixed
+		<!-- The container for the subtitles' and pills' cqi sizes. Not the wrapper: a container is the box its fixed
 		children position in, which would hold the chat's bottom sheet inside the player. -->
 		<!-- On a tall enough window the video box stops growing where the control bar still fits on screen,
 		and sits between black bars. The box narrows with it, not just the picture, so subtitles size and
@@ -460,7 +460,7 @@
 					</div>
 				{/if}
 				{#if cantPlay}
-					<p class="pill px-4 py-2">{unplayable}</p>
+					<p class="pill">{unplayable}</p>
 				{:else if src && (!joined || blocked)}
 					<button onclick={join} class="btn btn-primary min-h-14 rounded-full px-7 text-lg">
 						<Icon name="play" class="size-6" />
@@ -469,7 +469,9 @@
 				{/if}
 				{#if preparing}
 					<div class="flex w-full max-w-64 flex-col items-center gap-3">
-						<p class="pill {prepare?.state === 'failed' ? 'text-ember' : ''}">{preparing}</p>
+						<p class="pill whitespace-nowrap {prepare?.state === 'failed' ? 'text-ember' : ''}">
+							{preparing}
+						</p>
 						{#if prepare?.state === 'running'}
 							<div class="h-1 w-full overflow-hidden rounded-full bg-dusk">
 								<div class="h-full bg-lamp" style:width="{prepare.progress * 100}%"></div>
@@ -497,11 +499,11 @@
 			</div>
 
 			<div
-				class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1 text-sm"
+				class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1"
 			>
 				{#if note}
 					<p class="pill flex items-center gap-1.5 break-words">
-						<Icon name="pause" class="size-3.5 shrink-0 text-lamp" />{note}
+						<Icon name="pause" class="size-[0.9em] shrink-0 text-lamp" />{note}
 					</p>
 				{/if}
 				{#each playState?.behind ?? [] as b (b.userId)}

@@ -221,11 +221,14 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 		color: var(--color-haze);
 	}
 
-	/* A short line over the video: "Alice paused", a toast. */
+	/* A short line over the video: "Alice paused", a toast. It grows with the player like subtitles, a
+	step smaller, so fullscreen keeps it readable. */
 	.pill {
 		border-radius: var(--radius-control);
 		background-color: color-mix(in oklab, var(--color-midnight) 82%, transparent);
-		padding: 0.25rem 0.625rem;
+		padding: 0.4em 0.75em;
+		font-size: max(1rem, 1.5cqi);
+		line-height: 1.4;
 	}
 
 	/* Fingers need 44 px. */

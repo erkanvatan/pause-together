@@ -312,7 +312,7 @@
 		<button
 			onclick={() => replyFromToast(t)}
 			out:fade={{ duration: toastFadeMs }}
-			class="pill pointer-events-auto flex text-left pointer-coarse:min-h-11 pointer-coarse:items-center"
+			class="pill pointer-events-auto flex max-w-[28em] text-left pointer-coarse:min-h-11 pointer-coarse:items-center"
 		>
 			<span class="line-clamp-2 break-words">
 				<span class="font-semibold">{t.from.name}</span>

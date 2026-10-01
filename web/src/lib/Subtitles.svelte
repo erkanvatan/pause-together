@@ -74,7 +74,7 @@
 </script>
 
 {#if failed}
-	<p class="pill pointer-events-none absolute top-2 right-2 text-sm">
+	<p class="pill pointer-events-none absolute top-2 right-2">
 		{failed === 'gone' ? strings.subtitleFailed : strings.subtitleRetrying}
 	</p>
 {/if}
