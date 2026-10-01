@@ -10,7 +10,7 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 @theme {
 	--color-*: initial;
 	--color-midnight: #16122b; /* the page */
-	--color-dusk: #231d40; /* raised surfaces: panels, sheets, fields, the control bar */
+	--color-dusk: #231d40; /* raised surfaces: panels, fields, the control bar */
 	--color-haze: #a69dcb; /* quiet text */
 	--color-moonlight: #eee9ff; /* text */
 	--color-lamp: #ffc15e; /* the accent, and "someone is here" */
@@ -38,14 +38,7 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 	--text-3xl--line-height: 0.95;
 
 	--radius-control: 0.5rem; /* buttons, fields */
-	--radius-panel: 1rem; /* the player, sheets, dialogs */
-
-	--animate-sheet-up: sheet-up 180ms ease-out;
-	@keyframes sheet-up {
-		from {
-			transform: translateY(100%);
-		}
-	}
+	--radius-panel: 1rem; /* the player, dialogs */
 }
 
 @layer base {

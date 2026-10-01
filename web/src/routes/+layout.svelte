@@ -9,7 +9,8 @@
 
 	let { children } = $props();
 
-	// The room page spans the whole window, so its video can use a big screen. The header lines up with it.
+	// The room page spans the whole window, so its video can use a big screen. The header lines up with it,
+	// and the page fills the window's height, so a portrait chat reaches the bottom edge.
 	const wide = $derived(page.route.id === '/rooms/[id]');
 
 	let loadFailed = $state(false);
@@ -46,7 +47,7 @@
 	<meta name="theme-color" content={themeColor} />
 </svelte:head>
 
-<div class="min-h-screen">
+<div class="min-h-dvh {wide ? 'flex flex-col' : ''}">
 	{#if loadFailed}
 		<main class="flex min-h-screen items-center justify-center p-4">
 			<p class="text-haze">{strings.loadFailed}</p>

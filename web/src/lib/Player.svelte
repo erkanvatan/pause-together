@@ -50,7 +50,7 @@
 		next: VideoSummary | null; // the next episode, offered at the end
 		onnext: () => void;
 		chatOpen: boolean;
-		// The chat panel: beside the video in landscape, a bottom sheet in portrait.
+		// The chat panel: beside the video in landscape, under it in portrait.
 		side: Snippet;
 		overlay: Snippet; // new chat messages over the video, while the chat is closed
 	} = $props();
@@ -373,19 +373,21 @@
 
 <div
 	bind:this={wrapper}
-	class="flex overflow-hidden bg-black {full ? 'fixed inset-0 z-30 h-dvh' : 'max-sm:-mx-4 sm:rounded-panel'}"
+	class="flex overflow-hidden bg-black portrait:flex-col {full
+		? 'fixed inset-0 z-30 h-dvh'
+		: `max-sm:-mx-4 sm:rounded-panel ${chatOpen ? 'portrait:flex-1' : ''}`}"
 >
-	<!-- In portrait fullscreen, the video and controls move up out of the chat sheet's way. The pointer
-	handlers only show and hide the controls; the buttons inside do the rest. -->
+	<!-- In portrait, the video keeps its own height and the chat takes the rest; in fullscreen the
+	video takes the rest. The pointer handlers only show and hide the controls; the buttons inside do the rest. No text selection or iOS
+	callout: a long press on the video would select a subtitle or button label. Chat stays selectable. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		onpointerdown={pointerDown}
 		onpointermove={(e) => e.pointerType === 'mouse' && wake()}
 		onpointerleave={(e) => e.pointerType === 'mouse' && rest()}
-		class="relative flex min-w-0 flex-1 flex-col {full && chatOpen ? 'portrait:pb-[50dvh]' : ''}"
+		class="relative flex min-w-0 flex-1 flex-col select-none [-webkit-touch-callout:none] {full ? 'portrait:min-h-0' : 'portrait:flex-none'}"
 	>
-		<!-- The container for the subtitles' and pills' cqi sizes. Not the wrapper: a container is the box its fixed
-		children position in, which would hold the chat's bottom sheet inside the player. -->
+		<!-- The container for the subtitles' and pills' cqi sizes. Not the wrapper: it holds the chat too. -->
 		<!-- On a tall enough window the video box stops growing where the control bar still fits on screen,
 		and sits between black bars. The box narrows with it, not just the picture, so subtitles size and
 		wrap to the picture. -->
@@ -519,7 +521,7 @@
 		resizes the video. -->
 		<div
 			class={full
-				? `pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent pt-12 transition-[opacity,visibility] duration-300 ${chatOpen ? 'portrait:bottom-[50dvh]' : ''} ${fade}`
+				? `pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent pt-12 transition-[opacity,visibility] duration-300 ${fade}`
 				: ''}
 		>
 			<!-- svelte-ignore a11y_no_static_element_interactions (keeps the controls up under the mouse) -->
@@ -672,12 +674,14 @@
 	</div>
 
 	{#if chatOpen}
-		<!-- Landscape: the panel takes the row's height; absolute, so its messages never make the row
-		taller. Portrait: a sheet over the page's lower part, or over the video in fullscreen. -->
+		<!-- Landscape: the panel takes the row's height. Portrait: the screen's rest under the video, or
+		its lower half in fullscreen. Absolute inside, so its messages never make the player taller. -->
 		<aside
-			class="z-10 border-line landscape:relative landscape:w-72 landscape:shrink-0 landscape:border-l lg:landscape:w-80 portrait:fixed portrait:inset-x-0 portrait:bottom-0 portrait:h-[50dvh] portrait:animate-sheet-up portrait:overflow-hidden portrait:rounded-t-panel portrait:border-t"
+			class="relative z-10 border-line landscape:w-72 landscape:shrink-0 landscape:border-l lg:landscape:w-80 portrait:border-t {full
+				? 'portrait:h-[50dvh] portrait:shrink-0'
+				: 'portrait:min-h-72 portrait:flex-1'}"
 		>
-			<div class="h-full landscape:absolute landscape:inset-0">
+			<div class="absolute inset-0">
 				{@render side()}
 			</div>
 		</aside>

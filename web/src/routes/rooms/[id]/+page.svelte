@@ -72,8 +72,8 @@
 	let more = $state(false); // older messages may be on the server
 	let replyTo = $state<ChatMessage | null>(null);
 	let draft = $state('');
-	// The chat starts open beside the video on wide screens, and closed as a sheet on portrait phones.
-	let chatOpen = $state(matchMedia('(orientation: landscape)').matches);
+	// The chat starts open: beside the video in landscape, under it in portrait.
+	let chatOpen = $state(true);
 	let toasts = $state<ChatMessage[]>([]);
 
 	// Opening the room starts preparing its video, then the socket joins it. It runs again when a link
@@ -326,10 +326,10 @@
 	<title>{room ? `${roomTitle(room)} · ` : ''}{strings.appName}</title>
 </svelte:head>
 
-<!-- A portrait chat sheet covers the page's lower part: room to scroll the rest above it. -->
+<!-- In portrait, the player with its chat fills the screen down to the bottom edge. -->
 <main
-	class="flex w-full flex-col gap-4 px-4 pt-2 pb-16 {chatOpen && room && !room.archived
-		? 'portrait:pb-[50dvh]'
+	class="flex w-full flex-1 flex-col gap-4 px-4 pt-2 pb-16 {chatOpen && room && !room.archived
+		? 'portrait:pb-0'
 		: ''}"
 >
 	{#if offline}

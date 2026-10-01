@@ -470,7 +470,7 @@ So each room's video is **prepared once**, then served as a plain file.
 - Over the video's middle: back 10 s, play or pause, forward 10 s. Hidden while "Tap to join", "Waiting
   for …" or "Next episode" hold the middle.
 - No playback speed control. `playbackRate` belongs to the drift fix.
-- Per device, in `localStorage`: volume, mute, subtitle size. Everything in room state is shared.
+- Per device, in `localStorage`: volume, mute, subtitle size (default medium). Everything in room state is shared.
 - Subtitle cues: `<i>` and `<b>` become real elements. Everything else (`{\an8}`, ASS tags, other
   markup) is dropped.
 - Library picker: a search box, show → season → episode grouping, and a "recently added" sort. Videos
@@ -492,9 +492,10 @@ So each room's video is **prepared once**, then served as a plain file.
   (wall clock) shows on tap or hover.
 - No typing indicator, no sounds, no system messages: play, pause, seek, switch, join and leave never
   appear in chat.
-- UI: a side panel on wide screens, a bottom sheet on portrait phones. While it's closed, new messages
-  pop up as small toasts over the video and fade out; tapping one opens a reply to it. Must work in
-  fullscreen.
+- UI: open on entering the room. A side panel on wide screens. On portrait screens it sits under the
+  video and fills the rest of the screen (the lower half in fullscreen), not a floating sheet. While
+  it's closed, new messages pop up as small toasts over the video and fade out; tapping one opens a
+  reply to it. Must work in fullscreen.
 - The "watching now" list sits at the top of the chat panel, under its header, like a chat app's
   online list. At most two lines, then it scrolls, so it never pushes the messages off a phone. Not
   shown while the chat is closed.
