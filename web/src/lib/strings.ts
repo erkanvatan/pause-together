@@ -158,13 +158,15 @@ export const strings = {
 	percent: (n: number) => new Intl.NumberFormat(strings.locale, { style: 'percent' }).format(n),
 	// A control's tooltip with its key: "Play (Space)".
 	withKey: (label: string, key: string) => `${label} (${key})`,
-	keySpace: 'Space',
+	// The player's keys as its tooltips name them.
+	keys: { play: 'Space', back: '←', forward: '→', mute: 'M', subtitles: 'C', chat: 'H', fullscreen: 'F' },
 	playAnyway: 'Play anyway',
 	playWithout: (names: string[]) => `Play without ${list(names)}`,
 	dontWaitForMe: "Don't wait for me",
 	waitingFor: (names: string[]) => `Waiting for ${list(names)}`,
 	waitingForYou: "Everyone's waiting for you",
 	yourVideoLoading: 'Your video is still loading…',
+	otherScreenAway: 'Another of your screens stepped away.',
 	// Why the room waits for someone (protocol Wait reasons), and for how long: "stepped away · 0:12".
 	waitReasons: { buffering: 'loading', away: 'stepped away', left: 'left the room' },
 	waitLine: (reason: string, time: string) => (time ? `${reason} · ${time}` : reason),

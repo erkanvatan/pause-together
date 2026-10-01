@@ -21,7 +21,8 @@ type Lag struct {
 type Wait struct {
 	Who
 	Reason string `json:"reason"` // WaitBuffering, WaitAway or WaitLeft
-	// SinceMs is the server time their stall began, so the room can show how long it has waited.
+	// SinceMs is the server time their stall began, so the room can show how long they've been away or
+	// loading. It may be well before the room began to wait: a tab hidden while the room was paused.
 	SinceMs int64 `json:"sinceMs"`
 }
 

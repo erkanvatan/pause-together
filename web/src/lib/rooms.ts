@@ -17,14 +17,17 @@ export function roomSubtitle(r: Room): string {
 	return r.name ? videoName(r.video) : r.video.version;
 }
 
-// splitArchived splits rooms into the ones in use and the archived ones, each in the order given,
-// except that rooms with people in them come first: that's where a guest wants to go.
+// splitArchived splits rooms into the ones in use and the archived ones, each in the order given.
+// busyFirst puts rooms with people in them first: that's where a guest wants to go. Not while
+// managing: a room jumping up as someone joins would put another room's Archive under the finger.
 export function splitArchived<R extends Room & { watching: Who[] }>(
-	rooms: R[]
+	rooms: R[],
+	busyFirst: boolean
 ): { active: R[]; archived: R[] } {
 	const active = rooms.filter((r) => !r.archived);
+	const busy = busyFirst ? active.filter((r) => r.watching.length > 0) : [];
 	return {
-		active: [...active.filter((r) => r.watching.length > 0), ...active.filter((r) => !r.watching.length)],
+		active: [...busy, ...active.filter((r) => !busy.includes(r))],
 		archived: rooms.filter((r) => r.archived)
 	};
 }
@@ -44,14 +47,26 @@ export type WaitText = {
 };
 
 // waitText says who the room waits for, as userId sees it: the person it waits for hears it's them.
-// serverMs is the server's clock now, or null before the first pong: then no times.
-export function waitText(waiting: Wait[], userId: number, serverMs: number | null): WaitText {
+// serverMs is the server's clock now, or null before the first pong: then no times. needsTap: this
+// page waits for "Tap to join", which says the rest.
+export function waitText(
+	waiting: Wait[],
+	userId: number,
+	serverMs: number | null,
+	needsTap: boolean
+): WaitText {
 	const me = waiting.find((w) => w.userId === userId);
 	const others = waiting.filter((w) => w.userId !== userId);
 	const names = others.map((w) => w.name);
 	const lines: string[] = [];
-	// Away, on a page that shows this, means the browser wants a fresh tap: "Tap to join" asks for it.
-	if (me && me.reason !== 'away') lines.push(strings.yourVideoLoading);
+	// Status is per socket, so the room may wait for this person's other tab or device. A page that
+	// shows this isn't hidden: away means a fresh tap here, or another screen. Left is an old socket
+	// of this page's person, waited for until this one is ready.
+	if (me?.reason === 'buffering' || (me?.reason === 'left' && !needsTap)) {
+		lines.push(strings.yourVideoLoading);
+	} else if (me?.reason === 'away' && !needsTap) {
+		lines.push(strings.otherScreenAway);
+	}
 	for (const w of others) {
 		const reason = strings.waitReasons[w.reason];
 		const time = serverMs === null ? '' : formatTime(serverMs - w.sinceMs);

@@ -56,6 +56,8 @@
 	let savingLangs = $state(false);
 	let langsSaved = $state(false);
 	let langsChanged = $state(false); // Save lights up only when there's something to save
+	// Edits so far, so a save that returns doesn't mark later typing as saved.
+	let langsEdits = 0;
 	let langsError = $state('');
 	const subtitleCodes = $derived(subtitleLangs.split(/[\s,]+/).filter(Boolean));
 
@@ -65,6 +67,7 @@
 	let savingCache = $state(false);
 	let cacheSaved = $state(false);
 	let cacheChanged = $state(false);
+	let cacheEdits = 0;
 	let cacheError = $state('');
 
 	const scanning = $derived(libraries.some((l) => l.scan.state !== ''));
@@ -145,21 +148,24 @@
 	async function saveLanguages(e: SubmitEvent) {
 		e.preventDefault();
 		savingLangs = true;
+		const edits = langsEdits;
 		const r = await setLanguages({ audio: audioLang.trim(), subtitles: subtitleCodes });
 		savingLangs = false;
-		langsSaved = r.ok;
-		langsChanged = !r.ok;
+		const current = langsEdits === edits; // nothing typed while it saved
+		langsSaved = r.ok && current;
+		langsChanged = !langsSaved;
 		langsError = r.ok ? '' : (strings.langErrors[r.error] ?? strings.langErrors.failed);
-		if (r.ok) showLanguages(r.value.audio, r.value.subtitles);
+		if (r.ok && current) showLanguages(r.value.audio, r.value.subtitles);
 	}
 
 	async function saveCache(e: SubmitEvent) {
 		e.preventDefault();
 		savingCache = true;
+		const edits = cacheEdits;
 		const r = await setCache({ unusedDays });
 		savingCache = false;
-		cacheSaved = r.ok;
-		cacheChanged = !r.ok;
+		cacheSaved = r.ok && cacheEdits === edits;
+		cacheChanged = !cacheSaved;
 		cacheError = r.ok ? '' : (strings.cacheErrors[r.error] ?? strings.cacheErrors.failed);
 	}
 
@@ -301,6 +307,7 @@
 							oninput={() => {
 								langsSaved = false;
 								langsChanged = true;
+								langsEdits++;
 							}}
 							class="flex flex-col gap-4"
 						>
@@ -345,6 +352,7 @@
 							oninput={() => {
 								cacheSaved = false;
 								cacheChanged = true;
+								cacheEdits++;
 							}}
 							class="flex flex-col gap-4"
 						>

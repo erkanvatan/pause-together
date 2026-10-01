@@ -23,9 +23,9 @@
 	// Archive and Delete show only while managing, so a guest sees rooms to join, not chores.
 	let managing = $state(false);
 
-	const parts = $derived(splitArchived(rooms ?? []));
+	const parts = $derived(splitArchived(rooms ?? [], !managing));
 	// Someone is watching: joining them is the page's main action, not starting something new.
-	const busy = $derived(parts.active[0]?.watching.length ? parts.active[0] : null);
+	const busy = $derived(parts.active.find((r) => r.watching.length > 0) ?? null);
 
 	let refreshSeq = 0; // only the latest ask may show its answer
 

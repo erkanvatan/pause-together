@@ -143,8 +143,10 @@
 		playState !== null && !playState.playing && durationMs > 0 && playState.positionMs >= durationMs
 	);
 
+	// This page waits for "Tap to join": the button in the middle, and what it says.
+	const needsTap = $derived(src !== '' && (!joined || blocked));
 	const waits = $derived(
-		playState && playState.waiting.length > 0 ? waitText(playState.waiting, userId, serverMs) : null
+		playState && playState.waiting.length > 0 ? waitText(playState.waiting, userId, serverMs, needsTap) : null
 	);
 
 	// What a screen reader hears: the room's state changes that show only over the video.
@@ -278,9 +280,13 @@
 		tick();
 	}
 
-	// togglePlay is the play button. Pressed before "Tap to join", it joins too: it's the same tap.
+	// togglePlay is the play button. Pressed before "Tap to join", it joins: it's the same tap. A
+	// room that already plays then plays on here, rather than pausing for everyone.
 	function togglePlay() {
-		if (src && !joined) join();
+		if (src && !joined) {
+			join();
+			if (playState?.playing) return;
+		}
 		intent({ type: playState?.playing ? 'pause' : 'play' });
 	}
 
@@ -313,7 +319,8 @@
 	// something on the page already used. Space stays with a focused button or link, and the arrows with
 	// a focused slider.
 	function shortcut(e: KeyboardEvent) {
-		if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+		// A held key repeats: each repeat would be another intent for everyone, or another toggle.
+		if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
 		const t = e.target as HTMLElement;
 		const typing = t.closest('input:not([type=range]), textarea, select, [contenteditable]');
 		if (typing || document.querySelector('dialog[open]')) return;
@@ -497,7 +504,7 @@
 							onclick={() => skip(-skipMs)}
 							disabled={!online || durationMs === 0}
 							aria-label={strings.skipBack(skipMs / 1000)}
-							title={strings.withKey(strings.skipBack(skipMs / 1000), '←')}
+							title={strings.withKey(strings.skipBack(skipMs / 1000), strings.keys.back)}
 							class="transport size-12 sm:size-14"
 						>
 							<Icon name="skip-back" step={skipMs / 1000} class="size-7 sm:size-8" />
@@ -514,7 +521,7 @@
 							onclick={() => skip(skipMs)}
 							disabled={!online || durationMs === 0}
 							aria-label={strings.skipForward(skipMs / 1000)}
-							title={strings.withKey(strings.skipForward(skipMs / 1000), '→')}
+							title={strings.withKey(strings.skipForward(skipMs / 1000), strings.keys.forward)}
 							class="transport size-12 sm:size-14"
 						>
 							<Icon name="skip-forward" step={skipMs / 1000} class="size-7 sm:size-8" />
@@ -523,7 +530,7 @@
 				{/if}
 				{#if cantPlay}
 					<p class="pill">{unplayable}</p>
-				{:else if src && (!joined || blocked)}
+				{:else if needsTap}
 					<button onclick={join} class="btn btn-primary min-h-14 rounded-full px-7 text-lg">
 						<Icon name="play" class="size-6" />
 						{coarse ? strings.tapToJoin : strings.clickToJoin}
@@ -697,7 +704,7 @@
 							onclick={togglePlay}
 							disabled={!online || !playState}
 							aria-label={playState?.playing ? strings.pause : strings.play}
-							title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keySpace)}
+							title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
 							class="icon-btn"
 						>
 							<Icon name={playState?.playing ? 'pause' : 'play'} />
@@ -726,7 +733,7 @@
 						<button
 							onclick={() => (muted = !muted)}
 							aria-label={muted ? strings.unmute : strings.mute}
-							title={strings.withKey(muted ? strings.unmute : strings.mute, 'M')}
+							title={strings.withKey(muted ? strings.unmute : strings.mute, strings.keys.mute)}
 							class="icon-btn"
 						>
 							<Icon name={muted ? 'muted' : 'volume'} />
@@ -747,7 +754,7 @@
 							onclick={() => (subtitlesOpen = !subtitlesOpen)}
 							aria-label={strings.subtitle}
 							aria-pressed={subtitlesOpen}
-							title={strings.withKey(strings.subtitle, 'C')}
+							title={strings.withKey(strings.subtitle, strings.keys.subtitles)}
 							class="icon-btn ml-auto {playState?.subtitle ? 'text-lamp' : ''}"
 						>
 							<Icon name="captions" />
@@ -756,7 +763,7 @@
 							onclick={() => (chatOpen = !chatOpen)}
 							aria-label={strings.chat}
 							aria-pressed={chatOpen}
-							title={strings.withKey(strings.chat, 'H')}
+							title={strings.withKey(strings.chat, strings.keys.chat)}
 							class="icon-btn"
 						>
 							<Icon name="chat" />
@@ -764,7 +771,7 @@
 						<button
 							onclick={toggleFullscreen}
 							aria-label={full ? strings.exitFullscreen : strings.fullscreen}
-							title={strings.withKey(full ? strings.exitFullscreen : strings.fullscreen, 'F')}
+							title={strings.withKey(full ? strings.exitFullscreen : strings.fullscreen, strings.keys.fullscreen)}
 							class="icon-btn"
 						>
 							<Icon name={full ? 'shrink' : 'expand'} />

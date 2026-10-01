@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
+	import Brand from '$lib/Brand.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import NameForm from '$lib/NameForm.svelte';
 	import { loadMe, me } from '$lib/me.svelte';
@@ -81,8 +82,7 @@
 	{:else}
 		<header class="mx-auto flex w-full {wide ? '' : 'max-w-6xl'} items-center justify-between gap-4 px-4 py-3">
 			<a href="/" class="-mx-1 flex min-h-11 items-center gap-1.5 rounded-control px-1">
-				<Icon name="pause" class="size-6 text-lamp" />
-				<span class="font-display text-xl font-bold">{strings.appName}</span>
+				<Brand />
 			</a>
 			<div bind:this={menu} class="relative min-w-0">
 				<button

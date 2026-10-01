@@ -73,14 +73,15 @@ describe('splitArchived', () => {
 
 	it('keeps the order in each part', () => {
 		const rooms = [card(4), card(3, { archived: true }), card(2), card(1, { archived: true })];
-		const { active, archived } = splitArchived(rooms);
+		const { active, archived } = splitArchived(rooms, false);
 		expect(active.map((r) => r.id)).toEqual([4, 2]);
 		expect(archived.map((r) => r.id)).toEqual([3, 1]);
 	});
 
 	it('puts rooms with people in them first, in the order given', () => {
 		const rooms = [card(5), card(4, { watching: ann }), card(3), card(2, { watching: ann }), card(1)];
-		expect(splitArchived(rooms).active.map((r) => r.id)).toEqual([4, 2, 5, 3, 1]);
+		expect(splitArchived(rooms, true).active.map((r) => r.id)).toEqual([4, 2, 5, 3, 1]);
+		expect(splitArchived(rooms, false).active.map((r) => r.id)).toEqual([5, 4, 3, 2, 1]);
 	});
 });
 
@@ -123,11 +124,6 @@ describe('waitText', () => {
 			{ headline: "Everyone's waiting for you", lines: ['Your video is still loading…'], action: "Don't wait for me" }
 		],
 		[
-			'me, away: "Tap to join" says the rest',
-			[{ ...alice, userId: 9 }],
-			{ headline: "Everyone's waiting for you", lines: [], action: "Don't wait for me" }
-		],
-		[
 			'me and Bob',
 			[bob, { ...alice, userId: 9, reason: 'buffering' }],
 			{
@@ -137,10 +133,21 @@ describe('waitText', () => {
 			}
 		]
 	] as [string, Wait[], WaitText][])('%s', (_, waiting, want) => {
-		expect(waitText(waiting, 9, 22_000)).toEqual(want);
+		expect(waitText(waiting, 9, 22_000, false)).toEqual(want);
+	});
+
+	// The room may wait for this page, or for another socket of the same person.
+	it.each([
+		['away, this page needs a tap: "Tap to join" says the rest', 'away', true, []],
+		['away, this page is fine: another screen is away', 'away', false, ['Another of your screens stepped away.']],
+		['left, this page needs a tap: its old socket left', 'left', true, []],
+		['left, this page is loading', 'left', false, ['Your video is still loading…']],
+		['buffering', 'buffering', false, ['Your video is still loading…']]
+	] as [string, Wait['reason'], boolean, string[]][])('me, %s', (_, reason, needsTap, lines) => {
+		expect(waitText([{ ...alice, userId: 9, reason }], 9, 22_000, needsTap).lines).toEqual(lines);
 	});
 
 	it('leaves out times before the server clock is known', () => {
-		expect(waitText([alice], 9, null).lines).toEqual(['stepped away']);
+		expect(waitText([alice], 9, null, false).lines).toEqual(['stepped away']);
 	});
 });

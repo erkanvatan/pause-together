@@ -2,6 +2,7 @@
 	// The name form: a first visit's welcome, or a rename from the menu (oncancel set).
 	import { onMount } from 'svelte';
 	import { listRooms } from '$lib/api';
+	import Brand from '$lib/Brand.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import { saveName } from '$lib/me.svelte';
 	import { roomTitle } from '$lib/rooms';
@@ -54,8 +55,7 @@
 	{#if welcome}
 		<div class="mb-4 flex flex-col gap-1">
 			<p class="flex items-center gap-1.5">
-				<Icon name="pause" class="size-6 text-lamp" />
-				<span class="font-display text-xl font-bold">{strings.appName}</span>
+				<Brand />
 			</p>
 			<p class="text-haze">{strings.tagline}</p>
 		</div>
