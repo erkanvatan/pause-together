@@ -24,7 +24,7 @@
 		type Problem,
 		type Problems
 	} from '$lib/admin';
-	import { me } from '$lib/me.svelte';
+	import { loadMe, me } from '$lib/me.svelte';
 	import { langName } from '$lib/picker';
 	import { strings } from '$lib/strings';
 
@@ -106,7 +106,11 @@
 
 	function visibilityChanged() {
 		visible = document.visibilityState === 'visible';
-		if (visible && me.isAdmin) refresh();
+		if (!visible || !me.isAdmin) return;
+		refresh();
+		// The guest link too: a task up after setting PUBLIC_BIND changes it without a new build, so
+		// nothing else reloads this page. A failed ask keeps the old one.
+		loadMe().catch(() => {});
 	}
 
 	// The next ask waits for the last answer, so answers can't pile up or land out of order.
@@ -198,7 +202,7 @@
 				{#if me.guestUrl}
 					<GuestLink />
 				{:else}
-					<p class="text-sm text-haze">{strings.guestsCantReach}</p>
+					<p class="text-sm text-haze">{strings.noGuestLink}</p>
 				{/if}
 			</div>
 

@@ -395,7 +395,8 @@
 		{#if roomSubtitle(room) && !renaming}
 			<p class="-mt-3 break-words text-haze">{roomSubtitle(room)}</p>
 		{/if}
-		{#if me.isAdmin && !room.archived}
+		<!-- Only the admin port sends a guest link: guests never see this. -->
+		{#if me.guestUrl && !room.archived}
 			<div class="-mt-2"><GuestLink path="/rooms/{room.id}" /></div>
 		{/if}
 

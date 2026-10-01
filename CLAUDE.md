@@ -104,7 +104,7 @@ Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env`
   (`localhost:5173`) and prod (`localhost:8421`) would otherwise overwrite each other's user.
 - Go also reads `PUBLIC_BIND` and `GUEST_PORT`, which `compose.yml` passes in from `.env`, to show the
   host the guest link (`http://{PUBLIC_BIND}:{GUEST_PORT}`). A loopback or `0.0.0.0` bind gives no link.
-  Dev passes neither, so dev shows the "Guests can't reach this server yet" note instead.
+  Dev passes neither, so dev shows the "No guest link yet" note instead. IPv6 binds come in brackets.
 - Go also reads `BUILD_ID`; without it, the ID comes from the embedded web build. Dev sets
   `BUILD_ID=dev` on both containers (`svelte.config.js` reads it too), or Vite's pages would never
   match Go's ID and would reload forever.

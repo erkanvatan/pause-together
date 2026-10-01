@@ -7,7 +7,9 @@ func TestGuestURL(t *testing.T) {
 		bind, port, want string
 	}{
 		{"100.101.102.103", "8420", "http://100.101.102.103:8420"},
+		{"[fd7a:115c:a1e0::1]", "8420", "http://[fd7a:115c:a1e0::1]:8420"}, // as compose's ports need it
 		{"fd7a:115c:a1e0::1", "8420", "http://[fd7a:115c:a1e0::1]:8420"},
+		{"[::1]", "8420", ""},
 		{"127.0.0.1", "8420", ""}, // the default: guests can't reach it yet
 		{"::1", "8420", ""},
 		{"0.0.0.0", "8420", ""}, // every address, so no one to give out
