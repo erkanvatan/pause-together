@@ -106,10 +106,10 @@
 	);
 	const cantPlay = $derived(unplayable !== '');
 	// Nothing to play yet, or ever: the copy is still being prepared, or failed, or the video is gone.
-	// Play and seek would only move the room's clock over a black box. A room that somehow plays can
-	// still be paused.
-	const stuck = $derived(missing || src === '');
-	const toggleable = $derived(!!playState && (!stuck || playState.playing));
+	// Or this device can't play it. Play and seek would only move the room's clock over a black box. A
+	// room that somehow plays can still be paused, but not from a screen that can't see it.
+	const stuck = $derived(missing || src === '' || cantPlay);
+	const toggleable = $derived(!!playState && (!stuck || (playState.playing && !cantPlay)));
 	const durationMs = $derived(playState?.durationMs ?? 0);
 
 	let subtitlesOpen = $state(false); // the subtitle panel
@@ -570,7 +570,9 @@ Compact on a phone's small video box, so it never spills out of it. -->
 						{@const everywhere = room.video.unplayable !== ''}
 						{@render notice(
 							unplayable,
-							everywhere ? strings.cantPlayAnywhere : strings.cantPlayHereWhy,
+							everywhere
+								? strings.cantPlayAnywhere
+								: strings.cantPlayHereWhy(codecName(room.video.codecString)),
 							false,
 							everywhere
 						)}

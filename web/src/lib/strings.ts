@@ -260,9 +260,16 @@ export const strings = {
 	season: (n: number) => (n === 0 ? 'Specials' : `Season ${n}`),
 	seasonCount: (n: number) => (n === 1 ? '1 season' : `${n} seasons`),
 	cantPlayHere: (codec: string) => `This device can't play ${codec}.`,
-	// Under "can't play" in the video box: what's left to do. A device that can't play never holds up
-	// the room.
-	cantPlayHereWhy: "Try another device, like a computer. The room won't wait for this one, and chat still works.",
+	// Under "can't play" in the video box: what's left to do, by codec (codecName's names). A device that
+	// can't play never holds up the room, and its play and seek are off.
+	cantPlayHereWhy: (codec: string) =>
+		`${
+			({
+				HEVC: 'Safari on an iPhone, iPad or Mac usually plays it.',
+				AV1: 'A recent phone or computer usually plays it.',
+				VP9: 'Chrome, Edge or Firefox usually play it.'
+			} as Record<string, string>)[codec] ?? 'Another device may play it.'
+		} The room won't wait for this screen, and chat still works.`,
 	cantPlayAnywhere: 'No screen can play this file. Pick another video to watch.',
 	// A room's prepare failed (media.FailNoSpace, media.FailPrepare), in the video box.
 	prepareFailed: "Couldn't get this video ready",

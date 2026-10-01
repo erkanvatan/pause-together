@@ -503,6 +503,9 @@ So each room's video is **prepared once**, then served as a plain file.
   word on the socket, the middle says "Getting the room ready…" (after a moment, so a quick connect
   never flashes it).
 - No playback speed control. `playbackRate` belongs to the drift fix.
+- A device that can't play the video ("This device can't play HEVC") has play, pause and seek turned
+  off: it would move the room for everyone over a black box. Its note says which devices usually
+  can play that codec. Chat still works.
 - Keys, as in other players: Space or K play and pause, ← and → skip 10 s, J and L skip 20 s,
   F fullscreen, C the subtitle panel, H chat, M mute. Never while typing or with a dialog open. The
   bar's tooltips name them. On the focused seek bar, the arrows skip 10 s too: its own 1 s step would
