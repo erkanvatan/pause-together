@@ -264,7 +264,8 @@ that is on (its panel is open) keeps a 12% tint. The subtitles button is haze wh
 and moonlight while on: state, not the lamp.
 
 ### Inputs / Fields
-- **Style:** dusk fill, line border, gentle corners, 2.5rem tall (2.75rem on touch).
+- **Style:** dusk fill, a border of haze at 60% (stronger than line: the edge is what shows where to
+  type, 3:1 on midnight and dusk), gentle corners, 2.5rem tall (2.75rem on touch).
 - **Focus:** the border turns lamp, plus the lamp focus ring.
 - **Disabled:** 45% opacity. Placeholders are haze at full opacity.
 
@@ -337,7 +338,7 @@ button with a chevron on the right. Its menu is a dusk panel with a line border,
 - **Do** separate surfaces with the midnight/dusk step and a 1px line border.
 - **Do** put text over video on translucent midnight and size it from the video box width.
 - **Do** leave room for longer Turkish strings: wrap and `break-words` instead of fixed widths.
-- **Do** honor reduced motion: transitions collapse to near zero.
+- **Do** honor reduced motion: transitions turn off and animations collapse to near zero.
 
 ### Don't:
 - **Don't** use Tailwind's built-in colors or sizes, or loose hex values in components.

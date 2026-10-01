@@ -148,7 +148,8 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 	.field {
 		min-height: 2.5rem;
 		padding: 0.5rem 0.75rem;
-		border: 1px solid var(--color-line);
+		/* Stronger than line: a field's edge is all that shows where to type (3:1 on midnight and dusk). */
+		border: 1px solid color-mix(in oklab, var(--color-haze) 60%, transparent);
 		border-radius: var(--radius-control);
 		background-color: var(--color-dusk);
 		color: var(--color-moonlight);
@@ -253,6 +254,8 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 	::after {
 		animation-duration: 0.01ms !important;
 		animation-iteration-count: 1 !important;
-		transition-duration: 0.01ms !important;
+		/* None, not a near-zero duration: that would turn on a transition for every property, which a
+		background tab never finishes, so text sat in its starting color. */
+		transition: none !important;
 	}
 }

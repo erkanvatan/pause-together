@@ -199,7 +199,7 @@
 				{#if why}
 					<span class="block text-sm text-haze">{why}</span>
 				{:else if v.appleOnly}
-					<span class="block text-sm text-lamp">{strings.appleOnlyPick}</span>
+					<span class="block text-sm text-haze">{strings.appleOnlyPick}</span>
 				{/if}
 			</span>
 		</button>

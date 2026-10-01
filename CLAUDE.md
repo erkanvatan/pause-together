@@ -521,7 +521,7 @@ So each room's video is **prepared once**, then served as a plain file.
 - People can delete their own messages, not edit them. A deleted message disappears from the list.
   Its row stays with the text wiped, so a reply to it quotes "deleted message".
 - Each message stores the video and the room position when it was sent (from the server's room clock)
-  and shows that as a timestamp, plus the video's name if it isn't the one playing now. The send time
+  and shows that as a timestamp (none before the video starts: it would always say 0:00), plus the video's name if it isn't the one playing now. The send time
   (wall clock) shows on tap or hover.
 - No typing indicator, no sounds, no system messages: play, pause, seek, switch, join and leave never
   appear in chat.

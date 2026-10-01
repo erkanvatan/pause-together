@@ -181,7 +181,10 @@
 						<span class="font-bold break-all {m.from.userId === userId ? 'text-lamp' : ''}">
 							{m.from.name}
 						</span>
-						<span class="text-haze tabular-nums">{formatTime(m.positionMs)}</span>
+						<!-- Not before the video starts: every such message would say 0:00. -->
+						{#if m.positionMs >= 1000}
+							<span class="text-haze tabular-nums">{formatTime(m.positionMs)}</span>
+						{/if}
 						{#if m.video.id !== videoId}
 							<span class="min-w-0 break-words text-haze">{videoName(m.video)}</span>
 						{/if}

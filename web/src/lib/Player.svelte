@@ -105,6 +105,9 @@
 			(decodeFailed ? strings.cantPlayHere(codecName(room.video.codecString)) : '')
 	);
 	const cantPlay = $derived(unplayable !== '');
+	// Nothing to play for anyone: the video is gone, or its copy failed. Play and seek would only move
+	// the room's clock over a black box.
+	const stuck = $derived(missing || prepare?.state === 'failed');
 	const durationMs = $derived(playState?.durationMs ?? 0);
 
 	let subtitlesOpen = $state(false); // the subtitle panel
@@ -335,7 +338,7 @@
 		const typing = t.closest('input:not([type=range]), textarea, select, [contenteditable]');
 		if (typing || document.querySelector('dialog[open]')) return;
 		const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-		const ready = online && !!playState;
+		const ready = online && !!playState && !stuck;
 		if ((key === ' ' && !t.closest('button, a, input')) || key === 'k') {
 			if (ready) togglePlay();
 		} else if ((key === 'ArrowLeft' || key === 'ArrowRight') && !t.closest('input')) {
@@ -754,7 +757,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 					<div class="flex flex-wrap items-center gap-x-1 px-1 py-1 @xl/bar:gap-x-2 @xl/bar:px-2">
 						<button
 							onclick={togglePlay}
-							disabled={!online || !playState}
+							disabled={!online || !playState || stuck}
 							aria-label={playState?.playing ? strings.pause : strings.play}
 							title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
 							class="icon-btn"
@@ -770,7 +773,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 								step="1000"
 								value={dragMs ?? shownMs}
 								aria-valuetext={strings.positionOf(formatTime(dragMs ?? shownMs), formatTime(durationMs))}
-								disabled={!online || durationMs === 0}
+								disabled={!online || durationMs === 0 || stuck}
 								oninput={(e) => (dragMs = Number(e.currentTarget.value))}
 								onkeydown={(e) => {
 									// An arrow skips 10 s, as everywhere else. The slider's own 1 s step would seek the
