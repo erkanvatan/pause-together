@@ -316,4 +316,4 @@ testing file adds and deletes.
 [coder/websocket](https://github.com/coder/websocket), ffmpeg. SvelteKit (Svelte 5, SPA mode) and
 Tailwind v4.
 
-The full spec lives in [CLAUDE.md](CLAUDE.md). The build order lives in [docs/plan.md](docs/plan.md).
+The full spec lives in [AGENTS.md](AGENTS.md). The build order lives in [docs/plan.md](docs/plan.md).

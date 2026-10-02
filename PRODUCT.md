@@ -42,7 +42,7 @@ settings mid-film.
 
 ## Capabilities and Constraints
 
-The full, binding spec is `CLAUDE.md`. Facts that shape design work:
+The full, binding spec is `AGENTS.md`. Facts that shape design work:
 
 - Roles: host (admin port, `localhost:8421`) and guests. No accounts. Everyone can create rooms,
   control playback, switch videos, chat, archive rooms.

@@ -1,6 +1,6 @@
 # Build plan
 
-`CLAUDE.md` is the spec. This file is the order we build it in: small slices, each tested and reviewed
+`AGENTS.md` is the spec. This file is the order we build it in: small slices, each tested and reviewed
 before the next one starts.
 
 ## How to work a slice
@@ -11,7 +11,7 @@ before the next one starts.
 3. Write the tests first.
 4. Build until `task test` and `task lint` pass.
 5. Do the slice's "by hand" check.
-6. Update `CLAUDE.md` where it no longer matches the code (layout, commands, "planned"/"design only").
+6. Update `AGENTS.md` where it no longer matches the code (layout, commands, "planned"/"design only").
 7. `git add -A`, so new files show up in the diff. 
     1. Run `/code-review high`.
     2. Run `/security-review` on the uncommitted working tree when the slice touches ports, cookies, the admin API, 
@@ -408,7 +408,7 @@ the sidecars.
 - No behaviour change beyond the player additions below. No new API or socket messages. The player
   rules still hold: one `<video playsinline>`, no native controls, subtitles clear of toasts and
   controls, chat works in fullscreen. User text is still rendered as text, never `{@html}`.
-- Player additions, all client side (the rules are in CLAUDE.md under "Player"):
+- Player additions, all client side (the rules are in AGENTS.md under "Player"):
   - Over the video's middle: back 10 s, play or pause, forward 10 s. They send the existing seek, play
     and pause intents.
   - Controls fade after 3 s without a mouse move, touch or key while the video plays; in fullscreen
@@ -444,7 +444,7 @@ all of them forever and filled the room page.
   the list: wide screen, portrait phone bottom sheet, and 1, 4 and 12 people with long names. The list
   must never push the messages off a phone screen: cap its height or let it scroll sideways. Tokens and
   shared classes from `web/src/app.css` only.
-- Update CLAUDE.md: the presence rule under "Rooms", and chat's UI under "Chat".
+- Update AGENTS.md: the presence rule under "Rooms", and chat's UI under "Chat".
 
 **Done when (tests):**
 - Presence, table-driven: gone past the grace → not in the list; clean close → out at once; two tabs →
