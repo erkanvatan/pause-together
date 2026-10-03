@@ -530,9 +530,17 @@ So each room's video is **prepared once**, then served as a plain file.
 - While the copy is prepared, the player shows "Preparing… 42%" with a progress bar, or its place in line.
 - Fullscreen the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   `document.fullscreenEnabled` is false (iPhone Safari), fill the window with CSS instead.
+- Fullscreen turns with the phone. Chrome and Firefox on Android hold fullscreen video sideways, so
+  the page asks for any orientation itself (`screen.orientation.lock('any')`) on entering it and when
+  the video starts playing. Held upright, the chat takes the lower half, and the control bar and the
+  subtitle panel sit in the black under the video, panel under the bar, covering none of it. The panel
+  pushes the chat down, not the video up, so the subtitles stay in view while their timing is set.
+- In fullscreen the wrapper is padded to the visual viewport, so a phone's keyboard pushes the chat's
+  box up above it instead of covering it.
 - Controls fade after 3 s with no mouse move, touch or key while the video plays: the round buttons
-  over the video always, the control bar in fullscreen only (there it lies over the video, so hiding it
-  never resizes the video, and subtitles move up while it shows). Never while paused, the subtitle panel
+  over the video always, the control bar in fullscreen only (in landscape it lies over the video, so
+  hiding it never resizes the video, and subtitles move up while it shows; held upright it keeps its
+  space under the video). Never while paused, the subtitle panel
   is open or the seek bar is held. On touch screens, a tap on bare video hides them.
 - Over the video's middle: back 10 s, play or pause, forward 10 s. Hidden while "Tap to join", "Waiting
   for …", the end of the video ("Next episode", "The end"), or "Host is offline" hold the middle. Before the room's first

@@ -131,10 +131,20 @@
 	let native = $state(false); // the browser's fullscreen
 	let filled = $state(false); // the CSS fill
 	const full = $derived(native || filled);
+	// Fullscreen held upright: the video is as wide as the screen, with black above and below it, and the
+	// chat under it.
+	const portrait = new MediaQuery('(orientation: portrait)');
+	// The bar lies over the video's foot in fullscreen, so hiding it never resizes the video. Held
+	// upright, there's black to spare: the bar and the subtitle panel go under the video, and cover none
+	// of it.
+	const barOver = $derived(full && !portrait.current);
 	// The subtitle panel lies over the video's foot only where the page fits the screen: there, taking
 	// room would shrink the video. Elsewhere the video is short (a phone), and the panel would hide the
 	// subtitles its timing is set by, so it goes under the bar and the page grows.
 	const panelOver = $derived(!full && fits.current);
+	// A phone's keyboard covers the foot of a fullscreen page without making it shorter. The wrapper is
+	// padded to the part still in view, so the chat's box sits on top of the keyboard.
+	let keyboard = $state({ top: 0, bottom: 0 });
 
 	// The controls step aside while the video plays and nobody touches them: the buttons over the video
 	// always, the bar in fullscreen only. Never while paused, the subtitle panel is open, or the seek
@@ -227,6 +237,34 @@
 		return () => (document.documentElement.style.overflow = '');
 	});
 
+	// The visual viewport is the part of the page in view: the keyboard shrinks it, and the browser may
+	// scroll it down to the focused box.
+	$effect(() => {
+		const view = window.visualViewport;
+		if (!full || !view) return;
+		const fit = () => {
+			const r = wrapper.getBoundingClientRect();
+			// Pinch zoom shrinks it too, and a zoomed-in page shouldn't squeeze the player. A view as tall as
+			// the wrapper has no keyboard: the browser may report the keyboard gone before it scrolls back,
+			// and an old offset would hold the player out of place until the next touch.
+			const none = Math.abs(view.scale - 1) > 0.01 || view.height >= r.height - 1;
+			const top = none ? 0 : Math.max(0, view.offsetTop - r.top);
+			const bottom = none ? 0 : Math.max(0, r.bottom - view.offsetTop - view.height);
+			// Scrolling fires every frame: only a change re-styles the wrapper.
+			if (top !== keyboard.top || bottom !== keyboard.bottom) keyboard = { top, bottom };
+		};
+		// Untracked: fit reads keyboard, and the cleanup below resets it, so a tracked read would re-run
+		// this effect on every change, forever.
+		untrack(fit);
+		view.addEventListener('resize', fit);
+		view.addEventListener('scroll', fit);
+		return () => {
+			view.removeEventListener('resize', fit);
+			view.removeEventListener('scroll', fit);
+			keyboard = { top: 0, bottom: 0 };
+		};
+	});
+
 	onMount(() => {
 		const timer = setInterval(tick, FOLLOW_EVERY_MS);
 		const visibility = () => {
@@ -234,7 +272,11 @@
 			tick();
 		};
 		document.addEventListener('visibilitychange', visibility);
-		const fullscreen = () => (native = document.fullscreenElement === wrapper);
+		const fullscreen = () => {
+			native = document.fullscreenElement === wrapper;
+			askOnPlay = true;
+			freeRotation();
+		};
 		document.addEventListener('fullscreenchange', fullscreen);
 		return () => {
 			clearInterval(timer);
@@ -396,6 +438,15 @@
 		if (full) exitFullscreen();
 		else if (document.fullscreenEnabled) wrapper.requestFullscreen().catch(() => (filled = true));
 		else filled = true;
+	}
+
+	// Phone browsers (Chrome and Firefox on Android) turn fullscreen video sideways and hold it there.
+	// Held upright, the chat fits under the video, so the page asks for any orientation itself, which
+	// outranks theirs. They may lock again once the video plays, so it asks once more then. Leaving
+	// fullscreen drops the page's lock. Where the browser has no lock (iPhone, desktops), nothing happens.
+	let askOnPlay = false; // the next 'playing' asks again: once per fullscreen
+	function freeRotation() {
+		if (native) screen.orientation?.lock?.('any').catch(() => {});
 	}
 
 	function exitFullscreen() {
@@ -571,18 +622,24 @@ Compact on a phone's small video box, so it never spills out of it. -->
 
 <div
 	bind:this={wrapper}
+	style:padding-top={keyboard.top ? `${keyboard.top}px` : undefined}
+	style:padding-bottom={keyboard.bottom ? `${keyboard.bottom}px` : undefined}
 	class="flex overflow-hidden bg-black portrait:flex-col {full
 		? 'fixed inset-0 z-30 h-dvh'
 		: `max-sm:-mx-4 min-h-0 fit:flex-1 sm:rounded-panel ${chatOpen ? 'portrait:flex-1' : ''}`}"
 >
 	<!-- In portrait, the video keeps its own height and the chat takes the rest; in fullscreen the
-	video takes the rest. The pointer handlers only show and hide the controls; the buttons inside do the rest. No text selection or iOS
+	video takes the rest, or with the chat open, the upper half plus the subtitle panel: the panel
+	pushes the chat down, and the video stays put to show the subtitles it times. The pointer handlers only show and hide the controls; the buttons inside do the rest. No text selection or iOS
 	callout: a long press on the video would select a subtitle or button label. Chat stays selectable. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		onpointerdown={pointerDown}
 		onpointermove={(e) => e.pointerType === 'mouse' && wake()}
 		onpointerleave={(e) => e.pointerType === 'mouse' && rest()}
+		style:flex={full && portrait.current && chatOpen
+			? `0 1 calc(50% + ${subtitlesOpen ? panelHeight : 0}px)`
+			: undefined}
 		class="relative flex min-w-0 flex-1 flex-col select-none [-webkit-touch-callout:none] {full ? 'portrait:min-h-0' : 'portrait:flex-none'}"
 	>
 		<!-- When the page fits the screen, this space is what's left above the control bar, and the video
@@ -611,7 +668,13 @@ Compact on a phone's small video box, so it never spills out of it. -->
 					disableremoteplayback
 					onerror={failed}
 					onwaiting={tick}
-					onplaying={tick}
+					onplaying={() => {
+						if (askOnPlay) {
+							askOnPlay = false;
+							freeRotation();
+						}
+						tick();
+					}}
 					onseeking={tick}
 					onseeked={tick}
 					oncanplay={tick}
@@ -626,7 +689,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 						{offsetMs}
 						size={subtitleSize}
 						videoMs={() => video.currentTime * 1000}
-						lift={full ? (faded ? 0 : barHeight) : subtitlesOpen && panelOver ? panelHeight : 0}
+						lift={barOver ? (faded ? 0 : barHeight) : subtitlesOpen && panelOver ? panelHeight : 0}
 					/>
 				{/if}
 
@@ -793,10 +856,10 @@ Compact on a phone's small video box, so it never spills out of it. -->
 		</div>
 
 		<!-- In fullscreen the controls lie over the video's foot on a dark fade, so hiding them never
-		resizes the video. -->
+		resizes the video. Held upright, they sit in the black under it and keep their space while hidden. -->
 		<div
 			class={full
-				? `pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent pt-12 transition-[opacity,visibility] duration-300 ${fade}`
+				? `transition-[opacity,visibility] duration-300 ${fade} ${barOver ? 'pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent pt-12' : ''}`
 				: ''}
 		>
 			<!-- svelte-ignore a11y_no_static_element_interactions (keeps the controls up under the mouse) -->
@@ -807,8 +870,8 @@ Compact on a phone's small video box, so it never spills out of it. -->
 				class="pointer-events-auto relative"
 			>
 				<!-- The subtitle panel sits where it shows, so Tab and screen readers meet it in that order: above
-				the bar in fullscreen and over the video's foot, under it where the page grows. -->
-				{#if full || panelOver}
+				the bar where the bar lies over the video, or the panel does; under it everywhere else. -->
+				{#if barOver || panelOver}
 					{@render subtitlePanel()}
 				{/if}
 
@@ -903,7 +966,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 						</button>
 					</div>
 				</div>
-				{#if !full && !panelOver}
+				{#if !barOver && !panelOver}
 					{@render subtitlePanel()}
 				{/if}
 			</div>
@@ -911,13 +974,15 @@ Compact on a phone's small video box, so it never spills out of it. -->
 	</div>
 
 	{#if chatOpen}
-		<!-- Landscape: the panel takes the row's height. Portrait: the screen's rest under the video, or
-		its lower half in fullscreen; it gives up more while the subtitle panel is open. Absolute inside,
-		so its messages never make the player taller. -->
+		<!-- Landscape: the panel takes the row's height. Portrait: the screen's rest under the video, in
+		fullscreen of what's in view (above the keyboard, while it's up); it gives up more while the
+		subtitle panel is open. Absolute inside, so its messages never make the player taller. -->
 		<aside
-			class="relative z-10 border-line landscape:w-72 landscape:shrink-0 landscape:border-l lg:landscape:w-80 portrait:border-t {full
-				? 'portrait:h-[50dvh] portrait:shrink-0'
-				: `portrait:flex-1 ${subtitlesOpen ? 'portrait:min-h-56' : 'portrait:min-h-72'}`}"
+			class="relative z-10 border-line landscape:w-72 landscape:shrink-0 landscape:border-l lg:landscape:w-80 portrait:border-t portrait:flex-1 {subtitlesOpen
+				? 'portrait:min-h-56'
+				: full
+					? 'portrait:min-h-0'
+					: 'portrait:min-h-72'}"
 		>
 			<div class="absolute inset-0">
 				{@render side()}

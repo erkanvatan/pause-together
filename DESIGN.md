@@ -244,7 +244,9 @@ labels.
   and the video box is the largest 16:9 that fits above the control bar, between black bars. A phone
   held sideways is shorter, so its page scrolls instead of shrinking the video to a strip.
 - Fullscreen fills the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
-  real fullscreen isn't available, the wrapper fills the window with CSS.
+  real fullscreen isn't available, the wrapper fills the window with CSS. Fullscreen turns with the
+  phone: held upright, the video sits on top with the bar under it, and the chat takes the lower half
+  of what's in view, above the keyboard while it's up.
 - Spacing steps: 0.5rem inside lists and stacks, 1.5rem between groups, 2.5rem between sections,
   4rem between homepage columns on wide screens.
 - Text over video (subtitles, pills) sizes from the video box width (container query units), so it
@@ -317,7 +319,8 @@ Archived rooms show their title in haze.
   92% while pressed. They fade after 3 s of no input while playing.
 - **Control bar:** dusk, a line border on top, label size. In fullscreen it lies over the foot of the
   video on a black-to-transparent fade (80% black at the bottom), and fades out with the transport
-  (300ms). Subtitles slide up while it shows.
+  (300ms). Subtitles slide up while it shows. Fullscreen held upright, it sits on the black under the
+  video instead, and keeps its space while hidden.
 - **Holds the middle:** "Tap to join" (a large round primary button), "Preparing… 42%" (a pill with a
   thin lamp progress bar on dusk), "Waiting for …", "Host is offline" (stays up while the video
   plays: that screen is on its own), "Video missing", "Can't play", "Couldn't get this video ready", "Getting the room
@@ -334,7 +337,8 @@ Archived rooms show their title in haze.
   - The end: a TV episode offers a lamp "Next episode". Anything else gets a title card, "The end" in
     the display face (3xl, 2xl on a phone's box), over a lamp "Watch something else".
 - **Subtitle panel:** a dusk strip over the bar (over the video's foot where the page fits the screen;
-  under the bar where the video is short, like a phone's, so it never hides the subtitles), in two labelled groups: "For everyone" (subtitle,
+  under the bar where the video is short, like a phone's, or in fullscreen held upright, so it never
+  hides the subtitles; held upright in fullscreen it pushes the chat down and the video stays put), in two labelled groups: "For everyone" (subtitle,
   timing) and "On this screen" (size). Group labels are semibold moonlight, field labels haze.
 
 ### Pills
