@@ -25,9 +25,17 @@ watch in sync from PCs, tablets and phones. When one of them buffers or steps aw
   Anyone can press "Play anyway".
 - **Subtitles.** Embedded and sidecar text subtitles, converted to WebVTT, with a shared time offset.
   Old Turkish, Western and Cyrillic `.srt` files decode correctly.
-- **Chat.** One chat per room, with replies and video timestamps. It stays visible in fullscreen.
-- **No accounts.** Guests pick a name. The host manages everything else from a local-only admin page.
-- **Works on phones.** Plays inline on iPhone, with its own controls and fullscreen.
+- **Join, don't split.** Pick a video that already has a room, and you're offered that room first.
+- **Binge-friendly.** "Next episode" switches at once and keeps the audio and subtitle language. No
+  autoplay: the end of an episode waits for someone to press it.
+- **Chat.** One chat per room, with replies, video timestamps and a color per person. It stays
+  visible in fullscreen.
+- **No accounts.** Guests pick a name. The same name on a phone and a TV is the same person. The host
+  manages everything else from a local-only admin page.
+- **Works on phones.** Plays inline on iPhone, with its own controls. In fullscreen, the phone turns
+  upright with the chat under the video, and sideways without it.
+- **Looks after itself.** Starts at boot, takes a daily database backup, and deletes prepared copies
+  nobody has watched for a while.
 
 ## How it works
 
@@ -160,8 +168,9 @@ You set it up once on the host. Each guest installs the app, accepts your invite
    Pick a name, then bookmark the page.
 
 Give every guest the same address, the Tailscale IP. The admin page shows it as the guest link, and
-each room shows its own link to copy into a message. Each address (`localhost`, the IP, the MagicDNS
-name) gives a guest a different identity, so switching loses their name.
+each room shows its own link to copy into a message. A browser remembers its name per address
+(`localhost`, the IP, the MagicDNS name). A guest who switches address has to type their name again.
+The same name makes them the same person again.
 
 > [!NOTE]
 > Tailscale must be on while watching. On phones it's a switch in the app, and it can turn itself off.
