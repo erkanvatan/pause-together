@@ -1,5 +1,5 @@
-// Chat helpers, pure: message length, and keeping the room's list of messages.
-import type { ChatMessage } from '$lib/api';
+// Chat helpers, pure: message length, name colors, and keeping the room's list of messages.
+import type { ChatMessage, Who } from '$lib/api';
 
 // MAX_MESSAGE_CHARS is the longest message, counted as the server does (MaxMessageRunes in
 // internal/room/chat.go): in code points, after trimming.
@@ -18,6 +18,50 @@ export function messageLength(text: string): number {
 export function canSend(text: string): boolean {
 	const n = messageLength(text);
 	return n > 0 && n <= MAX_MESSAGE_CHARS;
+}
+
+// Full class names, so Tailwind finds them. Nine, so a room of ten never shares one. More would look alike.
+const personColors = [
+	'text-person-1',
+	'text-person-2',
+	'text-person-3',
+	'text-person-4',
+	'text-person-5',
+	'text-person-6',
+	'text-person-7',
+	'text-person-8',
+	'text-person-9'
+];
+
+// Names are colored first come first served, so nobody in a room shares a color until a tenth other
+// person shows up. A person keeps theirs while the page is open; another screen, or a reload, may hand
+// them out in another order. NameColors maps a user ID to its place in personColors.
+export type NameColors = Map<number, number>;
+
+// withPeople gives each person not colored yet the next color, in the order they show up: messages
+// oldest first, each with whoever it quotes, then who's watching. You get none: yours is the lamp. It
+// returns the same map when nobody is new.
+export function withPeople(colors: NameColors, messages: ChatMessage[], watching: Who[], me: number): NameColors {
+	let next = colors;
+	const add = (userId: number) => {
+		if (userId === me || next.has(userId)) return;
+		if (next === colors) next = new Map(colors);
+		next.set(userId, next.size % personColors.length);
+	};
+	for (const m of messages) {
+		add(m.from.userId);
+		if (m.replyTo) add(m.replyTo.from.userId);
+	}
+	for (const w of watching) add(w.userId);
+	return next;
+}
+
+// nameColor is the text color of a person's name: the lamp for you, else the color withPeople gave them.
+// Someone it hasn't met keeps the plain text color, so they never pass for whoever has the first one.
+export function nameColor(userId: number, me: number, colors: NameColors): string {
+	if (userId === me) return 'text-lamp';
+	const at = colors.get(userId);
+	return at === undefined ? '' : personColors[at];
 }
 
 // withMessage adds a new message at the end, unless the list has it.

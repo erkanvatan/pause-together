@@ -8,6 +8,15 @@ colors:
   moonlight: "#eee9ff"
   lamp: "#ffc15e"
   ember: "#ff7a6b"
+  person-1: "#8de390"
+  person-2: "#fca4d6"
+  person-3: "#6be5de"
+  person-4: "#84b2fd"
+  person-5: "#c28efb"
+  person-6: "#d0ee5f"
+  person-7: "#3bb5a1"
+  person-8: "#e175d9"
+  person-9: "#6bc456"
   line: "color-mix(in oklab, #a69dcb 28%, transparent)"
   black: "#000"
   white: "#fff"
@@ -162,7 +171,7 @@ A cool violet night with one warm lamp and one red-orange warning.
   decorative.
 
 ### Neutral
-- **Midnight Violet** (midnight): the page. Also the base for translucent layers over video (55–82%
+- **Midnight Violet** (midnight): the page. Also the base for translucent layers over video (55–90%
   mixed with transparent).
 - **Dusk Violet** (dusk): raised surfaces: panels, dialogs, fields, menus, the picker, the control
   bar. Also the "off" state of a filled button.
@@ -174,11 +183,21 @@ A cool violet night with one warm lamp and one red-orange warning.
 - **Black / White** (black, white): the video box and subtitles only. Subtitle text is white on a
   black 65% backing.
 
+### People
+- **Person colors** (person-1 to person-9: green, pink, aqua, blue, purple, lime, teal, magenta,
+  deep green): other people's names in chat, the watching list, reply quotes and chat toasts, so two
+  voices read apart. Handed out on the page, first come first served, so nobody in a room of ten
+  shares one. A person keeps theirs while the page is open; another screen, or a reload, may give
+  them another. Away from amber, coral and haze. The clearest come first: the last three are darker
+  cousins of green, pink and aqua, so they show only in a room of seven or more. Blue sits darker so
+  it stays apart from aqua. 5.8:1 or more on dusk, 4.5:1 or more on a pill over a white frame. Your
+  own name stays lamp. Never on anything but a name.
+
 ### Named Rules
 **The One Lamp Rule.** Lamp Amber is the only warm color. It points at the next action or at people.
 Two lamp-colored things fighting on one screen means one of them is wrong.
 
-**The Closed Palette Rule.** Only these tokens exist. Tailwind's own palette is cleared in
+**The Closed Palette Rule.** Only these tokens exist, the person colors included. Tailwind's own palette is cleared in
 `web/src/app.css`, so `neutral-700` builds to nothing. Components never use loose hex values.
 
 ## Typography
@@ -318,12 +337,12 @@ Archived rooms show their title in haze.
 
 ### Pills
 A short line over the video: "Host is offline, reconnecting…" (with a small ember signal icon), "Alice
-paused" (with a small lamp pause icon), "Alice is 3 s behind", chat toasts. Midnight at 82%, gentle corners, sized with the video width (at least 1rem), so they stay
+paused" (with a small lamp pause icon), "Alice is 3 s behind", chat toasts. Midnight at 88% (so person colors stay readable over a white frame), gentle corners, sized with the video width (at least 1rem), so they stay
 readable in fullscreen.
 
 ### Chat
 A panel with a title-small header, then the "watching now" list in label size (at most two lines),
-then messages. Messages are not bubbles: each is a row with the name in bold (yours in lamp), the
+then messages. Messages are not bubbles: each is a row with the name in bold (yours in lamp, everyone else's in their person color), the
 video time in haze, then the text. Replies quote with a 2px line border on the left. The reply being
 written shows a lamp left border instead. A small haze reply arrow on hover and focus (and on
 every message on a touch screen) hints that a message opens Reply. Delete your own message asks
@@ -344,7 +363,7 @@ stands between the title and the video, so the video starts high on a phone.
 ## Do's and Don'ts
 
 ### Do:
-- **Do** use only the tokens in `web/src/app.css`: six named colors, line, black and white.
+- **Do** use only the tokens in `web/src/app.css`: six named colors, the person colors, line, black and white.
 - **Do** keep Lamp Amber for the next action, focus, progress and presence.
 - **Do** make every control at least 44 px (2.75rem) on touch screens.
 - **Do** separate surfaces with the midnight/dusk step and a 1px line border.

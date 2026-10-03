@@ -2,7 +2,7 @@
 	// A room's chat: the messages, and a line to write one. Text is shown as text, never as HTML.
 	import { onMount, tick, untrack } from 'svelte';
 	import type { ChatMessage, Who } from '$lib/api';
-	import { canSend, focusAfter, MAX_MESSAGE_CHARS, messageLength } from '$lib/chat';
+	import { canSend, focusAfter, MAX_MESSAGE_CHARS, messageLength, nameColor, type NameColors } from '$lib/chat';
 	import Confirm from '$lib/Confirm.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import { videoName } from '$lib/picker';
@@ -14,6 +14,7 @@
 		more,
 		watching,
 		userId,
+		colors,
 		videoId,
 		readOnly,
 		online,
@@ -28,6 +29,7 @@
 		more: boolean; // older ones may be on the server
 		watching: Who[];
 		userId: number; // this user's
+		colors: NameColors; // everyone else's name color
 		videoId: number; // the room's video now; other videos are named on their messages
 		readOnly: boolean; // an archived room
 		online: boolean;
@@ -203,7 +205,7 @@
 				</li>
 				<!-- Each name on its own chip: names can hold spaces, so a plain gap can't tell two apart. -->
 				{#each watching as w (w.userId)}
-					<li title={w.name} class="max-w-full truncate rounded-control bg-midnight px-2 {w.userId === userId ? 'text-lamp' : ''}">
+					<li title={w.name} class="max-w-full truncate rounded-control bg-midnight px-2 {nameColor(w.userId, userId, colors)}">
 						{w.name}
 					</li>
 				{/each}
@@ -230,7 +232,7 @@
 					class="group flex w-full flex-col gap-0.5 rounded-control px-2 py-1.5 text-left hover:bg-midnight/40"
 				>
 					<span class="flex flex-wrap items-baseline gap-x-2 text-sm">
-						<span class="font-bold break-all {m.from.userId === userId ? 'text-lamp' : ''}">
+						<span class="font-bold break-all {nameColor(m.from.userId, userId, colors)}">
 							{m.from.name}
 						</span>
 						<!-- Not before the video starts: every such message would say 0:00. The play mark says it's a
@@ -260,7 +262,7 @@
 							{#if m.replyTo.deleted}
 								<i>{strings.deletedMessage}</i>
 							{:else}
-								<span class="font-semibold">{m.replyTo.from.name}</span> {m.replyTo.text}
+								<span class="font-semibold {nameColor(m.replyTo.from.userId, userId, colors)}">{m.replyTo.from.name}</span> {m.replyTo.text}
 							{/if}
 						</span>
 					{/if}

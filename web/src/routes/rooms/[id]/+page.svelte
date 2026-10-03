@@ -10,11 +10,14 @@
 	import { me } from '$lib/me.svelte';
 	import {
 		CHAT_PAGE_SIZE,
+		nameColor,
+		type NameColors,
 		TOAST_MS,
 		withDeleted,
 		withHistory,
 		withMessage,
 		withOlder,
+		withPeople,
 		withToast
 	} from '$lib/chat';
 	import Picker from '$lib/Picker.svelte';
@@ -81,6 +84,9 @@
 	let chatOpen = $state(true);
 	let toasts = $state<ChatMessage[]>([]);
 	let heard = $state(''); // the newest message from someone else, for screen readers
+	// Each person's name color. meet adds the new people, so older messages loading in never recolor
+	// anyone; the room change below starts it over.
+	let colors = $state.raw<NameColors>(new Map());
 
 	// Opening the room starts preparing its video, then the socket joins it. It runs again when a link
 	// leads to another room, since that reuses this page.
@@ -106,6 +112,7 @@
 		draft = '';
 		toasts = [];
 		heard = '';
+		colors = new Map();
 		const load = async () => {
 			const r = await openRoom(roomId);
 			if (stopped) return;
@@ -184,6 +191,7 @@
 				break;
 			case 'presence':
 				watching = m.watching;
+				meet();
 				break;
 			case 'prepare':
 				prepare = m.prepare;
@@ -195,10 +203,12 @@
 				const h = withHistory(messages, m.messages);
 				messages = h.list;
 				if (!h.keptOlder) more = m.messages.length === CHAT_PAGE_SIZE;
+				meet();
 				break;
 			}
 			case 'chat':
 				messages = withMessage(messages, m.message);
+				meet();
 				if (m.message.from.userId !== userId) {
 					heard = strings.said(m.message.from.name, m.message.text);
 					if (!chatOpen) toast(m.message);
@@ -211,6 +221,11 @@
 				if (replyTo?.id === m.id) replyTo = { ...replyTo, text: '' };
 				break;
 		}
+	}
+
+	// meet gives a name color to everyone new in the chat or the watching list.
+	function meet() {
+		colors = withPeople(colors, messages, watching, userId);
 	}
 
 	function toast(m: ChatMessage) {
@@ -243,6 +258,7 @@
 		if (r.ok) {
 			messages = withOlder(messages, r.value);
 			more = r.value.length === CHAT_PAGE_SIZE;
+			meet();
 		}
 		return r.ok;
 	}
@@ -330,6 +346,7 @@
 		{more}
 		{watching}
 		{userId}
+		{colors}
 		videoId={room?.video.id ?? 0}
 		{readOnly}
 		{online}
@@ -350,7 +367,7 @@
 			class="pill pointer-events-auto flex max-w-[28em] text-left pointer-coarse:min-h-11 pointer-coarse:items-center"
 		>
 			<span class="line-clamp-2 break-words">
-				<span class="font-semibold">{t.from.name}</span>
+				<span class="font-semibold {nameColor(t.from.userId, userId, colors)}">{t.from.name}</span>
 				{t.text}
 			</span>
 		</button>

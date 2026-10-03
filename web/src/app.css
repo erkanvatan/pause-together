@@ -19,6 +19,18 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 	--color-moonlight: #eee9ff; /* text */
 	--color-lamp: #ffc15e; /* the accent, and "someone is here" */
 	--color-ember: #ff7a6b; /* delete, errors */
+	/* Other people's names in chat, so two voices read apart. Handed out in this order, so the clearest
+	come first; the last three are darker cousins of green, pink and aqua. None near amber (you), coral
+	(an error) or haze. 5.8:1 or more on dusk; 4.5:1 or more on a pill over a white frame. */
+	--color-person-1: #8de390; /* green */
+	--color-person-2: #fca4d6; /* pink */
+	--color-person-3: #6be5de; /* aqua */
+	--color-person-4: #84b2fd; /* blue, darker, so it stays apart from aqua */
+	--color-person-5: #c28efb; /* purple */
+	--color-person-6: #d0ee5f; /* lime */
+	--color-person-7: #3bb5a1; /* teal */
+	--color-person-8: #e175d9; /* magenta */
+	--color-person-9: #6bc456; /* deep green */
 	--color-line: color-mix(in oklab, var(--color-haze) 28%, transparent); /* borders */
 	--color-black: #000; /* the video box and subtitle backing */
 	--color-white: #fff; /* subtitle text */
@@ -225,7 +237,7 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 	step smaller, so fullscreen keeps it readable. */
 	.pill {
 		border-radius: var(--radius-control);
-		background-color: color-mix(in oklab, var(--color-midnight) 82%, transparent);
+		background-color: color-mix(in oklab, var(--color-midnight) 88%, transparent); /* person colors stay readable over a white frame */
 		padding: 0.4em 0.75em;
 		font-size: max(1rem, 1.5cqi);
 		line-height: 1.4;

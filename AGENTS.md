@@ -30,10 +30,11 @@ The tokens below are the short version; `DESIGN.md` is the long one.
   `/rooms/{id}`.
 - **Look:** design tokens live in `web/src/app.css` under `@theme`: six named colors (`midnight` page,
   `dusk` raised surfaces, `haze` quiet text, `moonlight` text, `lamp` accent, `ember` delete and errors),
-  plus `line` (borders) and plain `black` and `white` (the video box, subtitles). Tailwind's own colors
-  and text sizes are cleared, so only these exist: `text-sm` to `text-3xl`, and a `text-xs` or
-  `neutral-700` silently builds to nothing. Radii add `rounded-control` and `rounded-panel` to
-  Tailwind's own; `font-display` is for titles. Shared classes there too (`.btn` with `-primary`,
+  plus `line` (borders), plain `black` and `white` (the video box, subtitles), and `person-1` to
+  `person-9` (other people's names in chat, handed out first come first served by `withPeople` in
+  `chat.ts`). Tailwind's own colors and text sizes are cleared, so only these exist: `text-sm` to
+  `text-3xl`, and a `text-xs` or `neutral-700` silently builds to nothing. Radii add `rounded-control`
+  and `rounded-panel` to Tailwind's own; `font-display` is for titles. Shared classes there too (`.btn` with `-primary`,
   `-quiet`, `-danger`, `-small`; `.field`, `.icon-btn`, `.row`, `.pill`). Components use the tokens, never loose hex values. Fonts are
   bundled with `@fontsource-variable` (Big Shoulders for titles, Atkinson Hyperlegible Next for the
   rest), never loaded from a CDN: guests may have no route to the internet. Controls are at least
@@ -159,7 +160,7 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
                      fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
                      Subtitles.svelte (the subtitle overlay), prefs.ts (per-device player settings in
-                     localStorage), time.ts (1:40:00), chat.ts (pure: message length, the message list),
+                     localStorage), time.ts (1:40:00), chat.ts (pure: message length, the message list, name colors),
                      Chat.svelte (the chat panel, with who's watching), Icon.svelte (inline SVG icons);
                      sync/ (pure): clock.ts (server clock offset), drift.ts (drift fix, follow step), state.ts
                      (target position, local intents), status.ts (what the player reports, and when),

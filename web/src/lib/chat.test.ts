@@ -6,10 +6,12 @@ import {
 	MAX_MESSAGE_CHARS,
 	MAX_TOASTS,
 	messageLength,
+	nameColor,
 	withDeleted,
 	withHistory,
 	withMessage,
 	withOlder,
+	withPeople,
 	withToast
 } from './chat';
 
@@ -119,5 +121,63 @@ describe('withToast', () => {
 		let toasts: ChatMessage[] = [];
 		for (let id = 1; id <= MAX_TOASTS + 2; id++) toasts = withToast(toasts, message(id));
 		expect(ids(toasts)).toEqual(Array.from({ length: MAX_TOASTS }, (_, k) => k + 3));
+	});
+});
+
+describe('withPeople', () => {
+	const from = (userId: number) => ({ userId, name: `u${userId}` });
+	const said = (id: number, userId: number, quoting?: number): ChatMessage => ({
+		...message(id),
+		from: from(userId),
+		replyTo: quoting === undefined ? null : { id: 0, from: from(quoting), text: '', deleted: false }
+	});
+	const me = 1;
+
+	it('gives the next color to each person as they show up, and none to you', () => {
+		// IDs nine apart, as many as there are colors: a color picked from the ID would be the same for all.
+		const colors = withPeople(new Map(), [said(1, 10), said(2, me), said(3, 19)], [from(28), from(me)], me);
+		expect([...colors]).toEqual([
+			[10, 0],
+			[19, 1],
+			[28, 2]
+		]);
+	});
+
+	it('colors whoever a message quotes, right after its sender', () => {
+		const colors = withPeople(new Map(), [said(1, 9, 5)], [], me);
+		expect(colors.get(5)).toBe(1);
+	});
+
+	it('never recolors anyone when older messages load', () => {
+		const first = withPeople(new Map(), [said(5, 9)], [], me);
+		const after = withPeople(first, [said(1, 7), said(5, 9)], [], me);
+		expect(after.get(9)).toBe(0);
+		expect(after.get(7)).toBe(1);
+	});
+
+	it('returns the same map when nobody is new', () => {
+		const colors = withPeople(new Map(), [said(1, 9)], [], me);
+		expect(withPeople(colors, [said(1, 9)], [from(9), from(me)], me)).toBe(colors);
+	});
+
+	it('shares only from the tenth other person on', () => {
+		const others = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+		const colors = withPeople(new Map(), others.map((u) => said(u, u)), [], me);
+		expect(new Set(others.slice(0, 9).map((u) => colors.get(u))).size).toBe(9);
+		expect(colors.get(11)).toBe(colors.get(2));
+	});
+});
+
+describe('nameColor', () => {
+	it('gives you the lamp', () => {
+		expect(nameColor(7, 7, new Map([[7, 2]]))).toBe('text-lamp');
+	});
+
+	it('gives others the color withPeople picked', () => {
+		expect(nameColor(9, 1, new Map([[9, 2]]))).toBe('text-person-3');
+	});
+
+	it('leaves someone it has not met plain', () => {
+		expect(nameColor(9, 1, new Map([[5, 0]]))).toBe('');
 	});
 });
