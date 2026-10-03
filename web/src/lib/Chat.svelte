@@ -174,7 +174,7 @@
 		{#if messages.length === 0}
 			<li class="m-auto text-haze">{strings.noMessages}</li>
 		{/if}
-		{#each messages as m, i (m.id)}
+		{#each messages as m (m.id)}
 			<li class="rounded-control {selected === m.id ? 'bg-midnight/60' : ''}">
 				<button
 					data-message={m.id}
@@ -201,15 +201,12 @@
 						{#if m.video.id !== videoId}
 							<span class="min-w-0 break-words text-haze">{videoName(m.video)}</span>
 						{/if}
-						<!-- A hint that a message opens Reply: on hover and focus, and on a touch screen's newest
-						message, where nothing hovers. -->
+						<!-- A hint that a message opens Reply: on hover and focus, and always on a touch screen,
+						where nothing hovers. -->
 						{#if !readOnly && selected !== m.id}
 							<Icon
 								name="reply"
-								class="ml-auto size-4 shrink-0 self-center text-haze opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 {i ===
-								messages.length - 1
-									? 'pointer-coarse:opacity-100'
-									: ''}"
+								class="ml-auto size-4 shrink-0 self-center text-haze opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 pointer-coarse:opacity-100"
 							/>
 						{/if}
 					</span>
