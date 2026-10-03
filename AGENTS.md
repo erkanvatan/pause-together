@@ -409,9 +409,10 @@ So each room's video is **prepared once**, then served as a plain file.
 - Joining comes before making: a family split across two rooms of one film isn't watching together.
   In the homepage's picker, a video that already has a room says so under its name ("In a room ·
   19:19 of 2:34:27", "In 3 rooms"), and a tap on it lists those rooms (where each is, who's watching)
-  above a quiet "Start a new room". Only rooms that can play count (not archived, video not gone),
-  and only the same video: another episode of the show is another video. "Switch video" in a room
-  never offers this.
+  above a quiet "Start a new room". A room's audio track never changes, so when the video has a
+  choice of them, each room says which it plays. Only rooms that can play count (not archived, video
+  not gone) and that aren't at the end, and only the same video: another episode of the show is
+  another video. "Switch video" in a room never offers this.
 - Defaults come from an admin setting: preferred audio language (or "original") and subtitle languages
   in order (e.g. `tr`, then `en`). Fall back to the file's default-track flag. Forced subtitles are
   turned on when their language matches the audio.

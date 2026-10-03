@@ -72,7 +72,7 @@
 	let folderName = $state<string | null>(null); // the open folder
 
 	const byVideo = $derived(roomsByVideo(rooms));
-	let offered = $state<VideoSummary | null>(null); // a video with rooms: join one, or make another
+	let offered = $state<VideoDetail | null>(null); // a video with rooms: join one, or make another
 	const offeredRooms = $derived((offered && byVideo.get(offered.id)) || []);
 	let picked = $state<VideoDetail | null>(null);
 	let audio = $state<number | null>(null); // stream
@@ -124,13 +124,8 @@
 		folderName = null;
 	}
 
-	async function choose(v: VideoSummary, fresh = false) {
+	async function choose(v: VideoSummary) {
 		pickFailed = false;
-		if (!fresh && byVideo.has(v.id)) {
-			pickSeq++; // a video tapped before this one, still loading, must not pick itself now
-			offered = v;
-			return;
-		}
 		const seq = ++pickSeq;
 		const r = await getVideo(v.id);
 		if (seq !== pickSeq) return; // another video was tapped, or Back, while this one loaded
@@ -138,7 +133,11 @@
 			pickFailed = true; // gone since the list loaded, or no connection
 			return;
 		}
-		const d = r.value;
+		if (byVideo.has(r.value.id)) offered = r.value;
+		else startNew(r.value);
+	}
+
+	function startNew(d: VideoDetail) {
 		const a = defaultAudio(d.audio, langs);
 		// Each audio track is its own prepared copy, so only a choice of them is asked. The subtitle
 		// takes the default and can be changed in the player.
@@ -296,6 +295,7 @@
 				</button>
 			</div>
 		{:else if offered}
+			{@const tracks = offered.audio.length > 1 ? offered.audio : []}
 			<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
 				{#if offered.version}
 					<p class="-mt-1 break-words text-haze">{offered.version}</p>
@@ -303,11 +303,16 @@
 				<p>{strings.videoHasRooms(offeredRooms.length)}</p>
 				<ul class="-mx-2">
 					{#each offeredRooms as r (r.id)}
+						<!-- A room's audio track never changes, so with a choice of them, say which it plays. -->
+						{@const track = tracks.find((t) => t.stream === r.audio)}
 						<li>
 							<a href="/rooms/{r.id}" class="row">
 								<span class="min-w-0 flex-1">
 									{#if r.name}
 										<span class="block break-words">{r.name}</span>
+									{/if}
+									{#if track}
+										<span class="block break-words">{audioLabel(track)}</span>
 									{/if}
 									<RoomMeta room={r} {now} />
 								</span>
@@ -316,7 +321,7 @@
 						</li>
 					{/each}
 				</ul>
-				<button onclick={() => offered && choose(offered, true)} class="btn btn-quiet self-start">
+				<button onclick={() => offered && startNew(offered)} class="btn btn-quiet self-start">
 					{strings.startNewRoom}
 				</button>
 			</div>

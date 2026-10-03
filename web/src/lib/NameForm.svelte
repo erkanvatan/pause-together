@@ -82,7 +82,12 @@
 		<p class="-mt-2 text-sm text-haze">{strings.nameWhy}</p>
 	{/if}
 	<div class="flex gap-2">
-		<button type="submit" disabled={saving || name.trim() === ''} class="btn btn-primary flex-1">
+		<!-- A rename's Save stays off until the name changes: a form at rest shows no lit lamp. -->
+		<button
+			type="submit"
+			disabled={saving || name.trim() === '' || (!welcome && name.trim() === initial)}
+			class="btn btn-primary flex-1"
+		>
 			{welcome ? strings.continue : strings.save}
 		</button>
 		{#if oncancel}

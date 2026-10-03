@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type { RoomCard } from '$lib/api';
-	import { roomProgress, usedAgo } from '$lib/rooms';
+	import { roomJoinable, roomProgress, usedAgo } from '$lib/rooms';
 	import { strings } from '$lib/strings';
 
 	// A room's meta line, on the homepage's cards and in the picker's rooms to join: where the room is,
 	// so a guest sees where they left off before opening it, and who's there.
 	let { room: r, now }: { room: RoomCard; now: number } = $props(); // now: for "3 days ago"
 
-	const joinable = $derived(r.watching.length > 0 && !r.archived);
+	const joinable = $derived(roomJoinable(r));
 	// Tells rooms with the same video apart, and says which one was on last.
 	const ago = $derived(joinable ? '' : usedAgo(r.usedAt, now));
 </script>

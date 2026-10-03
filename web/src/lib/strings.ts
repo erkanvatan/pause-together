@@ -66,7 +66,8 @@ export const strings = {
 	} as Record<string, string>,
 
 	languageDefaults: 'Language defaults',
-	languageDefaultsNote: 'The picker preselects these. Anyone can still change them for each video.',
+	languageDefaultsNote:
+		'New picks start with these. Anyone can change the audio when picking, and the subtitle in the player.',
 	audioLanguage: 'Audio',
 	audioLanguageHint: "A language code like en. Blank: the file's own default track.",
 	subtitleLanguages: 'Subtitles',
@@ -244,7 +245,7 @@ export const strings = {
 	deletedMessage: 'Deleted message',
 	replyingTo: (name: string) => `Replying to ${name}`,
 	cancelReply: 'Cancel reply',
-	chatReadOnly: 'This room is archived. Its chat is read-only.',
+	chatReadOnly: 'The chat is read-only.',
 	olderFailed: "Couldn't load older messages.",
 	// Where the video was when a message was sent.
 	inVideoAt: (at: string) => `At ${at} in the video`,

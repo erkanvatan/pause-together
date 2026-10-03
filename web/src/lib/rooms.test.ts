@@ -144,11 +144,12 @@ describe('roomsByVideo', () => {
 		expect(ids(byVideo.get(8))).toEqual([4]);
 	});
 
-	it("leaves out rooms that can't play: archived, or gone even with people in it", () => {
+	it("leaves out rooms that can't play, or are at the end", () => {
 		const byVideo = roomsByVideo([
 			card(1, { archived: true }),
 			card(2, { gone: true }),
-			card(3, { gone: true, watching: ann })
+			card(3, { gone: true, watching: ann }),
+			card(4, { positionMs: 5000, video: { ...room(4).video, durationMs: 5000 } })
 		]);
 		expect(byVideo.get(7)).toBeUndefined();
 	});

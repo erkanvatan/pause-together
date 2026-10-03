@@ -9,7 +9,7 @@
 	import { deleteRoom } from '$lib/admin';
 	import { createRoom, listRooms, setArchived, type Pick, type Result, type RoomCard } from '$lib/api';
 	import { me } from '$lib/me.svelte';
-	import { roomSubtitle, roomTitle, splitRooms } from '$lib/rooms';
+	import { roomJoinable, roomSubtitle, roomTitle, splitRooms } from '$lib/rooms';
 	import { strings } from '$lib/strings';
 
 	// How often the room list is asked again while the tab is visible: others make, archive and
@@ -91,10 +91,10 @@
 
 {#snippet card(r: RoomCard)}
 	{@const subtitle = roomSubtitle(r)}
-	{@const joinable = r.watching.length > 0 && !r.archived}
+	{@const joinable = roomJoinable(r)}
 	<li class="relative flex flex-col gap-3 py-3 pl-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
 		{#if joinable}
-			<!-- The lamp is on: someone is in this room. An archived one can't play, so it stays dark. -->
+			<!-- The lamp is on: someone is in this room. -->
 			<span class="absolute inset-y-3 left-0 w-1 rounded-full bg-lamp" aria-hidden="true"></span>
 		{/if}
 		<a href="/rooms/{r.id}" class="group flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-control">
@@ -210,8 +210,10 @@
 					<summary
 						class="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-control font-display text-xl font-bold text-haze hover:text-moonlight [&::-webkit-details-marker]:hidden"
 					>
-						<Icon name="chevron" class="size-5 shrink-0 transition-transform group-open/gone:rotate-90" />
+						<!-- The chevron trails, so the label lines up with the Rooms and Archived headings. It points
+						down, not right like a room row's, since it unfolds the group rather than opening a page. -->
 						{strings.videoMissingRooms(parts.gone.length)}
+						<Icon name="chevron" class="size-5 shrink-0 rotate-90 transition-transform group-open/gone:-rotate-90" />
 					</summary>
 					<ul class="mt-2 flex flex-col gap-2">
 						{#each parts.gone as r (r.id)}

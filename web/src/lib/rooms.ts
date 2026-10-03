@@ -23,10 +23,21 @@ export function roomProgress(r: Room): string {
 	const { positionMs } = r;
 	const { durationMs } = r.video;
 	if (positionMs < 1000) return strings.notStarted;
-	if (durationMs > 0 && positionMs >= durationMs) return strings.finished;
+	if (roomFinished(r)) return strings.finished;
 	return durationMs > 0
 		? strings.positionOf(formatTime(positionMs), formatTime(durationMs))
 		: formatTime(positionMs);
+}
+
+// roomFinished says whether a room sits at the end of its video.
+export function roomFinished(r: Room): boolean {
+	return r.video.durationMs > 0 && r.positionMs >= r.video.durationMs;
+}
+
+// roomJoinable says whether someone is in a room to join: the homepage lights its lamp. An archived
+// room can't play, so it stays dark.
+export function roomJoinable(r: RoomCard): boolean {
+	return r.watching.length > 0 && !r.archived;
 }
 
 // splitRooms sorts rooms into the homepage's groups: active, gone (can't play, nobody in it) and
@@ -54,11 +65,14 @@ export function splitRooms<R extends RoomCard>(
 
 // roomsByVideo maps each video to the rooms a pick of it could join instead of making another, in
 // the homepage's order: a family split across two rooms of one film isn't watching together. Only
-// rooms that can play: not archived, not gone (even with people in it).
+// rooms that can play: not archived, not gone (even with people in it), and not at the end, where
+// joining would only show "The end".
 export function roomsByVideo<R extends RoomCard>(rooms: R[]): Map<number, R[]> {
 	const byVideo = new Map<number, R[]>();
-	for (const r of splitRooms(rooms.filter((r) => !r.gone), null).active) {
-		byVideo.set(r.video.id, [...(byVideo.get(r.video.id) ?? []), r]);
+	for (const r of splitRooms(rooms.filter((r) => !r.gone && !roomFinished(r)), null).active) {
+		const list = byVideo.get(r.video.id);
+		if (list) list.push(r);
+		else byVideo.set(r.video.id, [r]);
 	}
 	return byVideo;
 }
