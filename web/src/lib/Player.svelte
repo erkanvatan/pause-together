@@ -117,7 +117,7 @@
 
 	let subtitlesOpen = $state(false); // the subtitle panel
 	let panelHeight = $state(0); // its height, so the subtitles sit above it outside fullscreen
-	// The page fits the screen: app.css's `fit` variant, which the layout below follows.
+	// The page fits the screen: app.css's `fit` variant, which the layout below follows. Change both.
 	const fits = new MediaQuery('(orientation: landscape) and (min-height: 30rem)');
 	const options = $derived(detail ? subtitleOptions(detail) : []);
 	const subtitleKey = $derived(
@@ -175,6 +175,8 @@
 		// A failed prepare first: it's everyone's, and another pick is what helps.
 		if (prepare?.state === 'failed') return 'failed';
 		if (cantPlay) return 'cantPlay';
+		// Offline, what needs the server is dead or stale: say why where the hands go.
+		if (offline) return 'offline';
 		if (src === '') return connecting ? 'connecting' : preparing ? 'preparing' : '';
 		if (needsTap) return 'tap';
 		// While the next episode is still looked up (undefined), neither card: a film's would flash.
@@ -461,6 +463,94 @@
 	}}
 />
 
+<!-- The subtitle panel: a strip by the bar. -->
+{#snippet subtitlePanel()}
+	{#if subtitlesOpen}
+		<div
+			bind:clientHeight={panelHeight}
+			class="flex flex-wrap items-center gap-x-8 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm {panelOver
+				? 'absolute inset-x-0 bottom-full'
+				: ''}"
+		>
+			<!-- Subtitle and timing change the room for everyone; size, only this screen. Said, so a guest
+			fixing their own view doesn't move everyone's. -->
+			<div
+				role="group"
+				aria-labelledby="subs-everyone"
+				class="flex max-w-full min-w-0 flex-wrap items-center gap-x-5 gap-y-2"
+			>
+				<span id="subs-everyone" class="font-semibold">{strings.forEveryone}</span>
+				<label class="flex max-w-full min-w-0 items-center gap-2">
+					<span class="text-haze">{strings.subtitle}</span>
+					<select
+						value={subtitleKey}
+						disabled={!online || !playState}
+						onchange={(e) =>
+							setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
+						class="field max-w-full min-w-0 py-1"
+					>
+						<option value="">{strings.subtitleOff}</option>
+						{#each options as o (o.key)}
+							{@const notInCopy =
+								'stream' in o.choice &&
+								prepare?.state === 'ready' &&
+								!prepare.subtitles.includes(o.choice.stream)}
+							{@const why = o.unavailable
+								? (strings.subtitleUnavailable[o.unavailable] ?? o.unavailable)
+								: notInCopy
+									? strings.notInCopy
+									: ''}
+							<option value={o.key} disabled={why !== ''}>
+								{why ? strings.withNote(subtitleLabel(o, options), why) : subtitleLabel(o, options)}
+							</option>
+						{/each}
+					</select>
+				</label>
+				<div class="flex items-center gap-1">
+					<span class="mr-1 text-haze">{strings.subtitleTiming}</span>
+					<button
+						onclick={() => setOffset(offsetMs - offsetStepMs)}
+						disabled={!online || !playState}
+						aria-label={strings.subtitleSooner}
+						class="btn btn-quiet btn-small w-11 px-0"
+					>
+						−
+					</button>
+					<span class="w-16 text-center tabular-nums">{strings.subtitleOffset(offsetMs)}</span>
+					<button
+						onclick={() => setOffset(offsetMs + offsetStepMs)}
+						disabled={!online || !playState}
+						aria-label={strings.subtitleLater}
+						class="btn btn-quiet btn-small w-11 px-0"
+					>
+						+
+					</button>
+					{#if offsetMs !== 0}
+						<button
+							onclick={() => setOffset(0)}
+							disabled={!online || !playState}
+							class="btn btn-small px-2 font-normal text-haze hover:text-moonlight"
+						>
+							{strings.reset}
+						</button>
+					{/if}
+				</div>
+			</div>
+			<div role="group" aria-labelledby="subs-screen" class="flex items-center gap-x-5">
+				<span id="subs-screen" class="font-semibold">{strings.onThisScreen}</span>
+				<label class="flex items-center gap-2">
+					<span class="text-haze">{strings.subtitleSize}</span>
+					<select bind:value={subtitleSize} class="field py-1">
+						{#each SUBTITLE_SIZES as size (size)}
+							<option value={size}>{strings.subtitleSizes[size]}</option>
+						{/each}
+					</select>
+				</label>
+			</div>
+		</div>
+	{/if}
+{/snippet}
+
 <!-- A problem that holds the video's middle: what happened, what's left to do, and maybe another pick.
 Compact on a phone's small video box, so it never spills out of it. -->
 {#snippet notice(headline: string, why: string, error: boolean, pick: boolean)}
@@ -579,6 +669,13 @@ Compact on a phone's small video box, so it never spills out of it. -->
 								<Icon name="skip-forward" step={skipMs / 1000} class="size-7 sm:size-8" />
 							</button>
 						</div>
+					{:else if middle === 'offline'}
+						<!-- Late, so a blip that reconnects at once never flashes it. -->
+						<div class="transition-[opacity,visibility] duration-300 {fade}">
+							<div class="appear-late [animation-delay:2s]">
+								{@render notice(strings.hostOffline, strings.hostOfflineWhy, false, false)}
+							</div>
+						</div>
 					{:else if middle === 'cantPlay'}
 						<!-- Unplayable for the server is unplayable for everyone: only another pick helps. -->
 						{@const everywhere = room.video.unplayable !== ''}
@@ -650,7 +747,8 @@ Compact on a phone's small video box, so it never spills out of it. -->
 							true
 						)}
 					{/if}
-					{#if waits}
+					<!-- Offline, who the room waits for is stale, and "Play anyway" can't reach anyone. -->
+					{#if waits && !offline}
 						<div
 							class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 px-5 py-4 @max-md:gap-2 @max-md:p-3"
 						>
@@ -674,8 +772,9 @@ Compact on a phone's small video box, so it never spills out of it. -->
 				<div
 					class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1"
 				>
-					{#if offline}
-						<p class="pill flex items-center gap-1.5 break-words">
+					<!-- Unless the middle says it: while the controls show, it does. -->
+					{#if offline && (middle !== 'offline' || faded)}
+						<p class="pill flex animate-[appear_300ms_both] items-center gap-1.5 break-words">
 							<Icon name="offline" class="size-[0.9em] shrink-0 text-ember" />{strings.hostOffline}
 						</p>
 					{/if}
@@ -707,8 +806,14 @@ Compact on a phone's small video box, so it never spills out of it. -->
 				bind:clientHeight={barHeight}
 				onpointerenter={() => (overBar = true)}
 				onpointerleave={() => (overBar = false)}
-				class="pointer-events-auto relative flex flex-col"
+				class="pointer-events-auto relative"
 			>
+				<!-- The subtitle panel sits where it shows, so Tab and screen readers meet it in that order: above
+				the bar in fullscreen and over the video's foot, under it where the page grows. -->
+				{#if full || panelOver}
+					{@render subtitlePanel()}
+				{/if}
+
 				<!-- Laid out by the bar's own width, not the screen's: the chat panel takes part of a wide one.
 				A narrow bar puts the seek bar and time on a row of their own, above the buttons. -->
 				<div class="@container/bar {full ? '' : 'bg-dusk'}">
@@ -800,94 +905,8 @@ Compact on a phone's small video box, so it never spills out of it. -->
 						</button>
 					</div>
 				</div>
-
-				<!-- After the bar, so Tab reaches it after the button that opened it. In fullscreen it shows above
-				the bar. -->
-				{#if subtitlesOpen}
-					<div
-						bind:clientHeight={panelHeight}
-						class="flex flex-wrap items-center gap-x-8 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm {full
-							? 'order-first'
-							: panelOver
-								? 'absolute inset-x-0 bottom-full'
-								: ''}"
-					>
-						<!-- Subtitle and timing change the room for everyone; size, only this screen. Said, so a guest
-						fixing their own view doesn't move everyone's. -->
-						<div
-							role="group"
-							aria-labelledby="subs-everyone"
-							class="flex max-w-full min-w-0 flex-wrap items-center gap-x-5 gap-y-2"
-						>
-							<span id="subs-everyone" class="font-semibold">{strings.forEveryone}</span>
-							<label class="flex max-w-full min-w-0 items-center gap-2">
-								<span class="text-haze">{strings.subtitle}</span>
-								<select
-									value={subtitleKey}
-									disabled={!online || !playState}
-									onchange={(e) =>
-										setSubtitle(options.find((o) => o.key === e.currentTarget.value)?.choice ?? null)}
-									class="field max-w-full min-w-0 py-1"
-								>
-									<option value="">{strings.subtitleOff}</option>
-									{#each options as o (o.key)}
-										{@const notInCopy =
-											'stream' in o.choice &&
-											prepare?.state === 'ready' &&
-											!prepare.subtitles.includes(o.choice.stream)}
-										{@const why = o.unavailable
-											? (strings.subtitleUnavailable[o.unavailable] ?? o.unavailable)
-											: notInCopy
-												? strings.notInCopy
-												: ''}
-										<option value={o.key} disabled={why !== ''}>
-											{why ? strings.withNote(subtitleLabel(o, options), why) : subtitleLabel(o, options)}
-										</option>
-									{/each}
-								</select>
-							</label>
-							<div class="flex items-center gap-1">
-								<span class="mr-1 text-haze">{strings.subtitleTiming}</span>
-								<button
-									onclick={() => setOffset(offsetMs - offsetStepMs)}
-									disabled={!online || !playState}
-									aria-label={strings.subtitleSooner}
-									class="btn btn-quiet btn-small w-11 px-0"
-								>
-									−
-								</button>
-								<span class="w-16 text-center tabular-nums">{strings.subtitleOffset(offsetMs)}</span>
-								<button
-									onclick={() => setOffset(offsetMs + offsetStepMs)}
-									disabled={!online || !playState}
-									aria-label={strings.subtitleLater}
-									class="btn btn-quiet btn-small w-11 px-0"
-								>
-									+
-								</button>
-								{#if offsetMs !== 0}
-									<button
-										onclick={() => setOffset(0)}
-										disabled={!online || !playState}
-										class="btn btn-small px-2 font-normal text-haze hover:text-moonlight"
-									>
-										{strings.reset}
-									</button>
-								{/if}
-							</div>
-						</div>
-						<div role="group" aria-labelledby="subs-screen" class="flex items-center gap-x-5">
-							<span id="subs-screen" class="font-semibold">{strings.onThisScreen}</span>
-							<label class="flex items-center gap-2">
-								<span class="text-haze">{strings.subtitleSize}</span>
-								<select bind:value={subtitleSize} class="field py-1">
-									{#each SUBTITLE_SIZES as size (size)}
-										<option value={size}>{strings.subtitleSizes[size]}</option>
-									{/each}
-								</select>
-							</label>
-						</div>
-					</div>
+				{#if !full && !panelOver}
+					{@render subtitlePanel()}
 				{/if}
 			</div>
 		</div>
@@ -900,7 +919,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 		<aside
 			class="relative z-10 border-line landscape:w-72 landscape:shrink-0 landscape:border-l lg:landscape:w-80 portrait:border-t {full
 				? 'portrait:h-[50dvh] portrait:shrink-0'
-				: `portrait:flex-1 ${subtitlesOpen ? 'portrait:min-h-40' : 'portrait:min-h-72'}`}"
+				: `portrait:flex-1 ${subtitlesOpen ? 'portrait:min-h-56' : 'portrait:min-h-72'}`}"
 		>
 			<div class="absolute inset-0">
 				{@render side()}

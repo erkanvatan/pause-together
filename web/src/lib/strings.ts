@@ -211,6 +211,7 @@ export const strings = {
 	behind: (name: string, ms: number) => `${name} is ${Math.round(ms / 1000)} s behind`,
 	pausedBy: (name: string) => `${name} paused`,
 	hostOffline: 'Host is offline, reconnecting…',
+	hostOfflineWhy: 'Play, pause and chat come back with it.',
 	gettingReady: 'Getting the room ready…',
 	fullscreen: 'Fullscreen',
 	exitFullscreen: 'Exit fullscreen',
@@ -246,6 +247,7 @@ export const strings = {
 	replyingTo: (name: string) => `Replying to ${name}`,
 	cancelReply: 'Cancel reply',
 	chatReadOnly: 'The chat is read-only.',
+	chatOffline: "Can't send while the host is offline. Your message stays here.",
 	olderFailed: "Couldn't load older messages.",
 	// Where the video was when a message was sent.
 	inVideoAt: (at: string) => `At ${at} in the video`,

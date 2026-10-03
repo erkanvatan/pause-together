@@ -319,7 +319,8 @@ Archived rooms show their title in haze.
   video on a black-to-transparent fade (80% black at the bottom), and fades out with the transport
   (300ms). Subtitles slide up while it shows.
 - **Holds the middle:** "Tap to join" (a large round primary button), "Preparing… 42%" (a pill with a
-  thin lamp progress bar on dusk), "Waiting for …", "Video missing", "Can't play", "Couldn't get this video ready", "Getting the room
+  thin lamp progress bar on dusk), "Waiting for …", "Host is offline" (fades with the controls; the
+  pill takes over while they're hidden), "Video missing", "Can't play", "Couldn't get this video ready", "Getting the room
   ready…" (a pill, after a moment), and the end. The waiting panel and the three problems are dusk
   panels at 90%, compact on a phone's small video box.
   - "Waiting for Alice" in body large, then why and for how long in haze label ("stepped away · 0:12"),
@@ -332,7 +333,8 @@ Archived rooms show their title in haze.
     and that chat still works. No pick there: the others can still watch.
   - The end: a TV episode offers a lamp "Next episode". Anything else gets a title card, "The end" in
     the display face (3xl, 2xl on a phone's box), over a lamp "Watch something else".
-- **Subtitle panel:** a dusk strip over the bar, in two labelled groups: "For everyone" (subtitle,
+- **Subtitle panel:** a dusk strip over the bar (over the video's foot where the page fits the screen;
+  under the bar where the video is short, like a phone's, so it never hides the subtitles), in two labelled groups: "For everyone" (subtitle,
   timing) and "On this screen" (size). Group labels are semibold moonlight, field labels haze.
 
 ### Pills

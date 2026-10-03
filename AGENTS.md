@@ -216,8 +216,9 @@ container mount for source files, and one name for two things gets mixed up in c
   (`'/api': url`) turns `changeOrigin` on, so proxy entries are objects with `changeOrigin: false`.
 - Bandwidth: every viewer streams the original-quality file. The host's upload must cover
   bitrate × viewers, and a guest on a relayed (DERP) Tailscale link may buffer, which pauses the room.
-- Host offline: open tabs show "Host is offline, reconnecting…" and keep retrying. A fresh visit just
-  fails; fixing that needs a second machine, which is out of scope.
+- Host offline: open tabs show "Host is offline, reconnecting…" and keep retrying. It takes the
+  middle of the video, where the dead buttons were (after 2 s, so a blip never flashes it), and the
+  chat says a typed message can't go yet and stays. A fresh visit just fails; fixing that needs a second machine, which is out of scope.
 
 ## Users
 
@@ -533,7 +534,7 @@ So each room's video is **prepared once**, then served as a plain file.
   never resizes the video, and subtitles move up while it shows). Never while paused, the subtitle panel
   is open or the seek bar is held. On touch screens, a tap on bare video hides them.
 - Over the video's middle: back 10 s, play or pause, forward 10 s. Hidden while "Tap to join", "Waiting
-  for …", or the end of the video ("Next episode", "The end") hold the middle. Before the room's first
+  for …", the end of the video ("Next episode", "The end"), or "Host is offline" hold the middle. Before the room's first
   word on the socket, the middle says "Getting the room ready…" (after a moment, so a quick connect
   never flashes it).
 - No playback speed control. `playbackRate` belongs to the drift fix.

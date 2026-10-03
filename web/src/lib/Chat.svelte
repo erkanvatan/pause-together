@@ -18,6 +18,7 @@
 		videoId,
 		readOnly,
 		online,
+		offline,
 		replyTo = $bindable(),
 		draft = $bindable(),
 		onsend,
@@ -33,6 +34,7 @@
 		videoId: number; // the room's video now; other videos are named on their messages
 		readOnly: boolean; // an archived room
 		online: boolean;
+		offline: boolean; // the socket dropped; not before the first connect
 		replyTo: ChatMessage | null;
 		draft: string;
 		onsend: (text: string) => void;
@@ -307,6 +309,9 @@
 		<p class="border-t border-line px-4 py-3 text-sm text-haze">{strings.chatReadOnly}</p>
 	{:else}
 		<form onsubmit={submit} class="flex flex-col gap-2 border-t border-line p-2">
+			{#if offline && draft.trim()}
+				<p class="px-1 text-sm text-haze">{strings.chatOffline}</p>
+			{/if}
 			{#if replyTo}
 				<div class="flex items-start gap-2">
 					<p class="line-clamp-2 min-w-0 flex-1 border-l-2 border-lamp pl-2 text-sm break-words text-haze">

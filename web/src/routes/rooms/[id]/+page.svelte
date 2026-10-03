@@ -363,6 +363,7 @@
 		videoId={room?.video.id ?? 0}
 		{readOnly}
 		{online}
+		{offline}
 		bind:replyTo
 		bind:draft
 		onsend={sendChat}
