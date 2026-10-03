@@ -440,13 +440,26 @@
 		else filled = true;
 	}
 
+	// Firefox on Android turns fullscreen video sideways again on every play and pause, over the
+	// page's lock, so the screen flashes sideways and back. It goes by the media session's state, and a
+	// declared "playing" outranks the video's own. So in fullscreen the page says it's always playing,
+	// and Firefox sees no play or pause to act on. This runs before turnScreen's effect: in a paused
+	// room the switch to "playing" looks like a play, and the page's lock must come after it.
+	$effect(() => {
+		if (!native || !navigator.mediaSession) return;
+		navigator.mediaSession.playbackState = 'playing';
+		return () => {
+			navigator.mediaSession.playbackState = 'none';
+		};
+	});
+
 	// Phone browsers (Chrome and Firefox on Android) turn fullscreen video sideways and hold it there.
 	// The page's own lock outranks theirs. On a phone it turns the screen with the chat: upright while
 	// the chat is open, so it sits under the video, and sideways while it's closed, so the video fills
 	// the screen. A phone is too short sideways for the chat beside the video. Bigger screens get any
-	// orientation. The browser locks again on its own (Chrome on play, Firefox on play and pause), so
-	// the page locks once more then, and whenever the screen turns anyway. Leaving fullscreen drops the
-	// page's lock. Where the browser has no lock (iPhone, desktops), nothing happens.
+	// orientation. Chrome locks again on its own on play (Firefox: see above), so the page locks once
+	// more then, and whenever the screen turns anyway. Leaving fullscreen drops the page's lock. Where
+	// the browser has no lock (iPhone, desktops), nothing happens.
 	function turnScreen() {
 		if (!native) return;
 		// Asked each time: a foldable opens into a tablet. 480 px is `fit`'s 30rem: sideways, it never fits.
@@ -682,10 +695,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 					onseeking={tick}
 					onseeked={tick}
 					oncanplay={tick}
-					onpause={() => {
-						turnScreen();
-						tick();
-					}}
+					onpause={tick}
 					onloadedmetadata={tick}
 					class={full ? 'h-full w-full object-contain' : 'aspect-video w-full'}
 				></video>

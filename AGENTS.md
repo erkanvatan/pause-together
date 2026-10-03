@@ -533,8 +533,12 @@ So each room's video is **prepared once**, then served as a plain file.
 - In fullscreen on a phone, the chat turns the screen: upright while it's open, sideways while it's
   closed, so the chat never squeezes in beside the video. Chrome and Firefox on Android hold
   fullscreen video sideways, so the page locks the orientation itself (`screen.orientation.lock`:
-  `portrait` or `landscape`) on entering fullscreen, on opening or closing the chat, on play and
-  pause (Chrome locks again on play, Firefox on play and pause), and whenever the screen turns anyway. A phone is a screen under 30rem on its short side. Bigger screens get `any`.
+  `portrait` or `landscape`) on entering fullscreen, on opening or closing the chat, on play
+  (Chrome locks again then), and whenever the screen turns anyway. Firefox locks again on every play
+  and pause, going by the media session's state, so in fullscreen the page declares it always
+  "playing" (`navigator.mediaSession.playbackState`), or a pause would flash the screen sideways and
+  back. So in fullscreen the phone's media notification shows "playing" while the room is paused.
+  A phone is a screen under 30rem on its short side. Bigger screens get `any`.
   iPhone has no lock and turns freely. Held upright, the chat takes the lower half, and the control bar and the
   subtitle panel sit in the black under the video, panel under the bar, covering none of it. The panel
   pushes the chat down, not the video up, so the subtitles stay in view while their timing is set.
