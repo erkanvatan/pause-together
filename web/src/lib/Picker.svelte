@@ -246,15 +246,20 @@
 	</li>
 {/snippet}
 
-<Dialog label={strings.pickVideo} {onclose} class="items-stretch justify-center sm:items-center sm:p-6">
-	<!-- The list keeps one tall frame, so it doesn't jump while searching; the short room and track
-	steps fit their content. -->
+<!-- Pinned to the top, not centred: each step fits its content, and a search that narrows the list
+moves only the bottom edge, never the search box under the finger. The list keeps a floor, so it
+doesn't open as a strip and grow when the videos arrive. -->
+<Dialog
+	label={strings.pickVideo}
+	{onclose}
+	class="items-stretch justify-center sm:items-start sm:p-6 sm:pt-[7.5vh]"
+>
 	<div
 		bind:this={panel}
-		class="flex w-full flex-col bg-dusk sm:max-w-2xl sm:rounded-panel sm:border sm:border-line {picked ||
+		class="flex w-full flex-col bg-dusk sm:max-h-[85vh] sm:max-w-2xl sm:rounded-panel sm:border sm:border-line {picked ||
 		offered
 			? ''
-			: 'sm:h-[85vh]'}"
+			: 'sm:min-h-[min(24rem,85vh)]'}"
 	>
 		<header class="flex items-center gap-1 border-b border-line p-1 pl-2">
 			{#if canGoBack}
