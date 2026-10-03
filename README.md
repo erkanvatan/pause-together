@@ -8,6 +8,10 @@ A self-hosted watch-together app. Same show. Same second. Different places.
 
 [Features](#features) • [How it works](#how-it-works) • [Getting started](#getting-started) • [Tailscale](#connecting-devices-with-tailscale) • [Development](#development)
 
+<img src="docs/demo.webp" width="900" alt="Alice on a laptop and Sam on a phone in one room. Alice presses play and both screens play the same frame. Sam pauses, and both stop, with &quot;Sam paused&quot; on Alice's screen. Alice's chat message shows up on Sam's phone, and Sam presses play for both." />
+
+<sub>Film: <a href="https://peach.blender.org">Big Buck Bunny</a> © Blender Foundation, CC BY 3.0.</sub>
+
 </div>
 
 One machine serves its own video library. Friends reach it over [Tailscale](https://tailscale.com) and

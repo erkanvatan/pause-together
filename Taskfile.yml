@@ -48,6 +48,35 @@ tasks:
     cmds:
       - '{{.GO}} sh testdata/make.sh'
 
+  demo:
+    desc: Record the README's demo (docs/demo.webp), in Docker. Downloads a 276 MB film once
+    deps: [build, go:image]
+    vars:
+      OUT: .cache/demo
+      PLAYWRIGHT: >-
+        docker run --rm --user "$HOST_UID:$HOST_GID" -e HOME=/tmp -e npm_config_cache=/src/.cache/npm
+        -e OUT=/src/.cache/demo -v .:/src
+      # Its Playwright version must match docs/demo/package.json.
+      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
+    cmds:
+      - mkdir -p {{.OUT}}
+      - >-
+        test -f "{{.OUT}}/media/Movies/Big Buck Bunny (2008)/Big Buck Bunny (2008).mp4" ||
+        {{.PLAYWRIGHT}} {{.PLAYWRIGHT_IMAGE}} sh /src/docs/demo/film.sh /src/{{.OUT}}
+      # A throwaway app on the prod image: no ports, its database in memory, so every run starts empty
+      # and nothing touches the real server or library.
+      - docker rm -f pausetogether-demo >/dev/null 2>&1 || true
+      - >-
+        docker run -d --name pausetogether-demo --user "$HOST_UID:$HOST_GID"
+        --tmpfs "/data:uid=$HOST_UID,gid=$HOST_GID" -v ./{{.OUT}}/media:/media:ro pausetogether:latest
+      - defer: docker rm -f pausetogether-demo >/dev/null
+      # Sharing the app's network: its ports are localhost to the browser.
+      - >-
+        {{.PLAYWRIGHT}} --network container:pausetogether-demo -w /src/docs/demo {{.PLAYWRIGHT_IMAGE}}
+        sh -c "npm ci --no-audit --no-fund && node record.mjs"
+      - '{{.GO}} sh docs/demo/webp.sh {{.OUT}}'
+      - ls -lh docs/demo.webp
+
   lint:
     desc: golangci-lint, svelte-check
     deps: [go:image, web:deps]

@@ -59,6 +59,7 @@ task test                                                     # all unit tests (
 task test:go -- -run TestMigrateInOrderOnce ./internal/store  # one Go test
 task test:web -- src/lib/me                                   # web tests under one path (a wrong path passes with 0 tests)
 task testdata                                                 # tiny test clips (testdata/media); task test:go runs it first
+task demo                                                     # re-record the README's demo (docs/demo.webp), all in Docker
 task lint                                                     # golangci-lint (.golangci.yml), svelte-check
 task build                                                    # build the production image
 task up | task down | task logs                               # build + start, stop, follow the production stack
@@ -144,6 +145,8 @@ internal/user/       name rules and the name key, users (one per person), tokens
                      SHA-256 hash), lookup by cookie token
 testdata/make.sh     makes the test clips in testdata/media (git-ignored)
 docs/plan.md         build order in slices, and how to work one
+docs/demo/           task demo: film.sh (downloads Big Buck Bunny into .cache/demo), record.mjs (Playwright:
+                     a throwaway app, a laptop and a phone in one room), webp.sh (both side by side, as an animated WebP)
 PRODUCT.md           who it's for, the tone, what it is not (read before UI or copy work)
 DESIGN.md            the visual system: colors, type, components (read before UI work)
 .claude/skills/      git-commit, fix-comments (used by the slice steps in docs/plan.md)
