@@ -34,7 +34,7 @@
 		videoId: number; // the room's video now; other videos are named on their messages
 		readOnly: boolean; // an archived room
 		online: boolean;
-		offline: boolean; // the socket dropped; not before the first connect
+		offline: boolean; // the socket has been down a while; not before the first connect
 		replyTo: ChatMessage | null;
 		draft: string;
 		onsend: (text: string) => void;

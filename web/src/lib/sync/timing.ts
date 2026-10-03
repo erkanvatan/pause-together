@@ -29,7 +29,7 @@ export const STATUS_EVERY_MS = 2000;
 // How long the "Alice paused" note stays up.
 export const PAUSED_NOTE_MS = 2000;
 // The host counts as offline once the socket has been down this long, so a blip that reconnects at
-// once changes nothing on screen.
+// once never says so.
 export const OFFLINE_NOTE_MS = 2000;
 // After a network error, the player loads the video again this much later.
 export const MEDIA_RETRY_MS = 2000;

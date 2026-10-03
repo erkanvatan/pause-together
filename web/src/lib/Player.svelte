@@ -25,7 +25,7 @@
 	import { follow, type Step } from '$lib/sync/drift';
 	import { local, running, target, type Intent } from '$lib/sync/state';
 	import { reportDue, statusOf, type Report } from '$lib/sync/status';
-	import { FOLLOW_EVERY_MS, MEDIA_RETRY_MS, OFFLINE_NOTE_MS } from '$lib/sync/timing';
+	import { FOLLOW_EVERY_MS, MEDIA_RETRY_MS } from '$lib/sync/timing';
 	import { formatTime } from '$lib/time';
 
 	let {
@@ -54,7 +54,7 @@
 		socket: RoomSocket | null;
 		userId: number; // this user's, from hello
 		online: boolean; // the socket said hello and hasn't dropped since
-		offline: boolean; // the socket dropped: "Host is offline"; not before the first connect
+		offline: boolean; // the socket has been down a while: "Host is offline"; not before the first connect
 		note: string; // "Alice paused"
 		missing: boolean; // the video is gone, with no prepared copy: offer another pick
 		onpick: () => void;
@@ -153,16 +153,6 @@
 	const preparing = $derived(prepare ? jobText(prepare) : '');
 	// Before the room's first word on the socket the box is black, with nothing to press: say why.
 	const connecting = $derived(prepare === null && !offline);
-	// Offline long enough to say so: a blip changes nothing on screen.
-	let hostDown = $state(false);
-	$effect(() => {
-		if (!offline) {
-			hostDown = false;
-			return;
-		}
-		const t = setTimeout(() => (hostDown = true), OFFLINE_NOTE_MS);
-		return () => clearTimeout(t);
-	});
 
 	// At the end the room pauses; a TV episode then offers the next one.
 	const atEnd = $derived(
@@ -177,8 +167,8 @@
 
 	// What a screen reader hears: the room's state changes that show only over the video.
 	// Who's behind is the server's word: stale while it's offline.
-	const behind = $derived(hostDown ? [] : (playState?.behind ?? []));
-	const announce = $derived(hostDown ? strings.hostOffline : (waits?.headline ?? note));
+	const behind = $derived(offline ? [] : (playState?.behind ?? []));
+	const announce = $derived(offline ? strings.hostOffline : (waits?.headline ?? note));
 
 	// What holds the video's middle, one thing at a time, the first that applies. "Waiting for …" is the
 	// room's, not this screen's: it can sit under any of them. 'transport' is back, play or pause, forward.
@@ -188,7 +178,7 @@
 		if (prepare?.state === 'failed') return 'failed';
 		if (cantPlay) return 'cantPlay';
 		// Offline, what needs the server is dead or stale: say why where the hands go.
-		if (hostDown) return 'offline';
+		if (offline) return 'offline';
 		if (src === '') return connecting ? 'connecting' : preparing ? 'preparing' : '';
 		if (needsTap) return 'tap';
 		// While the next episode is still looked up (undefined), neither card: a film's would flash.
@@ -757,7 +747,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 						)}
 					{/if}
 					<!-- Offline, who the room waits for is stale, and "Play anyway" can't reach anyone. -->
-					{#if waits && !hostDown}
+					{#if waits && !offline}
 						<div
 							class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 px-5 py-4 @max-md:gap-2 @max-md:p-3"
 						>
@@ -782,7 +772,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 					class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1"
 				>
 					<!-- Unless the middle says it: while the controls show, it does. -->
-					{#if hostDown && (middle !== 'offline' || faded)}
+					{#if offline && (middle !== 'offline' || faded)}
 						<p class="pill flex animate-[appear_300ms_both] items-center gap-1.5 break-words">
 							<Icon name="offline" class="size-[0.9em] shrink-0 text-ember" />{strings.hostOffline}
 						</p>

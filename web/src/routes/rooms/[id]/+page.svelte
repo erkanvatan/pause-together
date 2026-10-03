@@ -46,7 +46,7 @@
 	import { RoomSocket } from '$lib/socket';
 	import { strings } from '$lib/strings';
 	import { target } from '$lib/sync/state';
-	import { PAUSED_NOTE_MS } from '$lib/sync/timing';
+	import { OFFLINE_NOTE_MS, PAUSED_NOTE_MS } from '$lib/sync/timing';
 	import { formatTime } from '$lib/time';
 
 	// How soon a failed load tries again.
@@ -73,7 +73,10 @@
 	let playState = $state<RoomState | null>(null);
 	let userId = $state(0); // this user's, from hello
 	let online = $state(false); // said hello, not dropped since
-	let offline = $state(false); // dropped; the first connect doesn't count
+	// Dropped for OFFLINE_NOTE_MS, so a blip that reconnects at once never says so. The first connect
+	// doesn't count.
+	let offline = $state(false);
+	let offlineTimer: ReturnType<typeof setTimeout> | undefined;
 	let note = $state(''); // "Alice paused"
 	let noteTimer: ReturnType<typeof setTimeout>;
 	let messages = $state<ChatMessage[]>([]); // the chat, oldest first
@@ -105,6 +108,8 @@
 		socket = null;
 		playState = null;
 		online = offline = false;
+		clearTimeout(offlineTimer);
+		offlineTimer = undefined;
 		note = '';
 		messages = [];
 		more = false;
@@ -121,7 +126,7 @@
 				room = r.value;
 				socket = new RoomSocket(roomId, received, () => {
 					online = false;
-					offline = true;
+					offlineTimer ??= setTimeout(() => (offline = true), OFFLINE_NOTE_MS);
 				});
 			} else if (r.error === 'not-found') notFound = true;
 			else timer = setTimeout(load, loadRetryMs);
@@ -131,6 +136,7 @@
 			stopped = true;
 			clearTimeout(timer);
 			clearTimeout(noteTimer);
+			clearTimeout(offlineTimer);
 			socket?.close();
 		};
 	});
@@ -189,6 +195,8 @@
 				userId = m.userId;
 				online = true;
 				offline = false;
+				clearTimeout(offlineTimer);
+				offlineTimer = undefined;
 				break;
 			case 'state':
 				playState = m.state;
