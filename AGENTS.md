@@ -401,9 +401,10 @@ So each room's video is **prepared once**, then served as a plain file.
 
 ## Rooms
 
-- Anyone creates a room by picking a video. The picker asks for the audio track and subtitle on every
-  pick, room creation and switch alike, with the defaults preselected. "Next episode" is the one
-  exception (below): it skips the picker.
+- Anyone creates a room by picking a video. When the video has more than one audio track, the picker
+  asks which, with the default preselected (each track is its own prepared copy). With one track or
+  none, a tap on the video picks it. The picker never asks for a subtitle: the room starts with the
+  default one, and the player's subtitle panel changes it. "Next episode" skips the picker (below).
 - Defaults come from an admin setting: preferred audio language (or "original") and subtitle languages
   in order (e.g. `tr`, then `en`). Fall back to the file's default-track flag. Forced subtitles are
   turned on when their language matches the audio.

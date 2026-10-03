@@ -729,14 +729,17 @@ Compact on a phone's small video box, so it never spills out of it. -->
 								>
 									<option value="">{strings.subtitleOff}</option>
 									{#each options as o (o.key)}
-										{@const missing =
+										{@const notInCopy =
 											'stream' in o.choice &&
 											prepare?.state === 'ready' &&
 											!prepare.subtitles.includes(o.choice.stream)}
-										<option value={o.key} disabled={o.unavailable !== '' || missing}>
-											{missing
-												? strings.withNote(subtitleLabel(o, options), strings.notInCopy)
-												: subtitleLabel(o, options)}
+										{@const why = o.unavailable
+											? (strings.subtitleUnavailable[o.unavailable] ?? o.unavailable)
+											: notInCopy
+												? strings.notInCopy
+												: ''}
+										<option value={o.key} disabled={why !== ''}>
+											{why ? strings.withNote(subtitleLabel(o, options), why) : subtitleLabel(o, options)}
 										</option>
 									{/each}
 								</select>

@@ -291,7 +291,6 @@ export const strings = {
 	} as Record<string, string>,
 	appleOnlyPick: 'Dolby Vision 5: only Apple devices show the right colors.',
 	audio: 'Audio',
-	noAudio: 'No audio',
 	subtitle: 'Subtitles',
 	subtitleOff: 'Off',
 	start: 'Start',
@@ -302,11 +301,11 @@ export const strings = {
 	channels: (n: number) =>
 		({ 1: 'Mono', 2: 'Stereo', 6: '5.1', 8: '7.1' })[n] ?? (n > 0 ? `${n} channels` : ''),
 
-	// Why a subtitle track can't be shown (media.SubtitleUnavailable).
+	// Why a subtitle track can't be shown (media.SubtitleUnavailable), as a note in the player's menu.
 	subtitleUnavailable: {
-		image: 'Picture subtitles (PGS, VobSub) are not supported.',
-		codec: 'This subtitle format is not supported.'
-	}
+		image: 'picture subtitles, not supported',
+		codec: 'format not supported'
+	} as Record<string, string>
 };
 
 // reasonText turns a reason code (strings.reasons) into text. Unknown codes show as they are.

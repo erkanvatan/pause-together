@@ -21,7 +21,6 @@
 		search,
 		searchIndex,
 		shelves,
-		subtitleLabel,
 		subtitleOptions,
 		videoName,
 		videoTitle,
@@ -67,8 +66,6 @@
 
 	let picked = $state<VideoDetail | null>(null);
 	let audio = $state<number | null>(null); // stream
-	let subtitle = $state(''); // a SubtitleOption key; '' = off
-	let subtitleTouched = false; // the user chose a subtitle, so an audio change leaves it alone
 	let pickSeq = 0; // only the latest video asked for may open
 
 	const all = $derived(videos ? shelves(videos, sort) : []);
@@ -81,7 +78,6 @@
 	const folder = $derived(
 		shelf?.type === 'other' ? shelf.folders.find((f) => f.name === folderName) : undefined
 	);
-	const options = $derived(picked ? subtitleOptions(picked) : []);
 
 	onMount(() => {
 		let stopped = false;
@@ -102,7 +98,14 @@
 		return () => {
 			stopped = true;
 			clearTimeout(timer);
+			pickSeq++; // closed while a video loaded: a one-track video would still pick itself
 		};
+	});
+
+	// Moving on (a search, another tab, a show or folder) drops a video still loading, for the same reason.
+	$effect(() => {
+		void [query, tab, showKey, folderName];
+		pickSeq++;
 	});
 
 	function openTab(t: LibraryType) {
@@ -122,19 +125,14 @@
 		}
 		const d = r.value;
 		const a = defaultAudio(d.audio, langs);
+		// Each audio track is its own prepared copy, so only a choice of them is asked. The subtitle
+		// takes the default and can be changed in the player.
+		if (d.audio.length < 2) {
+			pick(d, a?.stream ?? null);
+			return;
+		}
 		picked = d;
 		audio = a?.stream ?? null;
-		subtitle = defaultSubtitle(subtitleOptions(d), a?.lang ?? '', langs)?.key ?? '';
-		subtitleTouched = false;
-	}
-
-	// audioChanged picks the default subtitle again, since it can hang on the audio's language. It
-	// reads the stream from the event: bind:value may not have updated `audio` yet.
-	function audioChanged(e: Event & { currentTarget: HTMLSelectElement }) {
-		if (subtitleTouched || !picked) return;
-		const stream = Number(e.currentTarget.value);
-		const lang = picked.audio.find((t) => t.stream === stream)?.lang ?? '';
-		subtitle = defaultSubtitle(options, lang, langs)?.key ?? '';
 	}
 
 	function back() {
@@ -145,16 +143,10 @@
 		else folderName = null;
 	}
 
-	function start() {
-		if (!picked) return;
-		onpick(
-			{
-				videoId: picked.id,
-				audio,
-				subtitle: options.find((o) => o.key === subtitle)?.choice ?? null
-			},
-			videoName(picked)
-		);
+	function pick(d: VideoDetail, stream: number | null) {
+		const lang = d.audio.find((t) => t.stream === stream)?.lang ?? '';
+		const subtitle = defaultSubtitle(subtitleOptions(d), lang, langs)?.choice ?? null;
+		onpick({ videoId: d.id, audio: stream, subtitle }, videoName(d));
 	}
 
 	// A step that replaces the focused row (a video, show or folder opened, or Back) would drop focus
@@ -261,32 +253,13 @@
 				{/if}
 				<label class="flex flex-col gap-1.5">
 					<span class="text-sm text-haze">{strings.audio}</span>
-					<!-- One track is no choice: say what it is. -->
-					{#if picked.audio.length === 0}
-						<span>{strings.noAudio}</span>
-					{:else if picked.audio.length === 1}
-						<span>{audioLabel(picked.audio[0])}</span>
-					{:else}
-						<select bind:value={audio} onchange={audioChanged} class="field">
-							{#each picked.audio as t (t.stream)}
-								<option value={t.stream}>{audioLabel(t)}</option>
-							{/each}
-						</select>
-					{/if}
-				</label>
-				<label class="flex flex-col gap-1.5">
-					<span class="text-sm text-haze">{strings.subtitle}</span>
-					<select bind:value={subtitle} onchange={() => (subtitleTouched = true)} class="field">
-						<option value="">{strings.subtitleOff}</option>
-						{#each options as o (o.key)}
-							{@const why = (strings.subtitleUnavailable as Record<string, string>)[o.unavailable]}
-							<option value={o.key} disabled={o.unavailable !== ''}>
-								{o.unavailable ? strings.withNote(subtitleLabel(o, options), why ?? o.unavailable) : subtitleLabel(o, options)}
-							</option>
+					<select bind:value={audio} class="field">
+						{#each picked.audio as t (t.stream)}
+							<option value={t.stream}>{audioLabel(t)}</option>
 						{/each}
 					</select>
 				</label>
-				<button onclick={start} class="btn btn-primary self-start">
+				<button onclick={() => picked && pick(picked, audio)} class="btn btn-primary self-start">
 					<Icon name="play" class="size-5" />
 					{strings.start}
 				</button>
