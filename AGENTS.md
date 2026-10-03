@@ -217,8 +217,8 @@ container mount for source files, and one name for two things gets mixed up in c
 - Bandwidth: every viewer streams the original-quality file. The host's upload must cover
   bitrate × viewers, and a guest on a relayed (DERP) Tailscale link may buffer, which pauses the room.
 - Host offline: open tabs show "Host is offline, reconnecting…" and keep retrying. It takes the
-  middle of the video, where the dead buttons were (after 2 s, so a blip never flashes it), and the
-  chat says a typed message can't go yet and stays. A fresh visit just fails; fixing that needs a second machine, which is out of scope.
+  middle of the video, where the dead buttons were, and the chat says a typed message can't go yet.
+  Only after 2 s down, so a blip that reconnects at once changes nothing on screen. A fresh visit just fails; fixing that needs a second machine, which is out of scope.
 
 ## Users
 

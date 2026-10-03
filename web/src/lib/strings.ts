@@ -247,7 +247,7 @@ export const strings = {
 	replyingTo: (name: string) => `Replying to ${name}`,
 	cancelReply: 'Cancel reply',
 	chatReadOnly: 'The chat is read-only.',
-	chatOffline: "Can't send while the host is offline. Your message stays here.",
+	chatOffline: "Can't send while the host is offline. Try again when it's back.",
 	olderFailed: "Couldn't load older messages.",
 	// Where the video was when a message was sent.
 	inVideoAt: (at: string) => `At ${at} in the video`,

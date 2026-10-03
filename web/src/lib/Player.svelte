@@ -25,7 +25,7 @@
 	import { follow, type Step } from '$lib/sync/drift';
 	import { local, running, target, type Intent } from '$lib/sync/state';
 	import { reportDue, statusOf, type Report } from '$lib/sync/status';
-	import { FOLLOW_EVERY_MS, MEDIA_RETRY_MS } from '$lib/sync/timing';
+	import { FOLLOW_EVERY_MS, MEDIA_RETRY_MS, OFFLINE_NOTE_MS } from '$lib/sync/timing';
 	import { formatTime } from '$lib/time';
 
 	let {
@@ -116,7 +116,7 @@
 	const durationMs = $derived(playState?.durationMs ?? 0);
 
 	let subtitlesOpen = $state(false); // the subtitle panel
-	let panelHeight = $state(0); // its height, so the subtitles sit above it outside fullscreen
+	let panelHeight = $state(0); // its height, so the subtitles sit above it where it lies over the video
 	// The page fits the screen: app.css's `fit` variant, which the layout below follows. Change both.
 	const fits = new MediaQuery('(orientation: landscape) and (min-height: 30rem)');
 	const options = $derived(detail ? subtitleOptions(detail) : []);
@@ -153,6 +153,16 @@
 	const preparing = $derived(prepare ? jobText(prepare) : '');
 	// Before the room's first word on the socket the box is black, with nothing to press: say why.
 	const connecting = $derived(prepare === null && !offline);
+	// Offline long enough to say so: a blip changes nothing on screen.
+	let hostDown = $state(false);
+	$effect(() => {
+		if (!offline) {
+			hostDown = false;
+			return;
+		}
+		const t = setTimeout(() => (hostDown = true), OFFLINE_NOTE_MS);
+		return () => clearTimeout(t);
+	});
 
 	// At the end the room pauses; a TV episode then offers the next one.
 	const atEnd = $derived(
@@ -166,7 +176,9 @@
 	);
 
 	// What a screen reader hears: the room's state changes that show only over the video.
-	const announce = $derived(offline ? strings.hostOffline : (waits?.headline ?? note));
+	// Who's behind is the server's word: stale while it's offline.
+	const behind = $derived(hostDown ? [] : (playState?.behind ?? []));
+	const announce = $derived(hostDown ? strings.hostOffline : (waits?.headline ?? note));
 
 	// What holds the video's middle, one thing at a time, the first that applies. "Waiting for …" is the
 	// room's, not this screen's: it can sit under any of them. 'transport' is back, play or pause, forward.
@@ -176,7 +188,7 @@
 		if (prepare?.state === 'failed') return 'failed';
 		if (cantPlay) return 'cantPlay';
 		// Offline, what needs the server is dead or stale: say why where the hands go.
-		if (offline) return 'offline';
+		if (hostDown) return 'offline';
 		if (src === '') return connecting ? 'connecting' : preparing ? 'preparing' : '';
 		if (needsTap) return 'tap';
 		// While the next episode is still looked up (undefined), neither card: a film's would flash.
@@ -670,11 +682,8 @@ Compact on a phone's small video box, so it never spills out of it. -->
 							</button>
 						</div>
 					{:else if middle === 'offline'}
-						<!-- Late, so a blip that reconnects at once never flashes it. -->
 						<div class="transition-[opacity,visibility] duration-300 {fade}">
-							<div class="appear-late [animation-delay:2s]">
-								{@render notice(strings.hostOffline, strings.hostOfflineWhy, false, false)}
-							</div>
+							{@render notice(strings.hostOffline, strings.hostOfflineWhy, false, false)}
 						</div>
 					{:else if middle === 'cantPlay'}
 						<!-- Unplayable for the server is unplayable for everyone: only another pick helps. -->
@@ -748,7 +757,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 						)}
 					{/if}
 					<!-- Offline, who the room waits for is stale, and "Play anyway" can't reach anyone. -->
-					{#if waits && !offline}
+					{#if waits && !hostDown}
 						<div
 							class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 px-5 py-4 @max-md:gap-2 @max-md:p-3"
 						>
@@ -773,7 +782,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 					class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1"
 				>
 					<!-- Unless the middle says it: while the controls show, it does. -->
-					{#if offline && (middle !== 'offline' || faded)}
+					{#if hostDown && (middle !== 'offline' || faded)}
 						<p class="pill flex animate-[appear_300ms_both] items-center gap-1.5 break-words">
 							<Icon name="offline" class="size-[0.9em] shrink-0 text-ember" />{strings.hostOffline}
 						</p>
@@ -783,7 +792,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 							<Icon name="pause" class="size-[0.9em] shrink-0 text-lamp" />{note}
 						</p>
 					{/if}
-					{#each playState?.behind ?? [] as b (b.userId)}
+					{#each behind as b (b.userId)}
 						<p class="pill break-words">{strings.behind(b.name, b.ms)}</p>
 					{/each}
 					{#if !chatOpen}
