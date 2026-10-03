@@ -294,6 +294,13 @@ export const strings = {
 	subtitle: 'Subtitles',
 	subtitleOff: 'Off',
 	start: 'Start',
+	// A picked video that already has a room: join it, or make another.
+	videoHasRooms: (n: number) =>
+		n === 1 ? 'This already has a room. Join it to watch together.' : 'This already has rooms. Join one to watch together.',
+	startNewRoom: 'Start a new room',
+	// Under a video in the homepage's picker: where its one room is, or how many it has.
+	inRoom: (progress: string) => `In a room · ${progress}`,
+	inRooms: (n: number) => `In ${n} rooms`,
 	unknownLanguage: 'Unknown language',
 	forced: 'Forced',
 	sdh: 'SDH',

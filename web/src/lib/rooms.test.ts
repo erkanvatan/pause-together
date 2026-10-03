@@ -8,6 +8,7 @@ import {
 	roomTitle,
 	splitRooms,
 	usedAgo,
+	roomsByVideo,
 	waitText,
 	type WaitText
 } from './rooms';
@@ -83,14 +84,15 @@ describe('roomProgress', () => {
 	});
 });
 
+const card = (id: number, over: Partial<RoomCard> = {}): RoomCard => ({
+	...room(id),
+	watching: [],
+	gone: false,
+	usedAt: 0,
+	...over
+});
+
 describe('splitRooms', () => {
-	const card = (id: number, over: Partial<RoomCard> = {}): RoomCard => ({
-		...room(id),
-		watching: [],
-		gone: false,
-		usedAt: 0,
-		...over
-	});
 	const ann = [{ userId: 1, name: 'Ann' }];
 	const ids = (rs: RoomCard[]) => rs.map((r) => r.id);
 
@@ -123,6 +125,32 @@ describe('splitRooms', () => {
 	it('keeps a frozen order while managing, rooms not in it first', () => {
 		const rooms = [card(1, { usedAt: 900 }), card(2, { watching: ann }), card(3), card(4), card(5)];
 		expect(ids(splitRooms(rooms, [3, 1, 2]).active)).toEqual([5, 4, 3, 1, 2]);
+	});
+});
+
+describe('roomsByVideo', () => {
+	const other = { ...room(1).video, id: 8 };
+	const ann = [{ userId: 1, name: 'Ann' }];
+	const ids = (rs: RoomCard[] = []) => rs.map((r) => r.id);
+
+	it("lists each video's rooms, people first, then the most recently used", () => {
+		const byVideo = roomsByVideo([
+			card(1, { usedAt: 900 }),
+			card(2, { usedAt: 100, watching: ann }),
+			card(3, { usedAt: 500 }),
+			card(4, { usedAt: 999, video: other })
+		]);
+		expect(ids(byVideo.get(7))).toEqual([2, 1, 3]);
+		expect(ids(byVideo.get(8))).toEqual([4]);
+	});
+
+	it("leaves out rooms that can't play: archived, or gone even with people in it", () => {
+		const byVideo = roomsByVideo([
+			card(1, { archived: true }),
+			card(2, { gone: true }),
+			card(3, { gone: true, watching: ann })
+		]);
+		expect(byVideo.get(7)).toBeUndefined();
 	});
 });
 

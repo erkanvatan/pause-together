@@ -7,12 +7,15 @@
 		type Languages,
 		type LibraryType,
 		type Pick,
+		type RoomCard,
 		type VideoDetail,
 		type VideoSummary
 	} from '$lib/api';
 	import Dialog from '$lib/Dialog.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import { me } from '$lib/me.svelte';
+	import RoomMeta from '$lib/RoomMeta.svelte';
+	import { roomProgress, roomsByVideo } from '$lib/rooms';
 	import {
 		audioLabel,
 		defaultAudio,
@@ -32,10 +35,14 @@
 
 	let {
 		onpick,
-		onclose
+		onclose,
+		rooms = [],
+		now = 0
 	}: {
 		onpick: (p: Pick, name: string) => void; // name: the video's, as videoName writes it
 		onclose: () => void;
+		rooms?: RoomCard[]; // making a room: a pick of a video that has one offers to join it first
+		now?: number; // when rooms loaded, for "3 days ago"
 	} = $props();
 
 	// How soon a failed load tries again.
@@ -64,6 +71,9 @@
 	let showKey = $state<string | null>(null); // the open show
 	let folderName = $state<string | null>(null); // the open folder
 
+	const byVideo = $derived(roomsByVideo(rooms));
+	let offered = $state<VideoSummary | null>(null); // a video with rooms: join one, or make another
+	const offeredRooms = $derived((offered && byVideo.get(offered.id)) || []);
 	let picked = $state<VideoDetail | null>(null);
 	let audio = $state<number | null>(null); // stream
 	let pickSeq = 0; // only the latest video asked for may open
@@ -114,8 +124,13 @@
 		folderName = null;
 	}
 
-	async function choose(v: VideoSummary) {
+	async function choose(v: VideoSummary, fresh = false) {
 		pickFailed = false;
+		if (!fresh && byVideo.has(v.id)) {
+			pickSeq++; // a video tapped before this one, still loading, must not pick itself now
+			offered = v;
+			return;
+		}
 		const seq = ++pickSeq;
 		const r = await getVideo(v.id);
 		if (seq !== pickSeq) return; // another video was tapped, or Back, while this one loaded
@@ -135,10 +150,17 @@
 		audio = a?.stream ?? null;
 	}
 
+	// The rooms are polled: the last one offered may switch away, archive or go. Then the tap stands
+	// as a plain pick again, back in the list.
+	$effect(() => {
+		if (offered && !picked && offeredRooms.length === 0) offered = null;
+	});
+
 	function back() {
 		pickFailed = false;
 		pickSeq++;
 		if (picked) picked = null;
+		else if (offered) offered = null;
 		else if (showKey !== null) showKey = null;
 		else folderName = null;
 	}
@@ -154,7 +176,7 @@
 	// would open a phone's keyboard.
 	let panel: HTMLDivElement;
 	$effect(() => {
-		void [picked, showKey, folderName];
+		void [picked, offered, showKey, folderName];
 		tick().then(() => {
 			if (panel && !panel.contains(document.activeElement)) {
 				(panel.querySelector<HTMLElement>('.row:not(:disabled)') ?? panel.querySelector('select'))?.focus();
@@ -162,14 +184,14 @@
 		});
 	});
 
-	const canGoBack = $derived(picked !== null || (!results && (show || folder)));
+	const canGoBack = $derived(picked !== null || offered !== null || (!results && (show || folder)));
 
 	// Escape steps back one level: out of a video, a search, a show or folder, then the picker. Handled
 	// here, so the dialog doesn't close at once.
 	function escape(e: KeyboardEvent) {
 		if (e.key !== 'Escape') return;
 		e.preventDefault();
-		if (picked) back();
+		if (picked || offered) back();
 		else if (query) query = '';
 		else if (canGoBack) back();
 		else onclose();
@@ -180,6 +202,7 @@
 
 {#snippet videoRow(v: VideoSummary, label: string, code = '')}
 	{@const why = whyUnplayable(v, canPlayType)}
+	{@const vRooms = (!why && byVideo.get(v.id)) || []}
 	<li>
 		<button disabled={why !== ''} onclick={() => choose(v)} class="row">
 			<span class="min-w-0 flex-1">
@@ -190,6 +213,11 @@
 					<span class="block text-sm text-haze">{why}</span>
 				{:else if v.appleOnly}
 					<span class="block text-sm text-haze">{strings.appleOnlyPick}</span>
+				{/if}
+				{#if vRooms.length > 0}
+					<span class="block text-sm text-haze tabular-nums">
+						{vRooms.length === 1 ? strings.inRoom(roomProgress(vRooms[0])) : strings.inRooms(vRooms.length)}
+					</span>
 				{/if}
 			</span>
 		</button>
@@ -211,11 +239,12 @@
 {/snippet}
 
 <Dialog label={strings.pickVideo} {onclose} class="items-stretch justify-center sm:items-center sm:p-6">
-	<!-- The list keeps one tall frame, so it doesn't jump while searching; the short track step fits
-	its content. -->
+	<!-- The list keeps one tall frame, so it doesn't jump while searching; the short room and track
+	steps fit their content. -->
 	<div
 		bind:this={panel}
-		class="flex w-full flex-col bg-dusk sm:max-w-2xl sm:rounded-panel sm:border sm:border-line {picked
+		class="flex w-full flex-col bg-dusk sm:max-w-2xl sm:rounded-panel sm:border sm:border-line {picked ||
+		offered
 			? ''
 			: 'sm:h-[85vh]'}"
 	>
@@ -229,6 +258,8 @@
 			<h2 class="min-w-0 flex-1 truncate px-2 font-display text-lg font-bold">
 				{#if picked}
 					{videoTitle(picked)}
+				{:else if offered}
+					{videoTitle(offered)}
 				{:else if show && !results}
 					{withYear(show.title, show.year)}
 				{:else if folder && !results}
@@ -262,6 +293,31 @@
 				<button onclick={() => picked && pick(picked, audio)} class="btn btn-primary self-start">
 					<Icon name="play" class="size-5" />
 					{strings.start}
+				</button>
+			</div>
+		{:else if offered}
+			<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+				{#if offered.version}
+					<p class="-mt-1 break-words text-haze">{offered.version}</p>
+				{/if}
+				<p>{strings.videoHasRooms(offeredRooms.length)}</p>
+				<ul class="-mx-2">
+					{#each offeredRooms as r (r.id)}
+						<li>
+							<a href="/rooms/{r.id}" class="row">
+								<span class="min-w-0 flex-1">
+									{#if r.name}
+										<span class="block break-words">{r.name}</span>
+									{/if}
+									<RoomMeta room={r} {now} />
+								</span>
+								<Icon name="chevron" class="size-5 shrink-0 text-haze" />
+							</a>
+						</li>
+					{/each}
+				</ul>
+				<button onclick={() => offered && choose(offered, true)} class="btn btn-quiet self-start">
+					{strings.startNewRoom}
 				</button>
 			</div>
 		{:else}

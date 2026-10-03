@@ -153,7 +153,8 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      carrying the audio and subtitle over to it),
                      Picker.svelte, Dialog.svelte (modals on the browser's <dialog>: focus, Escape, inert page),
                      FolderPicker.svelte, NameForm.svelte, Menu.svelte (a button with a panel of rows), Confirm.svelte
-                     (an inline "Are you sure?" row), GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), strings.ts,
+                     (an inline "Are you sure?" row), GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), RoomMeta.svelte
+                     (a room's progress, last use and who's watching: homepage cards, the picker), strings.ts,
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID),
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
                      fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
@@ -405,6 +406,12 @@ So each room's video is **prepared once**, then served as a plain file.
   asks which, with the default preselected (each track is its own prepared copy). With one track or
   none, a tap on the video picks it. The picker never asks for a subtitle: the room starts with the
   default one, and the player's subtitle panel changes it. "Next episode" skips the picker (below).
+- Joining comes before making: a family split across two rooms of one film isn't watching together.
+  In the homepage's picker, a video that already has a room says so under its name ("In a room ·
+  19:19 of 2:34:27", "In 3 rooms"), and a tap on it lists those rooms (where each is, who's watching)
+  above a quiet "Start a new room". Only rooms that can play count (not archived, video not gone),
+  and only the same video: another episode of the show is another video. "Switch video" in a room
+  never offers this.
 - Defaults come from an admin setting: preferred audio language (or "original") and subtitle languages
   in order (e.g. `tr`, then `en`). Fall back to the file's default-track flag. Forced subtitles are
   turned on when their language matches the audio.

@@ -5,10 +5,11 @@
 	import Confirm from '$lib/Confirm.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import Picker from '$lib/Picker.svelte';
+	import RoomMeta from '$lib/RoomMeta.svelte';
 	import { deleteRoom } from '$lib/admin';
 	import { createRoom, listRooms, setArchived, type Pick, type Result, type RoomCard } from '$lib/api';
 	import { me } from '$lib/me.svelte';
-	import { roomProgress, roomSubtitle, roomTitle, splitRooms, usedAgo } from '$lib/rooms';
+	import { roomSubtitle, roomTitle, splitRooms } from '$lib/rooms';
 	import { strings } from '$lib/strings';
 
 	// How often the room list is asked again while the tab is visible: others make, archive and
@@ -91,7 +92,6 @@
 {#snippet card(r: RoomCard)}
 	{@const subtitle = roomSubtitle(r)}
 	{@const joinable = r.watching.length > 0 && !r.archived}
-	{@const ago = joinable ? '' : usedAgo(r.usedAt, now)}
 	<li class="relative flex flex-col gap-3 py-3 pl-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
 		{#if joinable}
 			<!-- The lamp is on: someone is in this room. An archived one can't play, so it stays dark. -->
@@ -109,26 +109,7 @@
 				{#if subtitle}
 					<span class="mt-1 block break-words text-haze">{subtitle}</span>
 				{/if}
-				<!-- Where the room is, so a guest sees where they left off before opening it, and who's there. -->
-				<span class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-					{#if r.gone}
-						<span class="text-ember">{strings.videoMissing}</span>
-					{:else}
-						<span class="text-haze tabular-nums">{roomProgress(r)}</span>
-					{/if}
-					<!-- Tells rooms with the same video apart, and says which one was on last. -->
-					{#if ago}
-						<span class="text-haze">{ago}</span>
-					{/if}
-					{#if joinable}
-						<span class="flex min-w-0 items-center gap-2">
-							<span class="size-2 shrink-0 rounded-full bg-lamp" aria-hidden="true"></span>
-							<span class="min-w-0 break-words">
-								{strings.watchingList(r.watching.map((w) => w.name).join(', '))}
-							</span>
-						</span>
-					{/if}
-				</span>
+				<span class="mt-1 block"><RoomMeta room={r} {now} /></span>
 			</span>
 			<!-- A room with nobody in it has no Join button: the chevron says the row opens it. -->
 			{#if !managing && !joinable}
@@ -255,5 +236,5 @@
 </main>
 
 {#if picking}
-	<Picker onpick={create} onclose={() => (picking = false)} />
+	<Picker rooms={rooms ?? []} {now} onpick={create} onclose={() => (picking = false)} />
 {/if}

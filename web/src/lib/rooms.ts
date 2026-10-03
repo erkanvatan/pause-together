@@ -52,6 +52,17 @@ export function splitRooms<R extends RoomCard>(
 	};
 }
 
+// roomsByVideo maps each video to the rooms a pick of it could join instead of making another, in
+// the homepage's order: a family split across two rooms of one film isn't watching together. Only
+// rooms that can play: not archived, not gone (even with people in it).
+export function roomsByVideo<R extends RoomCard>(rooms: R[]): Map<number, R[]> {
+	const byVideo = new Map<number, R[]>();
+	for (const r of splitRooms(rooms.filter((r) => !r.gone), null).active) {
+		byVideo.set(r.video.id, [...(byVideo.get(r.video.id) ?? []), r]);
+	}
+	return byVideo;
+}
+
 // usedAgo says how long ago a room was used: "3 days ago", "yesterday". '' when unknown (0).
 export function usedAgo(usedAt: number, now: number): string {
 	if (usedAt === 0) return '';
