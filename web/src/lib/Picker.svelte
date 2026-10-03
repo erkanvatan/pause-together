@@ -208,6 +208,10 @@
 				<span class="block break-words">
 					{#if code}<span class="mr-2 text-haze tabular-nums">{code}</span>{/if}{label}
 				</span>
+				<!-- Release tags ("1080p.BrRip.x264") are noise in a title: a quiet line of their own. -->
+				{#if v.version}
+					<span class="block text-sm break-words text-haze">{v.version}</span>
+				{/if}
 				{#if why}
 					<span class="block text-sm text-haze">{why}</span>
 				{:else if v.appleOnly}
@@ -366,7 +370,7 @@
 				{:else if results}
 					<ul>
 						{#each results as v (v.id)}
-							{@render videoRow(v, videoName(v))}
+							{@render videoRow(v, videoTitle(v))}
 						{/each}
 					</ul>
 				{:else if !shelf}
@@ -382,7 +386,7 @@
 				{:else if shelf.type === 'movies'}
 					<ul>
 						{#each shelf.movies as v (v.id)}
-							{@render videoRow(v, videoName(v))}
+							{@render videoRow(v, videoTitle(v))}
 						{/each}
 					</ul>
 				{:else if shelf.type === 'tv'}
