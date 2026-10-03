@@ -40,6 +40,17 @@ export function withDeleted(list: ChatMessage[], id: number): ChatMessage[] {
 		);
 }
 
+// focusAfter is the message that takes focus when the focused one (id) leaves the list: the nearest
+// newer one that stays, else the nearest older one. null: none stays.
+export function focusAfter(before: ChatMessage[], now: ChatMessage[], id: number): number | null {
+	const at = before.findIndex((m) => m.id === id);
+	if (at < 0) return null;
+	const stays = new Set(now.map((m) => m.id));
+	const newer = before.slice(at + 1).find((m) => stays.has(m.id));
+	const older = before.slice(0, at).findLast((m) => stays.has(m.id));
+	return (newer ?? older)?.id ?? null;
+}
+
 // withToast adds a toast, keeping the newest MAX_TOASTS.
 export function withToast(toasts: ChatMessage[], m: ChatMessage): ChatMessage[] {
 	return [...toasts, m].slice(-MAX_TOASTS);

@@ -2,7 +2,7 @@
 	// A room's chat: the messages, and a line to write one. Text is shown as text, never as HTML.
 	import { onMount, tick, untrack } from 'svelte';
 	import type { ChatMessage, Who } from '$lib/api';
-	import { canSend, MAX_MESSAGE_CHARS, messageLength } from '$lib/chat';
+	import { canSend, focusAfter, MAX_MESSAGE_CHARS, messageLength } from '$lib/chat';
 	import Confirm from '$lib/Confirm.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import { videoName } from '$lib/picker';
@@ -56,6 +56,7 @@
 	let atBottom = true; // new messages keep the list at the bottom only when it's there
 
 	const length = $derived(messageLength(draft));
+	const coarse = () => matchMedia('(pointer: coarse)').matches; // a touch screen
 
 	onMount(() => {
 		lastId = messages.at(-1)?.id;
@@ -108,7 +109,7 @@
 		if (!online || !canSend(draft)) return;
 		onsend(draft.trim());
 		// On touch screens, close the keyboard so the video shows again.
-		if (matchMedia('(pointer: coarse)').matches) input?.blur();
+		if (coarse()) input?.blur();
 	}
 
 	// The messages are one stop for Tab, like a list box: ↑ and ↓ step through them, Home and End jump
@@ -118,15 +119,59 @@
 		const at = messages.findIndex((m) => m.id === focusable);
 		if (step === undefined || at < 0 || !(e.target as HTMLElement).dataset.message) return;
 		e.preventDefault();
-		const to = messages[Math.min(Math.max(at + step, 0), messages.length - 1)];
-		current = to.id;
-		tick().then(() => list.querySelector<HTMLElement>(`[data-message="${to.id}"]`)?.focus());
+		focusMessage(messages[Math.min(Math.max(at + step, 0), messages.length - 1)].id);
 	}
+
+	function focusMessage(id: number) {
+		current = id;
+		tick().then(() => list?.querySelector<HTMLElement>(`[data-message="${id}"]`)?.focus());
+	}
+
+	// A message's actions open under it, below the list's edge on the last few messages: scroll the list
+	// just enough to show them. Only the list: the page and the video stay put.
+	$effect(() => {
+		const id = confirming ?? selected;
+		if (id === null) return;
+		untrack(() => {
+			const actions = list.querySelector(`[data-message="${id}"]`)?.nextElementSibling;
+			if (!actions) return;
+			const pad = parseFloat(getComputedStyle(list).paddingBottom);
+			const below = actions.getBoundingClientRect().bottom + pad - list.getBoundingClientRect().bottom;
+			if (below > 0) list.scrollTop += below;
+		});
+	});
 
 	function select(id: number) {
 		selected = selected === id ? null : id;
 		confirming = null;
 	}
+
+	// Delete swaps out the focused button (the Confirm's Cancel takes focus), and so does Cancel.
+	function cancelDelete(id: number) {
+		confirming = null;
+		focusMessage(id);
+	}
+
+	// A focused message that leaves the list (deleted here, in another tab, or by its sender) takes focus
+	// with it. Before the list updates, pass focus to the nearest message that stays, so keys never land
+	// on the page, where Space plays the room.
+	let shown: ChatMessage[] = [];
+	$effect.pre(() => {
+		const now = messages;
+		untrack(() => {
+			const before = shown;
+			shown = now;
+			const has = (id: number | null) => now.some((m) => m.id === id);
+			if (selected !== null && !has(selected)) selected = confirming = null;
+			const focused = document.activeElement;
+			if (!focused || !list?.contains(focused)) return;
+			const id = Number(focused.closest('li')?.querySelector<HTMLElement>('[data-message]')?.dataset.message);
+			if (!id || has(id)) return;
+			const to = focusAfter(before, now, id);
+			if (to !== null) focusMessage(to);
+			else if (!coarse()) tick().then(() => input?.focus()); // not on touch: it opens the keyboard
+		});
+	});
 
 	function reply(m: ChatMessage) {
 		selected = null;
@@ -234,8 +279,9 @@
 										message={strings.deleteMessageConfirm}
 										action={strings.deleteMessage}
 										onconfirm={() => ondelete(m.id)}
-										oncancel={() => (confirming = null)}
+										oncancel={() => cancelDelete(m.id)}
 										disabled={!online}
+										focus
 										class="basis-full"
 									/>
 								{:else}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ChatMessage, VideoSummary } from './api';
 import {
 	canSend,
+	focusAfter,
 	MAX_MESSAGE_CHARS,
 	MAX_TOASTS,
 	messageLength,
@@ -96,6 +97,20 @@ describe('withDeleted', () => {
 	it('marks replies to one not loaded', () => {
 		const list = withDeleted([message(5, 1)], 1);
 		expect(list[0].replyTo?.deleted).toBe(true);
+	});
+});
+
+describe('focusAfter', () => {
+	it.each([
+		{ name: 'the next newer', before: [1, 2, 3], now: [1, 3], id: 2, want: 3 },
+		{ name: 'the one before the newest', before: [1, 2, 3], now: [1, 2], id: 3, want: 2 },
+		{ name: 'skips newer ones also gone', before: [1, 2, 3, 4], now: [1, 4], id: 2, want: 4 },
+		{ name: 'older when no newer stays', before: [1, 2, 3], now: [1], id: 2, want: 1 },
+		{ name: 'none stays', before: [1], now: [], id: 1, want: null },
+		{ name: 'not in the list', before: [1, 2], now: [1, 2], id: 9, want: null }
+	])('$name', ({ before, now, id, want }) => {
+		const list = (ids: number[]) => ids.map((i) => message(i));
+		expect(focusAfter(list(before), list(now), id)).toBe(want);
 	});
 });
 
