@@ -70,7 +70,7 @@ func (s *server) getMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
-// postMe sets the visitor's name: a rename for a known user, a new user otherwise.
+// postMe makes this browser the person with the name: a known browser moves, a new one gets a token.
 func (s *server) postMe(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name string `json:"name"`
@@ -91,16 +91,17 @@ func (s *server) postMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if ok {
-		err = s.Users.Rename(r.Context(), u.ID, name)
+		u, err = s.Users.Rename(r.Context(), token, u, name)
 	} else {
-		_, token, err = s.Users.Create(r.Context(), name)
+		u, token, err = s.Users.Create(r.Context(), name)
 	}
 	if err != nil {
 		internalError(w, "save user", err)
 		return
 	}
 	s.setTokenCookie(w, token)
-	writeJSON(w, s.me(&name))
+	// The person's spelling, which may not be the one typed: "ali" joins "Ali".
+	writeJSON(w, s.me(&u.Name))
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

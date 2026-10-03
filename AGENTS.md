@@ -8,7 +8,7 @@ This file provides guidance to AI coding agents when working with code in this r
 serves its local video library. Guests reach it over Tailscale and watch in sync from PCs, tablets and
 phones. Same show. Same second. Different places.
 
-**Status: slices 1–20 are built; "a name is a person" is next (`docs/plan.md`).** This file is the spec. When
+**Status: slices 1–21 are built (`docs/plan.md`).** This file is the spec. When
 code changes, update the layout and commands below to match reality. The rules here are decided: flag problems,
 but don't quietly change them. Work each slice by the steps under "How to work a slice" in
 `docs/plan.md`.
@@ -140,7 +140,8 @@ internal/library/    Plex name parsing (pure: path in, video/subtitle/skip out),
 internal/media/      ffprobe and the codec check; prepare jobs (ffmpeg arguments, job queue, cache in DATA_DIR/cache);
                      sidecar subtitles to WebVTT (encoding, ffmpeg over stdin)
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
-internal/user/       name rules, users table (token stored as a SHA-256 hash), lookup by cookie token
+internal/user/       name rules and the name key, users (one per person), tokens (one per browser, stored as a
+                     SHA-256 hash), lookup by cookie token
 testdata/make.sh     makes the test clips in testdata/media (git-ignored)
 docs/plan.md         build order in slices, and how to work one
 PRODUCT.md           who it's for, the tone, what it is not (read before UI or copy work)
@@ -156,7 +157,8 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      FolderPicker.svelte, NameForm.svelte, Menu.svelte (a button with a panel of rows), Confirm.svelte
                      (an inline "Are you sure?" row), GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), RoomMeta.svelte
                      (a room's progress, last use and who's watching: homepage cards, the picker), strings.ts,
-                     protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, build ID),
+                     protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, rejoin after a rename,
+                     build ID),
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
                      fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
                      Subtitles.svelte (the subtitle overlay), prefs.ts (per-device player settings in
@@ -221,16 +223,28 @@ container mount for source files, and one name for two things gets mixed up in c
 
 - No accounts: one host (anyone on the admin port) plus anonymous guests.
 - First visit: pick a display name. The form says what the app is, and which room a room link leads to.
-  The server creates a user with a random token in an `HttpOnly` cookie (it rides along on the WebSocket
+  The server gives the browser a random token in an `HttpOnly` cookie (it rides along on the WebSocket
   upgrade too). The token keeps the name across visits.
+- A name is a person: every browser that picks it is one user, with one color in chat, one entry in
+  "watching now", and the same own messages. Anyone who types a name becomes that person (the tailnet
+  is trusted), so they can delete that person's messages too. Names match ignoring case: the key is the
+  name in NFC, then case-folded (`cases.Fold`). Turkish isn't special: `ALİ` and `ali` are two people.
+  SQLite's `lower()` and `NOCASE` fold only ASCII, so Go makes the key (`user.NameKey`, also the SQL
+  function `name_key`).
+- Picking a name that exists makes this browser that person, with the person's spelling. A rename
+  moves only this browser: to the new name's person, or a new one. The old person keeps its name, its
+  messages and its other browsers; with no browser left, it stays, so its messages still show its name.
+  Renaming to your own name in another case (`mom` → `Mom`) changes the spelling for everyone: it's the
+  only way to fix one.
 - The cookie gets the longest life browsers allow (Chrome caps it at 400 days) and is refreshed on
   every visit.
 - Cookies are per host name: `localhost`, the Tailscale IP and the MagicDNS name each give a different
   user. Give guests one address to use: the host's pages show it (the guest link, below).
 - Names: 1–32 runes, trimmed, at least one letter or number. No control characters, no invisible
   format characters (zero-width, text direction), no Unicode line breaks, no emoji. Emoji live in
-  Unicode's "other symbol" class with `♥ ★ ©`, so those go too. Rename from a menu. Duplicates are
-  allowed (no accounts, so no way to reclaim a name).
+  Unicode's "other symbol" class with `♥ ★ ©`, so those go too. Rename from a menu, in a dialog over
+  the page: a room page stays, and its socket joins again as the new name, so a rename mid-movie
+  needs no new "Tap to join" and doesn't pause the room.
 - `GET /api/me` returns `{name, isAdmin}` (`name` is null for a new visitor) and refreshes the cookie.
   The admin listener sets `isAdmin`. The page hides admin links when it's false.
 - The admin listener also sends `guestUrl`, the address guests open, built from the guest port's bind
@@ -238,8 +252,8 @@ container mount for source files, and one name for two things gets mixed up in c
   the host "Guest link: http://100.101.102.103:8420/rooms/15" with a Copy button (`localhost` is a
   secure context, so the clipboard works there), and the admin page shows the bare address, or, when
   `PUBLIC_BIND` is still loopback, how to open the guest port.
-- `POST /api/me {name}` renames a known user, or creates one (and sets the cookie) when the token is
-  missing or unknown.
+- `POST /api/me {name}` moves a known browser to the person with that name, or gives a new browser a
+  token (and sets the cookie) when it's missing or unknown. It answers with the person's spelling.
 - The cookie (`pt_token`) is `SameSite=Lax` and never `Secure`: guests use plain HTTP, and their
   browser would drop a `Secure` cookie. `localhost` counts as secure, so dev would hide that bug.
 - Everyone can: see all rooms, create and name rooms, control playback, switch a room's video, chat,
@@ -454,8 +468,8 @@ So each room's video is **prepared once**, then served as a plain file.
 - Presence: "watching now" only: an open socket, plus a 15 s reconnect grace so flaky phones don't
   flicker out of the list. A page that closes its socket cleanly (tab closed, or went to another page)
   skips the grace: it left on purpose. Someone gone past the grace is forgotten, and nothing is stored.
-  No "was here": each browser has its own cookie, so one person on three browsers would stay listed
-  three times forever. Each user shows once, even with two tabs open.
+  No "was here": it would list everyone who ever came, forever. Each user shows once, even with two
+  tabs or two devices open.
 
 ## Sync
 
@@ -485,9 +499,11 @@ So each room's video is **prepared once**, then served as a plain file.
   3 s pauses the room ("Waiting for Alice"). It resumes when everyone is ready. Anyone can press "Play
   anyway": the blocking client is then skipped until it catches up or comes back.
 - Leaving (closing the tab, or going to another page) counts as away, so the room pauses 3 s later
-  too. It waits until that person is back and ready on a new socket. "Play anyway" forgets them
-  instead of skipping: they can't catch up. Closing one of two tabs doesn't count: the person is
-  still there.
+  too. It waits until that browser is back and ready on a new socket. "Play anyway" forgets them
+  instead of skipping: they can't catch up. Closing one of two tabs doesn't count: the browser is
+  still there. Leaving goes by browser, not by person: one person's TV and phone (both "Dad") are two
+  browsers, and the room waits for the TV even while the phone stays. A browser that comes back under
+  another name (a rename) clears its old wait.
 - Some clients never block, and none of them count as away:
   - a device marked "can't play" (it can't decode the video),
   - someone who hasn't pressed "Tap to join" yet,

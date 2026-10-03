@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/fs"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -112,6 +113,73 @@ func TestMigration10DropsRoomVisitors(t *testing.T) {
 		}
 		if n != c.want {
 			t.Errorf("%s = %d, want %d", c.query, n, c.want)
+		}
+	}
+}
+
+// Migration 12 makes a name one person: users whose names match ignoring case merge into the oldest.
+// Its spelling stays, and every token and message moves to it.
+func TestMigration12MergesUsers(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "test.db")
+	db, err := Open(ctx, path, upTo(t, 11))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		"INSERT INTO users (id, token_hash, name) VALUES (1, x'01', 'Ali'), (2, x'02', 'ali'), (3, x'03', 'Can')",
+		"INSERT INTO libraries (id, path, type) VALUES (1, 'Movies', 'movies')",
+		`INSERT INTO videos (id, library_id, path, title, year, edition, version, season, episode, episode_end,
+			episode_title, group_name, size, mtime) VALUES (1, 1, 'A (2020).mkv', 'A', 2020, '', '', 0, 0, 0, '', '', 1, 1)`,
+		"INSERT INTO rooms (id, name, video_id) VALUES (1, '', 1)",
+		`INSERT INTO messages (room_id, user_id, text, video_id, position_ms, sent_at)
+			VALUES (1, 1, 'one', 1, 0, 0), (1, 2, 'two', 1, 0, 0), (1, 3, 'three', 1, 0, 0)`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err = Open(ctx, path, Migrations())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	rows := func(query string) []string {
+		t.Helper()
+		var out []string
+		r, err := db.Query(query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = r.Close() }()
+		for r.Next() {
+			var s string
+			if err := r.Scan(&s); err != nil {
+				t.Fatal(err)
+			}
+			out = append(out, s)
+		}
+		if err := r.Err(); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	checks := []struct {
+		query string
+		want  string
+	}{
+		{"SELECT id || ':' || name || ':' || name_key FROM users ORDER BY id", "1:Ali:ali,3:Can:can"},
+		{"SELECT hex(token_hash) || ':' || user_id FROM tokens ORDER BY token_hash", "01:1,02:1,03:3"},
+		{"SELECT text || ':' || user_id FROM messages ORDER BY id", "one:1,two:1,three:3"},
+		{"SELECT 'broken' FROM pragma_foreign_key_check", ""},
+	}
+	for _, c := range checks {
+		if got := strings.Join(rows(c.query), ","); got != c.want {
+			t.Errorf("%s = %q, want %q", c.query, got, c.want)
 		}
 	}
 }

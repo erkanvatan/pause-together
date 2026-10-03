@@ -39,9 +39,13 @@ func videoRoom(video, durationMs, positionMs int64) Room {
 	}
 }
 
-func (sc *scene) join(w Who) int64 {
+// join opens a tab of w's, in w's one browser.
+func (sc *scene) join(w Who) int64 { return sc.joinOn(w, w.Name) }
+
+// joinOn opens a tab of w's in a browser of its own: another device, or a renamed one.
+func (sc *scene) joinOn(w Who, browser string) int64 {
 	sc.next++
-	sc.e = sc.s.Join(sc.next, w, sc.now)
+	sc.e = sc.s.Join(sc.next, w, browser, sc.now)
 	return sc.next
 }
 
@@ -245,6 +249,27 @@ func TestSync(t *testing.T) {
 		sc.leave(a)
 		sc.at(24_000)
 		sc.check("waiting", sc.waiting(), []Who{alice})
+	})
+
+	t.Run("Alice's TV leaves, her phone stays → room waits for Alice", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		phone := sc.joinOn(alice, "phone")
+		sc.status(phone, Ready)
+		sc.at(10_000).leave(a)
+		sc.at(14_000)
+		sc.check("waiting", sc.waiting(), []Who{alice})
+		sc.status(phone, Ready)
+		sc.check("waiting after her phone reports", sc.waiting(), []Who{alice})
+	})
+
+	t.Run("Alice leaves to rename, comes back as Bo → room no longer waits for Alice", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		sc.at(10_000).leave(a)
+		sc.at(14_000)
+		sc.check("waiting", sc.waiting(), []Who{alice})
+		bo := sc.joinOn(Who{UserID: 4, Name: "Bo"}, alice.Name)
+		sc.at(16_000).status(bo, Ready, 13_000)
+		sc.check("waiting", sc.waiting(), []Who{})
 	})
 
 	t.Run("Alice left, Play anyway → she's forgotten, not shown behind", func(t *testing.T) {

@@ -4,6 +4,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"embed"
 	"errors"
 	"fmt"
@@ -14,7 +15,9 @@ import (
 	"strconv"
 	"time"
 
-	_ "modernc.org/sqlite" // registers the "sqlite" driver
+	"modernc.org/sqlite"
+
+	"github.com/erkanvatan/pause-together/internal/user"
 )
 
 const (
@@ -27,6 +30,22 @@ const (
 	// BackupKeep is how many backups are kept; older ones are deleted.
 	BackupKeep = 7
 )
+
+// name_key(name) is user.NameKey in SQL, for the migration that merges users by name. SQLite's lower()
+// and NOCASE fold only ASCII. The driver adds it to each connection opened after this.
+func init() {
+	if err := sqlite.RegisterDeterministicScalarFunction("name_key", 1,
+		func(_ *sqlite.FunctionContext, args []driver.Value) (driver.Value, error) {
+			name, ok := args[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("name_key: want text, got %T", args[0])
+			}
+			return user.NameKey(name), nil
+		},
+	); err != nil {
+		panic(err) // only fails for a bad name or argument count
+	}
+}
 
 // all: so .gitkeep is embedded too; an empty folder won't embed.
 //

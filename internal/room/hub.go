@@ -66,12 +66,13 @@ func (h *Hub) Wait() { h.loops.Wait() }
 // now is server time: monotonic, in milliseconds since the hub started.
 func (h *Hub) now() int64 { return time.Since(h.start).Milliseconds() }
 
-// Serve runs one socket of who's in room rm, just opened, until it closes.
-func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, rm Room, who Who) {
+// Serve runs one socket of who's in room rm, just opened, until it closes. browser tells one browser
+// from another (see client.browser).
+func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, rm Room, who Who, browser string) {
 	conn.SetReadLimit(readLimit)
 	ctx, drop := context.WithCancel(ctx)
 	defer drop()
-	s := &socket{who: who, out: make(chan []byte, sendBuffer), quit: make(chan struct{}), drop: drop}
+	s := &socket{who: who, browser: browser, out: make(chan []byte, sendBuffer), quit: make(chan struct{}), drop: drop}
 	s.send(encode(HelloMsg{Type: MsgHello, BuildID: h.BuildID, UserID: who.UserID}))
 	l := h.join(rm, s)
 
@@ -204,10 +205,11 @@ func (h *Hub) SetArchived(ctx context.Context, id int64, archived bool) (Room, e
 
 // socket is one open room page.
 type socket struct {
-	id   int64
-	who  Who
-	out  chan []byte
-	drop context.CancelFunc // closes the socket at once
+	id      int64
+	who     Who
+	browser string
+	out     chan []byte
+	drop    context.CancelFunc // closes the socket at once
 
 	quit      chan struct{} // closed by closeWith: send what's queued, then close
 	closeOnce sync.Once

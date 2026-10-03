@@ -140,6 +140,7 @@ func TestMeCreateThenReturn(t *testing.T) {
 	}
 }
 
+// A rename to a new name keeps the browser's token, and makes a new person. The old one stays.
 func TestMeRenameKeepsToken(t *testing.T) {
 	users := testUsers(t)
 	h := Guest(fakeBuild(), deps(users))
@@ -151,6 +152,24 @@ func TestMeRenameKeepsToken(t *testing.T) {
 	}
 	if c := tokenFrom(rec); c == nil || c.Value != token {
 		t.Errorf("rename cookie = %v, want the same token", c)
+	}
+	if n := userCount(t, users); n != 2 {
+		t.Errorf("users = %d, want 2", n)
+	}
+}
+
+// A name that exists makes this browser that person, with the person's spelling.
+func TestMeSameNameIsOnePerson(t *testing.T) {
+	users := testUsers(t)
+	h := Guest(fakeBuild(), deps(users))
+	serve(h, meRequest(http.MethodPost, `{"name":"Ali"}`, ""))
+
+	rec := serve(h, meRequest(http.MethodPost, `{"name":"ali"}`, ""))
+	if b := decodeMe(t, rec); b.Name == nil || *b.Name != "Ali" {
+		t.Errorf("POST ali: name = %v, want Ali", b.Name)
+	}
+	if b := decodeMe(t, serve(h, meRequest(http.MethodGet, "", tokenFrom(rec).Value))); b.Name == nil || *b.Name != "Ali" {
+		t.Errorf("GET: name = %v, want Ali", b.Name)
 	}
 	if n := userCount(t, users); n != 1 {
 		t.Errorf("users = %d, want 1", n)

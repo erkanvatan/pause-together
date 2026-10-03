@@ -80,15 +80,18 @@ type Effect struct {
 
 // client is one socket in the room.
 type client struct {
-	id        int64
-	who       Who
+	id  int64
+	who Who
+	// browser tells one browser's tabs from another's. A person can have several (a TV and a phone, both
+	// "Dad"), and the room waits for each. A rename keeps it, though who changes.
+	browser   string
 	status    Status // 0: nothing reported yet
 	since     int64  // when its current stall began
 	posMs     int64  // reported position
 	posAt     int64  // when it was reported
 	readyOnce bool
 	skipped   bool // by "Play anyway", until it catches up
-	// gone: its socket closed. It stays, away, until its person is ready again on another socket, or
+	// gone: its socket closed. It stays, away, until its browser is ready again on another socket, or
 	// "Play anyway" skips it. Leaving the room is being away from it.
 	gone bool
 }
@@ -158,12 +161,12 @@ func (s *Sync) State(now int64) State {
 }
 
 // Join adds a socket. It blocks nobody until it has been ready once.
-func (s *Sync) Join(id int64, w Who, now int64) Effect {
-	s.clients = append(s.clients, &client{id: id, who: w})
+func (s *Sync) Join(id int64, w Who, browser string, now int64) Effect {
+	s.clients = append(s.clients, &client{id: id, who: w, browser: browser})
 	return s.settle(now, Effect{})
 }
 
-// Leave closes a socket. Someone the room would wait for stays as away, unless they still have
+// Leave closes a socket. Someone the room would wait for stays as away, unless their browser still has
 // another socket in the room. When the last socket goes, the room pauses and forgets who left.
 func (s *Sync) Leave(id, now int64) Effect {
 	c := s.client(id)
@@ -181,7 +184,7 @@ func (s *Sync) Leave(id, now int64) Effect {
 		}
 		return s.settle(now, e)
 	}
-	here := slices.ContainsFunc(s.clients, func(o *client) bool { return !o.gone && o.who.UserID == c.who.UserID })
+	here := slices.ContainsFunc(s.clients, func(o *client) bool { return !o.gone && o.browser == c.browser })
 	if c.readyOnce && !c.skipped && c.status != CantPlay && !here {
 		if !stalled(c.status) {
 			c.since = now
@@ -258,7 +261,7 @@ func (s *Sync) SetOffset(ms, now int64) Effect {
 // Status records what a socket reports, with its position. A skipped socket is no longer skipped once
 // it is ready within CaughtUpMs of the room, or can't play at all. Going from buffering to away, or
 // back, doesn't restart the stall. Someone who left and came back stops being waited for as gone once
-// their new socket is ready, or can't play.
+// their browser's new socket is ready, or can't play.
 func (s *Sync) Status(id int64, st Status, posMs, now int64) Effect {
 	c := s.client(id)
 	if c == nil {
@@ -278,7 +281,7 @@ func (s *Sync) Status(id int64, st Status, posMs, now int64) Effect {
 		c.skipped = false
 	}
 	if st == Ready || st == CantPlay {
-		s.clients = slices.DeleteFunc(s.clients, func(o *client) bool { return o.gone && o.who.UserID == c.who.UserID })
+		s.clients = slices.DeleteFunc(s.clients, func(o *client) bool { return o.gone && o.browser == c.browser })
 	}
 	return s.settle(now, Effect{})
 }

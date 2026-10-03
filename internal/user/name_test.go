@@ -69,3 +69,29 @@ func TestCleanName(t *testing.T) {
 		})
 	}
 }
+
+func TestNameKey(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		same bool
+	}{
+		{name: "lower and title case", a: "Ali", b: "ali", same: true},
+		{name: "upper and title case", a: "ALI", b: "Ali", same: true},
+		{name: "dotted capital I is not i", a: "ALİ", b: "ali", same: false},
+		{name: "NFC and NFD ş", a: "ş", b: "ş", same: true},
+		{name: "spaces trimmed", a: "  Ali ", b: "ali", same: true},
+		{name: "inner space counts", a: "Al i", b: "Ali", same: false},
+		{name: "no-break space", a: "Ali\u00a0Veli", b: "ali veli", same: true},
+		{name: "two spaces", a: "Ali  Veli", b: "ali veli", same: true},
+		{name: "two names", a: "Ali", b: "Can", same: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ka, kb := NameKey(tt.a), NameKey(tt.b)
+			if (ka == kb) != tt.same {
+				t.Errorf("NameKey(%q) = %q, NameKey(%q) = %q; same = %v, want %v", tt.a, ka, tt.b, kb, ka == kb, tt.same)
+			}
+		})
+	}
+}

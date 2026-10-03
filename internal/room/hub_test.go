@@ -33,7 +33,7 @@ func nextMsg(t *testing.T, s *socket) map[string]any {
 func TestHubJoinStaleRoom(t *testing.T) {
 	ctx := context.Background()
 	r := newTestRooms(t)
-	if _, err := r.DB.Exec(`INSERT INTO users (id, token_hash, name) VALUES (1, x'01', 'Alice')`); err != nil {
+	if _, err := r.DB.Exec(`INSERT INTO users (id, name, name_key) VALUES (1, 'Alice', 'alice')`); err != nil {
 		t.Fatal(err)
 	}
 	h := NewHub(t.Context(), r, "build")

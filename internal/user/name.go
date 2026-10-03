@@ -1,4 +1,5 @@
-// Package user holds display names and the tokens that keep them across visits.
+// Package user holds people, known by their display name, and the browser tokens that keep them across
+// visits.
 package user
 
 import (
@@ -6,6 +7,9 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/unicode/norm"
 )
 
 // MaxNameRunes is the longest name, in runes. Not bytes (Turkish letters take two), and not UTF-16
@@ -46,6 +50,13 @@ func CleanName(s string) (string, error) {
 		return "", ErrBadName
 	}
 	return s, nil
+}
+
+// NameKey is what makes two names one person: each run of spaces made one plain space (a phone may
+// type a no-break space), trimmed, in NFC, then case-folded, so "ali" and "Ali" match. The fold is the
+// same for every language: "ALİ" and "ali" stay two people.
+func NameKey(name string) string {
+	return cases.Fold().String(norm.NFC.String(strings.Join(strings.Fields(name), " ")))
 }
 
 func isNotAllowed(r rune) bool { return unicode.IsOneOf(notAllowed, r) }

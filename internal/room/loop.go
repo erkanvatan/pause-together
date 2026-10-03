@@ -102,7 +102,7 @@ func (l *loop) run(ctx context.Context) {
 func (l *loop) join(s *socket) {
 	now := l.hub.now()
 	l.presence.Join(s.who)
-	e := l.sync.Join(s.id, s.who, now)
+	e := l.sync.Join(s.id, s.who, s.browser, now)
 	// The file may have changed since the key was found: a rescan, or a server restart.
 	l.findKey()
 	l.checkPrepare()

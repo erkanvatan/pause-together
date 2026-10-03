@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/sha256"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -22,7 +23,7 @@ func (s *server) roomSocket(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, errRoomNotFound)
 		return
 	}
-	u, _, ok, err := s.currentUser(r)
+	u, token, ok, err := s.currentUser(r)
 	if err != nil {
 		internalError(w, "look up user", err)
 		return
@@ -48,5 +49,7 @@ func (s *server) roomSocket(w http.ResponseWriter, r *http.Request) {
 		_ = conn.Close(code, "")
 		return
 	}
-	s.Hub.Serve(r.Context(), conn, rm, room.Who{UserID: u.ID, Name: u.Name})
+	// The browser is its token's hash: the room keeps it in memory only, and never sends it.
+	browser := sha256.Sum256([]byte(token))
+	s.Hub.Serve(r.Context(), conn, rm, room.Who{UserID: u.ID, Name: u.Name}, string(browser[:]))
 }

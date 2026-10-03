@@ -458,8 +458,7 @@ all of them forever and filled the room page.
 nothing stays behind. Screenshots of the chat panel at 360×800, phone landscape and desktop, with one
 and many people.
 
-**Not here:** merging one person's browsers into one user (needs accounts, out of scope). A count or
-list while the chat is closed.
+**Not here:** a count or list while the chat is closed.
 
 ### [x] 20. Field test
 
@@ -469,7 +468,7 @@ list while the chat is closed.
 - A full episode together. Lock a phone. Switch Wi-Fi. Restart the host mid-movie.
 - Write down every problem as a new slice or a fix.
 
-### [ ] 21. A name is a person
+### [x] 21. A name is a person
 
 **Goal:** two browsers with the same name are one person: one color in chat, one entry in "watching
 now", the same "own" messages.
@@ -492,6 +491,11 @@ colors. There are no accounts, so the name is the only thing that can join them.
 - A person with no browser left stays: their messages still show their name.
 - Presence, colors and "delete own message" already go by user id, so they follow with no change. No
   socket message changes.
+- The room's waiting goes by browser, not by user (the token's hash, kept in memory only). Otherwise a
+  person's phone would stand in for their TV when it drops, and a rename mid-movie would leave the old
+  name waited for until "Play anyway".
+- Rename opens in a dialog over the page, not in place of it. The room page stays, and its socket
+  joins again as the new person (`RoomSocket.rejoin`), so the player plays on with no new tap.
 - Update AGENTS.md: under "Users", duplicates are no longer allowed: a name is a person, and anyone who
   types it becomes them (the tailnet is trusted, so they can delete that person's messages too). The
   slice 19 note about merging browsers needing accounts goes.

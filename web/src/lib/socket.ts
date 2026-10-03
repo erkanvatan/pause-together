@@ -51,6 +51,15 @@ export class RoomSocket {
 		this.drop(CLOSE_LEFT);
 	}
 
+	// rejoin joins again on a new connection: after a rename, as the browser's new person. The clean close
+	// drops the old one from the room at once, and the same browser coming back ready ends any wait for it.
+	rejoin() {
+		if (this.closed) return;
+		clearTimeout(this.retryTimer);
+		this.drop(CLOSE_LEFT);
+		this.connect();
+	}
+
 	private connect() {
 		const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
 		const ws = new WebSocket(`${scheme}//${location.host}/ws?room=${this.roomId}`);

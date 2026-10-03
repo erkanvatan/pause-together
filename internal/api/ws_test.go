@@ -352,6 +352,61 @@ func chatText(m msg) (string, float64) {
 	return c["text"].(string), c["id"].(float64)
 }
 
+// Two browsers with one name are one person: one entry in the list, and each can delete the
+// other's message.
+func TestSocketSameName(t *testing.T) {
+	w := newWSTest(t)
+	phone := w.join(t, w.alice)
+	until(t, phone, room.MsgPresence, nil)
+	laptopUser, laptop, err := w.d.Users.Create(t.Context(), "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if laptopUser.ID != w.aliceID {
+		t.Fatalf("alice = user %d, want Alice's %d", laptopUser.ID, w.aliceID)
+	}
+	l := w.join(t, laptop)
+	if m := until(t, l, room.MsgPresence, nil); strings.Join(names(m["watching"]), ",") != "Alice" {
+		t.Errorf("watching = %v, want Alice once", names(m["watching"]))
+	}
+
+	send(t, phone, `{"type":"chat","text":"Hello","replyTo":null}`)
+	_, id := chatText(until(t, l, room.MsgChat, nil))
+	send(t, l, fmt.Sprintf(`{"type":"deleteChat","id":%v}`, id))
+	if m := until(t, phone, room.MsgChatDeleted, nil); m["id"] != id {
+		t.Errorf("chatDeleted = %v, want id %v", m, id)
+	}
+}
+
+// Alice leaves mid-movie to rename herself Bo. The room waits for Alice until her browser is back
+// and ready, as Bo.
+func TestSocketRenameMidMovie(t *testing.T) {
+	w := newWSTest(t)
+	a := w.join(t, w.alice)
+	until(t, a, room.MsgPresence, nil)
+	b := w.join(t, w.bob)
+	until(t, b, room.MsgPresence, nil)
+	for _, c := range []*websocket.Conn{a, b} {
+		send(t, c, `{"type":"status","status":"ready"}`)
+	}
+	send(t, b, `{"type":"play"}`)
+	waiting := func(m msg) []any { return m["state"].(map[string]any)["waiting"].([]any) }
+	until(t, b, room.MsgState, func(m msg) bool { return m["state"].(map[string]any)["playing"] == true })
+
+	if err := a.Close(websocket.StatusNormalClosure, ""); err != nil {
+		t.Fatal(err)
+	}
+	until(t, b, room.MsgState, func(m msg) bool { return len(waiting(m)) == 1 })
+
+	if rec := serve(w.guest, meRequest(http.MethodPost, `{"name":"Bo"}`, w.alice)); rec.Code != http.StatusOK {
+		t.Fatalf("rename: %d", rec.Code)
+	}
+	bo := w.join(t, w.alice)
+	until(t, bo, room.MsgPresence, nil)
+	send(t, bo, `{"type":"status","status":"ready","positionMs":3000}`)
+	until(t, b, room.MsgState, func(m msg) bool { return len(waiting(m)) == 0 })
+}
+
 // A message reaches everyone in the room, with the room's video and position. Only its sender can
 // delete it, and a new joiner gets the chat so far.
 func TestSocketChat(t *testing.T) {

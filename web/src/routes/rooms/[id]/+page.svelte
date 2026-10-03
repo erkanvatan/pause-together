@@ -135,6 +135,19 @@
 		};
 	});
 
+	// A rename may make this browser another person. Join again as them, so the room hears the new name
+	// and the page gets the new user id. The page stays, so the player plays on with no new tap.
+	let named = me.name;
+	$effect(() => {
+		if (me.name === named) return;
+		named = me.name;
+		untrack(() => {
+			if (!socket) return;
+			online = false; // hello sets it back, and the player reports its status to the new connection
+			socket.rejoin();
+		});
+	});
+
 	const videoId = $derived(room?.video.id);
 
 	// The room's video, with its subtitles, and its next episode. Again whenever the video changes.

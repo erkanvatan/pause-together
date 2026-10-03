@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import Brand from '$lib/Brand.svelte';
+	import Dialog from '$lib/Dialog.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import Menu from '$lib/Menu.svelte';
 	import NameForm from '$lib/NameForm.svelte';
@@ -59,10 +60,6 @@
 		<main class="flex min-h-dvh items-center justify-center p-4">
 			<NameForm roomId={wide ? Number(page.params.id) : undefined} />
 		</main>
-	{:else if renaming}
-		<main class="flex min-h-dvh items-center justify-center p-4">
-			<NameForm initial={me.name} ondone={closeRename} oncancel={closeRename} />
-		</main>
 	{:else}
 		<header class="mx-auto flex w-full {wide ? '' : 'max-w-6xl'} items-center justify-between gap-4 px-4 py-3">
 			<a href="/" class="-mx-1 flex min-h-11 items-center gap-1.5 rounded-control px-1">
@@ -103,5 +100,14 @@
 			</div>
 		</header>
 		{@render children()}
+		<!-- A dialog over the page, not a page of its own: a room page stays, so a rename mid-movie never
+		leaves the room. -->
+		{#if renaming}
+			<Dialog label={strings.rename} onclose={closeRename} class="items-center justify-center p-4">
+				<div class="flex w-full max-w-sm justify-center rounded-panel border border-line bg-dusk p-5">
+					<NameForm initial={me.name} ondone={closeRename} oncancel={closeRename} />
+				</div>
+			</Dialog>
+		{/if}
 	{/if}
 </div>

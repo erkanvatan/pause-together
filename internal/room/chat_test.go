@@ -11,7 +11,7 @@ import (
 func chatRooms(t *testing.T) (r *Rooms, heat, ronin Room) {
 	t.Helper()
 	r = newTestRooms(t)
-	if _, err := r.DB.Exec(`INSERT INTO users (id, token_hash, name) VALUES (1, x'01', 'Alice'), (2, x'02', 'Bob')`); err != nil {
+	if _, err := r.DB.Exec(`INSERT INTO users (id, name, name_key) VALUES (1, 'Alice', 'alice'), (2, 'Bob', 'bob')`); err != nil {
 		t.Fatal(err)
 	}
 	return r, mustCreate(t, r, pick(1, stream(1))), mustCreate(t, r, pick(2, stream(1)))
