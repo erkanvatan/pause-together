@@ -310,7 +310,7 @@
 	{:else}
 		<form onsubmit={submit} class="flex flex-col gap-2 border-t border-line p-2">
 			{#if offline && draft.trim()}
-				<p class="px-1 text-sm text-haze">{strings.chatOffline}</p>
+				<p id="chat-offline" class="px-1 text-sm text-haze">{strings.chatOffline}</p>
 			{/if}
 			{#if replyTo}
 				<div class="flex items-start gap-2">
@@ -336,6 +336,7 @@
 					placeholder={strings.messagePlaceholder}
 					enterkeyhint="send"
 					aria-label={strings.messagePlaceholder}
+					aria-describedby={offline && draft.trim() ? 'chat-offline' : undefined}
 					class="field min-w-0 flex-1 bg-midnight"
 				/>
 				<button type="submit" disabled={!online || !canSend(draft)} class="btn btn-primary">

@@ -672,9 +672,8 @@ Compact on a phone's small video box, so it never spills out of it. -->
 							</button>
 						</div>
 					{:else if middle === 'offline'}
-						<div class="transition-[opacity,visibility] duration-300 {fade}">
-							{@render notice(strings.hostOffline, strings.hostOfflineWhy, false, false)}
-						</div>
+						<!-- It stays up while the video plays: this screen is on its own until the host is back. -->
+						{@render notice(strings.hostOffline, strings.hostOfflineWhy, false, false)}
 					{:else if middle === 'cantPlay'}
 						<!-- Unplayable for the server is unplayable for everyone: only another pick helps. -->
 						{@const everywhere = room.video.unplayable !== ''}
@@ -771,8 +770,8 @@ Compact on a phone's small video box, so it never spills out of it. -->
 				<div
 					class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1"
 				>
-					<!-- Unless the middle says it: while the controls show, it does. -->
-					{#if offline && (middle !== 'offline' || faded)}
+					<!-- Unless the middle says it. -->
+					{#if offline && middle !== 'offline'}
 						<p class="pill flex animate-[appear_300ms_both] items-center gap-1.5 break-words">
 							<Icon name="offline" class="size-[0.9em] shrink-0 text-ember" />{strings.hostOffline}
 						</p>

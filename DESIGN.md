@@ -319,8 +319,8 @@ Archived rooms show their title in haze.
   video on a black-to-transparent fade (80% black at the bottom), and fades out with the transport
   (300ms). Subtitles slide up while it shows.
 - **Holds the middle:** "Tap to join" (a large round primary button), "Preparing… 42%" (a pill with a
-  thin lamp progress bar on dusk), "Waiting for …", "Host is offline" (fades with the controls; the
-  pill takes over while they're hidden), "Video missing", "Can't play", "Couldn't get this video ready", "Getting the room
+  thin lamp progress bar on dusk), "Waiting for …", "Host is offline" (stays up while the video
+  plays: that screen is on its own), "Video missing", "Can't play", "Couldn't get this video ready", "Getting the room
   ready…" (a pill, after a moment), and the end. The waiting panel and the three problems are dusk
   panels at 90%, compact on a phone's small video box.
   - "Waiting for Alice" in body large, then why and for how long in haze label ("stepped away · 0:12"),

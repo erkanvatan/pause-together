@@ -77,6 +77,12 @@
 	// doesn't count.
 	let offline = $state(false);
 	let offlineTimer: ReturnType<typeof setTimeout> | undefined;
+	// backOnline forgets a drop: a new room, or the socket said hello again.
+	function backOnline() {
+		offline = false;
+		clearTimeout(offlineTimer);
+		offlineTimer = undefined;
+	}
 	let note = $state(''); // "Alice paused"
 	let noteTimer: ReturnType<typeof setTimeout>;
 	let messages = $state<ChatMessage[]>([]); // the chat, oldest first
@@ -107,9 +113,8 @@
 		prepare = null;
 		socket = null;
 		playState = null;
-		online = offline = false;
-		clearTimeout(offlineTimer);
-		offlineTimer = undefined;
+		online = false;
+		backOnline();
 		note = '';
 		messages = [];
 		more = false;
@@ -194,9 +199,7 @@
 			case 'hello':
 				userId = m.userId;
 				online = true;
-				offline = false;
-				clearTimeout(offlineTimer);
-				offlineTimer = undefined;
+				backOnline();
 				break;
 			case 'state':
 				playState = m.state;
