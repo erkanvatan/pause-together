@@ -530,9 +530,12 @@ So each room's video is **prepared once**, then served as a plain file.
 - While the copy is prepared, the player shows "Preparing… 42%" with a progress bar, or its place in line.
 - Fullscreen the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   `document.fullscreenEnabled` is false (iPhone Safari), fill the window with CSS instead.
-- Fullscreen turns with the phone. Chrome and Firefox on Android hold fullscreen video sideways, so
-  the page asks for any orientation itself (`screen.orientation.lock('any')`) on entering it and when
-  the video starts playing. Held upright, the chat takes the lower half, and the control bar and the
+- In fullscreen on a phone, the chat turns the screen: upright while it's open, sideways while it's
+  closed, so the chat never squeezes in beside the video. Chrome and Firefox on Android hold
+  fullscreen video sideways, so the page locks the orientation itself (`screen.orientation.lock`:
+  `portrait` or `landscape`) on entering fullscreen, on opening or closing the chat, on play and
+  pause (Chrome locks again on play, Firefox on play and pause), and whenever the screen turns anyway. A phone is a screen under 30rem on its short side. Bigger screens get `any`.
+  iPhone has no lock and turns freely. Held upright, the chat takes the lower half, and the control bar and the
   subtitle panel sit in the black under the video, panel under the bar, covering none of it. The panel
   pushes the chat down, not the video up, so the subtitles stay in view while their timing is set.
 - In fullscreen the wrapper is padded to the visual viewport, so a phone's keyboard pushes the chat's

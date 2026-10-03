@@ -274,16 +274,16 @@
 		document.addEventListener('visibilitychange', visibility);
 		const fullscreen = () => {
 			native = document.fullscreenElement === wrapper;
-			askOnPlay = true;
-			freeRotation();
 		};
 		document.addEventListener('fullscreenchange', fullscreen);
+		screen.orientation?.addEventListener('change', turnScreen);
 		return () => {
 			clearInterval(timer);
 			clearTimeout(retryTimer);
 			clearTimeout(idleTimer);
 			document.removeEventListener('visibilitychange', visibility);
 			document.removeEventListener('fullscreenchange', fullscreen);
+			screen.orientation?.removeEventListener('change', turnScreen);
 		};
 	});
 
@@ -441,13 +441,20 @@
 	}
 
 	// Phone browsers (Chrome and Firefox on Android) turn fullscreen video sideways and hold it there.
-	// Held upright, the chat fits under the video, so the page asks for any orientation itself, which
-	// outranks theirs. They may lock again once the video plays, so it asks once more then. Leaving
-	// fullscreen drops the page's lock. Where the browser has no lock (iPhone, desktops), nothing happens.
-	let askOnPlay = false; // the next 'playing' asks again: once per fullscreen
-	function freeRotation() {
-		if (native) screen.orientation?.lock?.('any').catch(() => {});
+	// The page's own lock outranks theirs. On a phone it turns the screen with the chat: upright while
+	// the chat is open, so it sits under the video, and sideways while it's closed, so the video fills
+	// the screen. A phone is too short sideways for the chat beside the video. Bigger screens get any
+	// orientation. The browser locks again on its own (Chrome on play, Firefox on play and pause), so
+	// the page locks once more then, and whenever the screen turns anyway. Leaving fullscreen drops the
+	// page's lock. Where the browser has no lock (iPhone, desktops), nothing happens.
+	function turnScreen() {
+		if (!native) return;
+		// Asked each time: a foldable opens into a tablet. 480 px is `fit`'s 30rem: sideways, it never fits.
+		const phone = Math.min(screen.width, screen.height) < 480;
+		const way = !phone ? 'any' : chatOpen ? 'portrait' : 'landscape';
+		screen.orientation?.lock?.(way).catch(() => {});
 	}
+	$effect(turnScreen);
 
 	function exitFullscreen() {
 		filled = false;
@@ -669,16 +676,16 @@ Compact on a phone's small video box, so it never spills out of it. -->
 					onerror={failed}
 					onwaiting={tick}
 					onplaying={() => {
-						if (askOnPlay) {
-							askOnPlay = false;
-							freeRotation();
-						}
+						turnScreen();
 						tick();
 					}}
 					onseeking={tick}
 					onseeked={tick}
 					oncanplay={tick}
-					onpause={tick}
+					onpause={() => {
+						turnScreen();
+						tick();
+					}}
 					onloadedmetadata={tick}
 					class={full ? 'h-full w-full object-contain' : 'aspect-video w-full'}
 				></video>

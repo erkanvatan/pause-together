@@ -7,7 +7,7 @@ latin-ext, which Turkish needs. */
 
 /* A window wide and tall enough for the room page to fit the screen with no scrolling. A phone held
 sideways is shorter: fitted, its video would be a strip, so it scrolls instead. Player.svelte's `fits`
-repeats this query: change both. */
+repeats this query, and its `turnScreen` the 30rem (as 480 px): change all three. */
 @custom-variant fit (@media (orientation: landscape) and (min-height: 30rem));
 
 /* A living room at night, lit by the TV and one lamp. Only these colors exist: Tailwind's own
