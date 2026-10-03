@@ -212,8 +212,9 @@
 				{#if v.version}
 					<span class="block text-sm break-words text-haze">{v.version}</span>
 				{/if}
+				<!-- Screen readers hear the reason in the button's name; the line that shows it is below. -->
 				{#if why}
-					<span class="block text-sm text-haze">{why}</span>
+					<span class="sr-only">{why}</span>
 				{:else if v.appleOnly}
 					<span class="block text-sm text-haze">{strings.appleOnlyPick}</span>
 				{/if}
@@ -224,6 +225,10 @@
 				{/if}
 			</span>
 		</button>
+		<!-- Outside the button, so the greying leaves the reason readable: it's what the guest needs. -->
+		{#if why}
+			<p aria-hidden="true" class="-mt-2 px-3 pb-2 text-sm text-haze">{why}</p>
+		{/if}
 	</li>
 {/snippet}
 
