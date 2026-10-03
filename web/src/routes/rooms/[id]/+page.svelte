@@ -486,7 +486,8 @@
 			<button onclick={unarchive} class="btn btn-primary self-start">
 				{strings.unarchive}
 			</button>
-			<div class="h-96 overflow-hidden rounded-panel border border-line">
+			<!-- A reading width: across a wide screen, the lines get too long to follow. -->
+			<div class="h-96 w-full max-w-xl overflow-hidden rounded-panel border border-line">
 				{@render chatPanel(true)}
 			</div>
 		{/if}
