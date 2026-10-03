@@ -21,6 +21,7 @@
 	import Menu from '$lib/Menu.svelte';
 	import Player from '$lib/Player.svelte';
 	import {
+		getLanguages,
 		getVideo,
 		listVideos,
 		olderMessages,
@@ -36,7 +37,7 @@
 		type VideoSummary,
 		type Who
 	} from '$lib/api';
-	import { nextEpisode, videoName } from '$lib/picker';
+	import { carryOver, nextEpisode, videoName, whyUnplayable } from '$lib/picker';
 	import type { Prepare, RoomState, ServerMessage } from '$lib/protocol';
 	import { needsConfirm, roomSubtitle, roomTitle } from '$lib/rooms';
 	import { RoomSocket } from '$lib/socket';
@@ -58,7 +59,6 @@
 	let loadFailed = $state(false);
 	let error = $state(''); // why the last change failed
 	let picking = $state(false);
-	let pickStart = $state<VideoSummary | undefined>(); // the picker opens on this video: "Next episode"
 	let confirming = $state<{ pick: Pick; text: string } | null>(null); // a switch waiting for a yes
 	let detail = $state<VideoDetail | null>(null); // the room's video with its tracks
 	let next = $state<VideoSummary | null | undefined>(null); // its next episode; undefined while looked up
@@ -260,28 +260,52 @@
 		return r.ok;
 	}
 
-	function openPicker(start?: VideoSummary) {
-		pickStart = start;
-		picking = true;
+	// playNext switches to the next episode with the room's audio and subtitle, without the picker:
+	// a series night shouldn't stop to ask the same thing every episode. False when it failed, and
+	// error says why.
+	let nexting = $state(false); // until the switch is done: a double tap mustn't switch twice
+	async function playNext(): Promise<boolean> {
+		const v = next;
+		const was = room;
+		if (!v || !was || nexting) return true;
+		// The picker would grey it out: it would switch everyone to a video this device can't show.
+		const why = whyUnplayable(v, (t) => document.createElement('video').canPlayType(t));
+		if (why) {
+			error = why;
+			return false;
+		}
+		nexting = true;
+		try {
+			const [to, l] = await Promise.all([getVideo(v.id), getLanguages()]);
+			// Another room, or someone switched this one meanwhile: the tap was for what's gone.
+			if (room?.id !== was.id || room.video.id !== was.video.id) return true;
+			if (!to.ok || to.value.missing || !l.ok) {
+				error = strings.actionFailed;
+				return false;
+			}
+			return await switchTo(carryOver(detail, room.audio, room.subtitle, to.value, l.value), videoName(v));
+		} finally {
+			nexting = false;
+		}
 	}
 
-	// switchTo asks first when the switch would lose the room's place.
-	function switchTo(p: Pick, name: string) {
+	// switchTo asks first when the switch would lose the room's place. False when the switch failed.
+	async function switchTo(p: Pick, name: string): Promise<boolean> {
 		picking = false;
-		if (!room) return;
+		if (!room) return true;
 		const s = playState;
 		const now = socket?.clock.serverNow(performance.now()) ?? null;
 		const at = s ? target(s, now ?? s.atMs) : room.positionMs;
 		if (needsConfirm(at, s?.durationMs ?? room.video.durationMs, missing)) {
 			confirming = { pick: p, text: strings.switchConfirm(formatTime(at), name) };
-		} else {
-			doSwitch(p);
+			return true;
 		}
+		return doSwitch(p);
 	}
 
-	async function doSwitch(p: Pick) {
+	async function doSwitch(p: Pick): Promise<boolean> {
 		confirming = null;
-		apply(await switchVideo(id, p));
+		return apply(await switchVideo(id, p));
 	}
 
 	function startRename() {
@@ -387,7 +411,7 @@
 				<div class="flex shrink-0 items-center gap-2 pt-1">
 					<!-- A missing video's pick sits in the player, in its place. -->
 					{#if !room.archived && !missing}
-						<button onclick={() => openPicker()} class="btn btn-quiet btn-small">
+						<button onclick={() => (picking = true)} class="btn btn-quiet btn-small">
 							{strings.switchVideo}
 						</button>
 					{/if}
@@ -400,7 +424,7 @@
 								<button
 									onclick={() => {
 										close();
-										openPicker(next ?? undefined);
+										playNext();
 									}}
 									class="row"
 								>
@@ -442,9 +466,10 @@
 				{offline}
 				{note}
 				{missing}
-				onpick={() => openPicker()}
+				onpick={() => (picking = true)}
 				{next}
-				onnext={() => openPicker(next ?? undefined)}
+				{nexting}
+				onnext={playNext}
 				bind:chatOpen
 			>
 				{#snippet side()}
@@ -471,7 +496,7 @@
 </main>
 
 {#if picking}
-	<Picker open={pickStart} onpick={switchTo} onclose={() => (picking = false)} />
+	<Picker onpick={switchTo} onclose={() => (picking = false)} />
 {/if}
 
 {#if confirming}

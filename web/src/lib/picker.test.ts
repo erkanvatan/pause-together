@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { AudioTrack, Languages, VideoDetail, VideoSummary } from './api';
+import type { AudioTrack, Languages, SubtitleTrack, VideoDetail, VideoSummary } from './api';
 import {
 	audioLabel,
 	canPlay,
+	carryOver,
 	codecName,
 	defaultAudio,
 	defaultSubtitle,
@@ -127,6 +128,86 @@ describe('subtitleOptions', () => {
 			{ key: 's4', choice: { stream: 4 }, lang: 'tr', title: '', default: false, forced: false, sdh: false, unavailable: 'image' },
 			{ key: 'f9', choice: { sidecar: 9 }, lang: 'tr', title: '', default: false, forced: false, sdh: true, unavailable: '' }
 		]);
+	});
+});
+
+describe('carryOver', () => {
+	const track = (stream: number, lang: string, flags: Partial<SubtitleTrack> = {}): SubtitleTrack => ({
+		stream,
+		lang,
+		title: '',
+		default: false,
+		forced: false,
+		sdh: false,
+		unavailable: '',
+		...flags
+	});
+	const detail = (id: number, v: Partial<VideoDetail>): VideoDetail => ({
+		...summary({ id, type: 'tv' }),
+		missing: false,
+		audio: [],
+		subtitles: [],
+		sidecars: [],
+		...v
+	});
+	const surround = (stream: number, lang: string): AudioTrack => ({ ...audio(stream, lang), channels: 6 });
+	const ep1 = detail(1, {
+		audio: [audio(1, 'en', true), audio(2, 'tr')],
+		subtitles: [track(3, 'tr'), track(4, 'en', { forced: true }), track(5, 'en')],
+		sidecars: [{ id: 7, lang: 'de', forced: false, sdh: false, key: '' }]
+	});
+	// The same show, its tracks in another order, as the next file may well have them.
+	const ep2 = detail(2, {
+		audio: [audio(1, 'tr', true), audio(2, 'en')],
+		subtitles: [track(3, 'en'), track(4, 'tr', { sdh: true }), track(5, 'tr'), track(6, 'en', { forced: true })],
+		sidecars: [{ id: 8, lang: 'de', forced: false, sdh: false, key: '' }]
+	});
+	const prefs = langs('', 'en');
+
+	it.each([
+		['audio and subtitle by language', 2, { stream: 3 }, ep2, { videoId: 2, audio: 1, subtitle: { stream: 5 } }],
+		['forced stays forced', 1, { stream: 4 }, ep2, { videoId: 2, audio: 2, subtitle: { stream: 6 } }],
+		['a sidecar matches by language too', 1, { sidecar: 7 }, ep2, { videoId: 2, audio: 2, subtitle: { sidecar: 8 } }],
+		[
+			'forced follows its audio: none in its language → the host defaults',
+			1,
+			{ stream: 4 },
+			detail(2, { audio: [audio(1, 'ja')], subtitles: [track(3, 'en', { forced: true }), track(4, 'en')] }),
+			{ videoId: 2, audio: 1, subtitle: { stream: 4 } }
+		],
+		['off stays off', 2, null, ep2, { videoId: 2, audio: 1, subtitle: null }],
+		[
+			'no match → the host defaults',
+			1,
+			{ sidecar: 7 },
+			detail(2, { audio: [audio(1, 'ja'), audio(2, 'fr', true)], subtitles: [track(3, 'en'), track(4, 'tr')] }),
+			{ videoId: 2, audio: 2, subtitle: { stream: 3 } }
+		],
+		[
+			'an unavailable match is no match',
+			2,
+			{ stream: 3 },
+			detail(2, { audio: [audio(1, 'tr')], subtitles: [track(3, 'tr', { unavailable: 'image' }), track(4, 'en')] }),
+			{ videoId: 2, audio: 1, subtitle: { stream: 4 } }
+		],
+		[
+			'same channels first within a language',
+			1,
+			null,
+			detail(2, { audio: [surround(1, 'en'), audio(2, 'en')] }),
+			{ videoId: 2, audio: 2, subtitle: null }
+		],
+		['no audio tracks → none', 1, null, detail(2, {}), { videoId: 2, audio: null, subtitle: null }]
+	] as const)('%s', (_, audioStream, subtitle, to, want) => {
+		expect(carryOver(ep1, audioStream, subtitle, to, prefs)).toEqual(want);
+	});
+
+	it('the room video not loaded → the host defaults', () => {
+		expect(carryOver(null, 2, { stream: 3 }, ep2, langs('tr', 'en'))).toEqual({
+			videoId: 2,
+			audio: 1,
+			subtitle: { stream: 3 }
+		});
 	});
 });
 

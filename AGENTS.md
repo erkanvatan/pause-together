@@ -149,7 +149,8 @@ web/                 SvelteKit app; web/embed.go embeds its build (go:embed can'
 web/src/app.css      design tokens (@theme), shared classes, font imports
 web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me.svelte.ts (current user),
                      Brand.svelte (the app name with its pause mark: header, welcome),
-                     picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode),
+                     picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode and
+                     carrying the audio and subtitle over to it),
                      Picker.svelte, Dialog.svelte (modals on the browser's <dialog>: focus, Escape, inert page),
                      FolderPicker.svelte, NameForm.svelte, Menu.svelte (a button with a panel of rows), Confirm.svelte
                      (an inline "Are you sure?" row), GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), strings.ts,
@@ -401,7 +402,8 @@ So each room's video is **prepared once**, then served as a plain file.
 ## Rooms
 
 - Anyone creates a room by picking a video. The picker asks for the audio track and subtitle on every
-  pick, room creation and switch alike, with the defaults preselected.
+  pick, room creation and switch alike, with the defaults preselected. "Next episode" is the one
+  exception (below): it skips the picker.
 - Defaults come from an admin setting: preferred audio language (or "original") and subtitle languages
   in order (e.g. `tr`, then `en`). Fall back to the file's default-track flag. Forced subtitles are
   turned on when their language matches the audio.
@@ -429,6 +431,9 @@ So each room's video is **prepared once**, then served as a plain file.
 - A room plays one video at a time. Anyone can switch it with the library picker, and TV episodes also
   get "Next episode" (in the room's "⋯" menu, and on the end card), which never lands on a special. A
   switch starts at 0:00; only the "Video missing" swap keeps the position.
+- "Next episode" switches at once, with no picker, and keeps fullscreen. It carries the room's audio and
+  subtitle over: the track with the same language (a subtitle also the same forced flag), the closest
+  on SDH, title and channels. With no match, the language defaults above. A subtitle that was off stays off.
 - Before a switch, the switcher confirms: "You're at 1:40:00. Switch to …?" Nobody else is asked. Not
   asked when nothing is lost: at 0:00, at the end, or the "Video missing" swap.
 - At the end of a video, the server (it knows the duration) pauses the room there. TV episodes show

@@ -40,6 +40,7 @@
 		missing,
 		onpick,
 		next,
+		nexting,
 		onnext,
 		chatOpen = $bindable(),
 		side,
@@ -57,7 +58,8 @@
 		missing: boolean; // the video is gone, with no prepared copy: offer another pick
 		onpick: () => void;
 		next: VideoSummary | null | undefined; // the next episode, offered at the end; undefined while looked up
-		onnext: () => void;
+		nexting: boolean; // a "Next episode" switch is under way
+		onnext: () => Promise<boolean>; // false: it failed, and the page says why
 		chatOpen: boolean;
 		// The chat panel: beside the video in landscape, under it in portrait.
 		side: Snippet;
@@ -390,12 +392,12 @@
 		if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 	}
 
-	// The picker opens outside the wrapper, where fullscreen would hide it.
-	function nextEpisode() {
-		exitFullscreen();
-		onnext();
+	// Next keeps fullscreen. Only a failure leaves it: the page says why outside the wrapper.
+	async function nextEpisode() {
+		if (!(await onnext())) exitFullscreen();
 	}
 
+	// The picker opens outside the wrapper, where fullscreen would hide it.
 	function pickAnother() {
 		exitFullscreen();
 		onpick();
@@ -613,7 +615,11 @@ Compact on a phone's small video box, so it never spills out of it. -->
 								{strings.episodeEnded(episodeCode(room.video))}
 							</p>
 							<div class="flex max-w-full flex-col items-center gap-2">
-								<button onclick={nextEpisode} class="btn btn-primary max-w-full break-words">
+								<button
+									onclick={nextEpisode}
+									disabled={!online || nexting}
+									class="btn btn-primary max-w-full break-words"
+								>
 									{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
 								</button>
 								<button onclick={pickAnother} disabled={!online} class="btn btn-quiet">

@@ -33,12 +33,10 @@
 
 	let {
 		onpick,
-		onclose,
-		open
+		onclose
 	}: {
 		onpick: (p: Pick, name: string) => void; // name: the video's, as videoName writes it
 		onclose: () => void;
-		open?: VideoSummary; // start on this video's audio and subtitle step: "Next episode"
 	} = $props();
 
 	// How soon a failed load tries again.
@@ -96,7 +94,6 @@
 			if (v.ok && l.ok) {
 				videos = v.value;
 				langs = l.value;
-				if (open) choose(open);
 			} else {
 				timer = setTimeout(load, loadRetryMs);
 			}

@@ -4,11 +4,13 @@ import type {
 	AudioTrack,
 	Languages,
 	LibraryType,
+	Pick,
 	SubtitleChoice,
 	VideoDetail,
 	VideoSummary
 } from '$lib/api';
 import { reasonText, strings } from '$lib/strings';
+import { sameSubtitle } from '$lib/subtitles';
 
 export type SubtitleOption = {
 	key: string; // unique in its video, for <select> values
@@ -58,6 +60,11 @@ export function defaultAudio(tracks: AudioTrack[], langs: Languages): AudioTrack
 	return pick(tracks) ?? null;
 }
 
+// closest is the item with the lowest cost; the first of a tie.
+function closest<T>(list: T[], cost: (x: T) => number): T {
+	return list.reduce((best, x) => (cost(x) < cost(best) ? x : best));
+}
+
 // defaultSubtitle walks the host's subtitle languages in order and takes the first one with a full
 // (not forced) track, even if it's the audio's language. Within a language: not SDH first, then the
 // default-flagged one. If no language matches: a forced track in the audio's language (it translates
@@ -71,13 +78,44 @@ export function defaultSubtitle(
 	const rank = (o: SubtitleOption) => (o.sdh ? 2 : 0) + (o.default ? 0 : 1);
 	for (const lang of langs.subtitles) {
 		const full = usable.filter((o) => o.lang === lang && !o.forced);
-		if (full.length > 0) return full.reduce((best, o) => (rank(o) < rank(best) ? o : best));
+		if (full.length > 0) return closest(full, rank);
 	}
 	if (audioLang) {
 		const forced = usable.find((o) => o.forced && o.lang === audioLang);
 		if (forced) return forced;
 	}
 	return usable.find((o) => o.default) ?? null;
+}
+
+// carryOver picks the next episode's audio and subtitle from the room's current ones, so "Next
+// episode" doesn't ask again. A track matches on language, and a subtitle on forced too; among
+// several, the closest on SDH, title and channels. A forced subtitle needs the audio in its language
+// too: it only translates that audio's odd foreign line. With no match, the host's defaults, as the
+// picker would preselect them. A subtitle that was off stays off.
+export function carryOver(
+	from: VideoDetail | null, // the room's video; null when it didn't load
+	audio: number | null,
+	subtitle: SubtitleChoice | null,
+	to: VideoDetail,
+	langs: Languages
+): Pick {
+	const wasAudio = from?.audio.find((t) => t.stream === audio);
+	const sameAudio = wasAudio ? to.audio.filter((t) => t.lang === wasAudio.lang) : [];
+	const a = wasAudio && sameAudio.length > 0
+		? closest(sameAudio, (t) => (t.title === wasAudio.title ? 0 : 2) + (t.channels === wasAudio.channels ? 0 : 1))
+		: defaultAudio(to.audio, langs);
+	const pick: Pick = { videoId: to.id, audio: a?.stream ?? null, subtitle: null };
+	if (subtitle === null) return pick;
+
+	const options = subtitleOptions(to);
+	const was = from && subtitleOptions(from).find((o) => sameSubtitle(o.choice, subtitle));
+	const same = was && !(was.forced && a?.lang !== was.lang)
+		? options.filter((o) => !o.unavailable && o.lang === was.lang && o.forced === was.forced)
+		: [];
+	const s = was && same.length > 0
+		? closest(same, (o) => (o.sdh === was.sdh ? 0 : 2) + (o.title === was.title ? 0 : 1))
+		: defaultSubtitle(options, a?.lang ?? '', langs);
+	return { ...pick, subtitle: s?.choice ?? null };
 }
 
 // canPlay asks the browser whether it can decode the video. Prepared copies are always MP4, and the
