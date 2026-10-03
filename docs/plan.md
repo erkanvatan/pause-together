@@ -461,10 +461,52 @@ and many people.
 **Not here:** merging one person's browsers into one user (needs accounts, out of scope). A count or
 list while the chat is closed.
 
-### [ ] 20. Field test
+### [x] 20. Field test
 
 **Goal:** real devices, real network.
 
 - Over Tailscale: two PCs, an iPhone, an Android phone, a tablet.
 - A full episode together. Lock a phone. Switch Wi-Fi. Restart the host mid-movie.
 - Write down every problem as a new slice or a fix.
+
+### [ ] 21. A name is a person
+
+**Goal:** two browsers with the same name are one person: one color in chat, one entry in "watching
+now", the same "own" messages.
+
+Why: each browser has its own cookie, so one person on a phone and a laptop is two users with two
+colors. There are no accounts, so the name is the only thing that can join them.
+
+- Names match ignoring case: `ali` and `Ali` are one person. The match key is the name in NFC, then
+  case-folded with `golang.org/x/text` (`cases.Fold`). Turkish isn't special: `ALİ` and `ali` stay
+  two people. SQLite's `lower()` and `NOCASE` fold only ASCII, so the key is made in Go and registered
+  as a SQLite function (`sqlite.RegisterDeterministicScalarFunction`), so the migration can use it too.
+- Migration `0012`: `users` becomes one row per person (`id`, `name`, a unique `name_key`). A new
+  `tokens` table maps each cookie's token hash to a user. Users that share a key merge into the oldest:
+  its name spelling stays, every token and message moves to it, and the others go. Messages keep
+  pointing at `users (id)`, so nothing else changes shape.
+- Picking a name that exists makes this browser that person. A new name makes a new person.
+- Rename moves only this browser: it points at the new name, or a new person. The old person keeps its
+  name, its messages and its other browsers. Renaming to your own name in another case (`mom` → `Mom`)
+  changes the spelling for everyone: it's the only way to fix one.
+- A person with no browser left stays: their messages still show their name.
+- Presence, colors and "delete own message" already go by user id, so they follow with no change. No
+  socket message changes.
+- Update AGENTS.md: under "Users", duplicates are no longer allowed: a name is a person, and anyone who
+  types it becomes them (the tailnet is trusted, so they can delete that person's messages too). The
+  slice 19 note about merging browsers needing accounts goes.
+
+**Done when (tests):**
+- Name key, table-driven: `Ali`/`ali`/`ALI` one key, `ALİ`/`ali` two, NFC and NFD `ş` one key, spaces
+  trimmed.
+- Two browsers pick `Ali` and `ali` → one user, one presence entry; each can delete the other's message.
+- Rename to a new name → this browser only; the other browser and the old messages keep the old name.
+  Rename to a taken name → joins that person. `mom` → `Mom` → spelling changes for both browsers.
+- Migration test: three users `Ali`, `ali`, `Can` with messages → two users, every message and token
+  kept, `Ali`'s spelling wins. `foreign_key_check` clean.
+- The rest pass unchanged.
+
+**By hand:** two browsers, both pick `Ali` (one types `ali`), chat in one room: one color, one entry in
+"watching now". Rename one to `Bo`: two people again, the old messages still say `Ali`.
+
+**Not here:** passwords or any other proof of who you are. Choosing your own color.

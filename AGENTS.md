@@ -8,7 +8,7 @@ This file provides guidance to AI coding agents when working with code in this r
 serves its local video library. Guests reach it over Tailscale and watch in sync from PCs, tablets and
 phones. Same show. Same second. Different places.
 
-**Status: slices 1–19 are built; the field test is next (`docs/plan.md`).** This file is the spec. When
+**Status: slices 1–20 are built; "a name is a person" is next (`docs/plan.md`).** This file is the spec. When
 code changes, update the layout and commands below to match reality. The rules here are decided: flag problems,
 but don't quietly change them. Work each slice by the steps under "How to work a slice" in
 `docs/plan.md`.
