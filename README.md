@@ -6,7 +6,7 @@
 
 A self-hosted watch-together app. Same show. Same second. Different places.
 
-[Features](#features) • [How it works](#how-it-works) • [Getting started](#getting-started) • [Tailscale](#connecting-devices-with-tailscale) • [Development](#development)
+[Features](#features) • [Screenshots](#screenshots) • [How it works](#how-it-works) • [Getting started](#getting-started) • [Tailscale](#connecting-devices-with-tailscale) • [Development](#development)
 
 <img src="docs/demo.webp" width="900" alt="Alice on a laptop and Sam on a phone in one room. Alice presses play and both screens play the same frame. Sam pauses, and both stop, with &quot;Sam paused&quot; on Alice's screen. Alice's chat message shows up on Sam's phone, and Sam presses play for both." />
 
@@ -40,6 +40,27 @@ watch in sync from PCs, tablets and phones. When one of them buffers or steps aw
   upright with the chat under the video, and sideways without it.
 - **Looks after itself.** Starts at boot, takes a daily database backup, and deletes prepared copies
   nobody has watched for a while.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/home.png" alt="The homepage: a room called Movie night with Alice and Sam watching Sintel at 6:12, a Join button, and a Caminandes episode room last used 2 days ago." /></td>
+    <td width="50%"><img src="docs/screenshots/picker.png" alt="The video picker: search, sort, tabs for Movies, TV Shows and Other Videos, and Sintel marked as in a room at 6:12." /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Rooms.</b> Who's watching, and where each room is.</sub></td>
+    <td align="center"><sub><b>Picker.</b> A video that already has a room says so.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/welcome.png" alt="The first visit to a room link: You're joining Movie night. What should we call you?" /></td>
+    <td><img src="docs/screenshots/admin.png" alt="The admin page: the guest link, three libraries, files we can't use grouped by reason, prepare jobs, language defaults and cache clean-up." /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Welcome.</b> A guest picks a name. No account.</sub></td>
+    <td align="center"><sub><b>Admin.</b> Libraries, misnamed files with the fix, the cache.</sub></td>
+  </tr>
+</table>
 
 ## How it works
 
@@ -315,10 +336,12 @@ These never show up in the picker:
 Everything runs in Docker through Task. You don't need Go or Node on the host.
 
 ```sh
-task dev        # dev stack with hot reload: http://localhost:5173
-task test       # all unit tests (Go + web)
-task lint       # golangci-lint, svelte-check
-task build      # build the production image
+task dev          # dev stack with hot reload: http://localhost:5173
+task test         # all unit tests (Go + web)
+task lint         # golangci-lint, svelte-check
+task build        # build the production image
+task demo         # re-record the demo at the top
+task screenshots  # retake the screenshots
 ```
 
 Dev uses its own ports and data folder (`./.dev-data`), so it runs safely next to production. It

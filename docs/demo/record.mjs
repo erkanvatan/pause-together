@@ -4,29 +4,9 @@
 // video, and how long it runs) into OUT, for webp.sh.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
+import { GUEST, api, prepared, until } from './app.mjs';
 
-const GUEST = 'http://localhost:8080';
-const ADMIN = 'http://localhost:8081';
 const OUT = process.env.OUT;
-
-async function api(method, path, body) {
-	const res = await fetch(ADMIN + path, {
-		method,
-		headers: { 'Content-Type': 'application/json' },
-		body: body && JSON.stringify(body)
-	});
-	if (!res.ok) throw new Error(`${method} ${path}: ${res.status} ${await res.text()}`);
-	return res.json();
-}
-
-async function until(what, check) {
-	for (let i = 0; i < 300; i++) {
-		const v = await check();
-		if (v) return v;
-		await new Promise((r) => setTimeout(r, 1000));
-	}
-	throw new Error(`timed out waiting for ${what}`);
-}
 
 // The film, in a room, prepared.
 await api('POST', '/api/admin/libraries', { path: 'Movies', type: 'movies' });
@@ -37,10 +17,7 @@ const [video] = await until('the scan', async () => {
 const { audio } = await api('GET', `/api/videos/${video.id}`);
 const room = await api('POST', '/api/rooms', { videoId: video.id, audio: audio[0].stream });
 await api('GET', `/api/rooms/${room.id}`);
-await until('the prepare', async () => {
-	const c = await api('GET', '/api/admin/jobs');
-	return c.jobs.length === 0 && c.cacheBytes > 0;
-});
+await prepared();
 
 const browser = await chromium.launch();
 

@@ -13,6 +13,10 @@ vars:
   # Tasks that use it depend on go:image, so a Dockerfile change reaches them without a manual rebuild.
   GO: '{{.DEV}} run --rm --no-deps api'
   NODE: '{{.DEV}} run --rm --no-deps web'
+  # For task demo and task screenshots. The image's Playwright version must match docs/demo/package.json.
+  PLAYWRIGHT: >-
+    docker run --rm --user "$HOST_UID:$HOST_GID" -e HOME=/tmp -e npm_config_cache=/src/.cache/npm -v .:/src
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
 
 tasks:
   dev:
@@ -53,11 +57,6 @@ tasks:
     deps: [build, go:image]
     vars:
       OUT: .cache/demo
-      PLAYWRIGHT: >-
-        docker run --rm --user "$HOST_UID:$HOST_GID" -e HOME=/tmp -e npm_config_cache=/src/.cache/npm
-        -e OUT=/src/.cache/demo -v .:/src
-      # Its Playwright version must match docs/demo/package.json.
-      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
     cmds:
       - mkdir -p {{.OUT}}
       - >-
@@ -72,10 +71,31 @@ tasks:
       - defer: docker rm -f pausetogether-demo >/dev/null
       # Sharing the app's network: its ports are localhost to the browser.
       - >-
-        {{.PLAYWRIGHT}} --network container:pausetogether-demo -w /src/docs/demo {{.PLAYWRIGHT_IMAGE}}
-        sh -c "npm ci --no-audit --no-fund && node record.mjs"
+        {{.PLAYWRIGHT}} -e OUT=/src/{{.OUT}} --network container:pausetogether-demo -w /src/docs/demo
+        {{.PLAYWRIGHT_IMAGE}} sh -c "npm ci --no-audit --no-fund && node record.mjs"
       - '{{.GO}} sh docs/demo/webp.sh {{.OUT}}'
       - ls -lh docs/demo.webp
+
+  screenshots:
+    desc: Take the README's screenshots (docs/screenshots), in Docker
+    deps: [build, go:image]
+    vars:
+      OUT: .cache/screenshots
+    cmds:
+      - mkdir -p {{.OUT}} docs/screenshots
+      - 'test "{{.OUT}}/.done" -nt docs/demo/library.sh || {{.GO}} sh docs/demo/library.sh {{.OUT}}'
+      # Like task demo's app, plus a guest address, so the admin page shows a guest link.
+      - docker rm -f pausetogether-shots >/dev/null 2>&1 || true
+      - >-
+        docker run -d --name pausetogether-shots --user "$HOST_UID:$HOST_GID"
+        --tmpfs "/data:uid=$HOST_UID,gid=$HOST_GID" -v ./{{.OUT}}/media:/media:ro
+        -e PUBLIC_BIND=100.101.102.103 -e GUEST_PORT=8420 pausetogether:latest
+      - defer: docker rm -f pausetogether-shots >/dev/null
+      - >-
+        {{.PLAYWRIGHT}} -e OUT=/src/{{.OUT}} --network container:pausetogether-shots -w /src/docs/demo
+        {{.PLAYWRIGHT_IMAGE}} sh -c "npm ci --no-audit --no-fund && node screenshots.mjs"
+      - cp {{.OUT}}/*.png docs/screenshots/
+      - ls -lh docs/screenshots
 
   lint:
     desc: golangci-lint, svelte-check
