@@ -330,3 +330,7 @@ testing file adds and deletes.
 Tailwind v4.
 
 The full spec lives in [AGENTS.md](AGENTS.md). The build order lives in [docs/plan.md](docs/plan.md).
+
+## License
+
+[MIT](LICENSE), Copyright (c) 2026 Erkan Vatan.
