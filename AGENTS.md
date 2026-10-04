@@ -143,7 +143,8 @@ internal/media/      ffprobe and the codec check; prepare jobs (ffmpeg arguments
 internal/store/      SQLite open, migrations (migrations/*.sql embedded, applied at startup), backups
 internal/user/       name rules and the name key, users (one per person), tokens (one per browser, stored as a
                      SHA-256 hash), lookup by cookie token
-testdata/make.sh     makes the test clips in testdata/media (git-ignored)
+testdata/make.sh     makes the test clips in testdata/media (git-ignored), one per case the app handles, so
+                     DEV_MEDIA_ROOT=testdata/media shows them all (libraries: Movies, TV, Other)
 docs/plan.md         build order in slices, and how to work one
 docs/demo/           task demo: film.sh (downloads Big Buck Bunny into .cache/demo), record.mjs (Playwright:
                      a throwaway app, a laptop and a phone in one room), webp.sh (both side by side, as an animated WebP)
@@ -618,6 +619,10 @@ So each room's video is **prepared once**, then served as a plain file.
   on the tiny clips `task testdata` makes: Plex names, 5.1 and 7.1 audio, a Windows-1254 `.srt`, an
   HEVC file. Missing clips fail these tests instead of skipping them, so they never pass by not
   running.
+- A test that needs a video or subtitle the clips don't have adds it to `testdata/make.sh`, never a
+  media file committed to the repo. So the clips keep one file per case, and the dev library
+  (`DEV_MEDIA_ROOT=testdata/media`) shows it too. `TestScanTestdata` lists every video, skipped file
+  and sidecar the clips hold, so a new file goes there as well.
 - SQLite: every connection sets `foreign_keys=ON` (off by default, and cascades silently don't run
   without it), WAL and `busy_timeout`, via `_pragma` in the DSN. Also `_txlock=immediate`: a
   transaction that reads, then writes, can otherwise fail with `SQLITE_BUSY` at once, without waiting.

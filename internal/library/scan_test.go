@@ -808,7 +808,7 @@ func TestScanTestdata(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 	cache := t.TempDir()
 	scanner := &Scanner{DB: db, Root: root, Prober: media.FFprobe{}, Subtitles: media.Subtitles{Dir: cache}}
-	for i, lib := range []Library{{Path: "Movies", Type: Movies}, {Path: "TV", Type: TVShows}} {
+	for i, lib := range []Library{{Path: "Movies", Type: Movies}, {Path: "TV", Type: TVShows}, {Path: "Other", Type: OtherVideos}} {
 		lib.ID = int64(i + 1)
 		if _, err := db.Exec("INSERT INTO libraries (id, path, type) VALUES (?, ?, ?)", lib.ID, lib.Path, lib.Type); err != nil {
 			t.Fatal(err)
@@ -818,74 +818,118 @@ func TestScanTestdata(t *testing.T) {
 		}
 	}
 
-	want := map[string]string{ // title → codec string prefix, or unplayable reason
-		"Stereo Test":    "avc1.6400",
-		"Surround Test":  "avc1.6400",
-		"Seven One Test": "avc1.6400",
-		"Two Audio Test": "avc1.6400",
-		"Ten Bit Test":   string(media.UnplayableH264Profile),
-		"Test Show":      "hvc1.1.6.L",
+	const h264, show = "avc1.6400", "TV/Test Show (2024)/"
+	checkPrefixes(t, "videos", queryPairs(t, db, `SELECT l.path || '/' || v.path, v.codec_string || COALESCE(v.unplayable, '')
+		FROM videos v JOIN libraries l ON l.id = v.library_id`), map[string]string{ // path → codec string prefix, or unplayable reason
+		"Movies/Stereo Test (2020)/Stereo Test (2020).mkv":                              h264,
+		"Movies/Surround Test (2021).mkv":                                               h264,
+		"Movies/Seven One Test (2022).mkv":                                              h264,
+		"Movies/Two Audio Test (2025).mkv":                                              h264,
+		"Movies/Ten Bit Test (2023).mkv":                                                string(media.UnplayableH264Profile),
+		"Movies/VP9 Test (2015).webm":                                                   "vp09.00.",
+		"Movies/AV1 Test (2014).mp4":                                                    "av01.0.",
+		"Movies/VP8 Test (2013).webm":                                                   string(media.UnplayableCodec),
+		"Movies/MPEG-2 Test (2012).ts":                                                  string(media.UnplayableCodec),
+		"Movies/No Video Test (2011).mkv":                                               string(media.UnplayableNoVideo),
+		"Movies/Broken Test (2010).mkv":                                                 string(media.UnplayableProbeFailed),
+		"Movies/Subtitle Tracks Test (2009).mkv":                                        h264,
+		"Movies/Versions Test (2019)/Versions Test (2019).mkv":                          h264,
+		"Movies/Versions Test (2019)/Versions Test (2019) {edition-Director's Cut}.mkv": h264,
+		"Movies/Versions Test (2019)/Versions Test (2019) - 4K.mkv":                     h264,
+		"Movies/Test Collection/Collection Test (2018).mp4":                             h264,
+		"Movies/Shorts/Shorts Collection Test (2017).mkv":                               h264,
+		"Movies/Sidecar Test (2008)/Sidecar Test (2008).mkv":                            h264,
+		show + "Season 01/Test Show (2024) - s01e01 - Pilot.mkv":                        "hvc1.1.6.L",
+		show + "Season 01/Test Show (2024) - s01e02-e03 - Double.mkv":                   h264,
+		show + "Season 2/Test Show (2024) - s02e01.mkv":                                 h264,
+		show + "Test Show (2024) - s02e02 - Loose.mkv":                                  h264,
+		show + "Specials/Test Show (2024) - s00e01 - Special.mkv":                       h264,
+		"TV/No Year Show/Season 01/No Year Show - s01e01.mkv":                           h264,
+		"Other/Root Clip.mp4":                                                           h264,
+		"Other/Silent Clip.mkv":                                                         h264,
+		"Other/Trailers/Trailer Clip.mkv":                                               h264,
+		"Other/Holidays/2023/Beach.mkv":                                                 h264,
+	})
+
+	sidecar := "Movies/Sidecar Test (2008)/"
+	checkPrefixes(t, "skipped files", queryPairs(t, db, `SELECT l.path || '/' || s.path, s.reason
+		FROM skipped_files s JOIN libraries l ON l.id = s.library_id`), map[string]string{
+		"Movies/No Year Test.mkv":                               string(ReasonMovieNoYear),
+		"Movies/Split Test (2016)/Split Test (2016) - pt1.mkv":  string(ReasonMovieSplit),
+		"Movies/Split Test (2016)/Split Test (2016) - cd2.mkv":  string(ReasonMovieSplit),
+		sidecar + "Sidecar Test (2008).srt":                     string(ReasonSubNoLang),
+		sidecar + "Sidecar Test (2008).english.srt":             string(ReasonSubBadName),
+		sidecar + "Nothing Here (2008).en.srt":                  string(ReasonSubNoVideo),
+		sidecar + "Sidecar Test (2008).zh.srt":                  string(ReasonSubUnreadable),
+		sidecar + "Sidecar Test (2008).fr.srt":                  string(ReasonSubUnreadable),
+		"TV/Loose Show - s01e01.mkv":                            string(ReasonTVNoShowFolder),
+		show + "Season 01/Disc 1/Test Show (2024) - s01e04.mkv": string(ReasonTVBadFolder),
+		show + "Season 01/Test Show (2024) - 05.mkv":            string(ReasonTVNoEpisode),
+		show + "Test Show (2024) - 2024-05-01.mkv":              string(ReasonTVDate),
+	})
+
+	// The sidecars, converted with real ffmpeg.
+	checkPrefixes(t, "sidecars", queryPairs(t, db, `SELECT name,
+		lang || IIF(forced, ' forced', '') || IIF(sdh, ' sdh', '') || ' ' || cache_key FROM sidecar_subtitles`), map[string]string{
+		"Stereo Test (2020).tr.srt":         "tr ",
+		"Stereo Test (2020).tur.srt":        "tur ",
+		"Stereo Test (2020).en.srt":         "en ",
+		"Stereo Test (2020).en.sdh.ass":     "en sdh ",
+		"Sidecar Test (2008).en.srt":        "en ",
+		"Sidecar Test (2008).en.forced.srt": "en forced ",
+		"Sidecar Test (2008).en.hi.srt":     "en sdh ",
+		"Sidecar Test (2008).hi.srt":        "hi ",
+		"Sidecar Test (2008).de.vtt":        "de ",
+	})
+	keys, err := os.ReadDir(cache)
+	if err != nil {
+		t.Fatal(err)
 	}
-	rows, err := db.Query("SELECT title, codec_string, COALESCE(unplayable, ''), COALESCE(probe_error, '') FROM videos")
+	for _, k := range keys {
+		if _, err := os.Stat(filepath.Join(cache, k.Name(), "subtitle.vtt")); err != nil {
+			t.Errorf("sidecar copy %s: %v", k.Name(), err)
+		}
+	}
+	if len(keys) != 9 {
+		t.Errorf("got %d sidecar copies, want 9", len(keys))
+	}
+}
+
+// queryPairs runs a query of two text columns and returns them as a map.
+func queryPairs(t *testing.T, db *sql.DB, query string) map[string]string {
+	t.Helper()
+	rows, err := db.Query(query)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = rows.Close() }()
-	got := 0
+	got := map[string]string{}
 	for rows.Next() {
-		var title, codec, unplayable, probeErr string
-		if err := rows.Scan(&title, &codec, &unplayable, &probeErr); err != nil {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
 			t.Fatal(err)
 		}
-		got++
-		w, ok := want[title]
-		switch {
-		case !ok:
-			t.Errorf("unexpected video %q", title)
-		case probeErr != "":
-			t.Errorf("%s: probe error %s", title, probeErr)
-		case !strings.HasPrefix(codec+unplayable, w):
-			t.Errorf("%s: codec %q, unplayable %q, want %q", title, codec, unplayable, w)
-		}
+		got[k] = v
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if got != len(want) {
-		t.Errorf("got %d videos, want %d", got, len(want))
-	}
+	return got
+}
 
-	// The stereo clip's sidecars, converted with real ffmpeg.
-	wantSubs := map[string]string{ // name → language + flags
-		"Stereo Test (2020).tr.srt":     "tr",
-		"Stereo Test (2020).tur.srt":    "tur",
-		"Stereo Test (2020).en.srt":     "en",
-		"Stereo Test (2020).en.sdh.ass": "en sdh",
-	}
-	subRows, err := db.Query("SELECT name, lang, sdh, cache_key FROM sidecar_subtitles")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = subRows.Close() }()
-	gotSubs := map[string]string{}
-	for subRows.Next() {
-		var name, lang, key string
-		var sdh bool
-		if err := subRows.Scan(&name, &lang, &sdh, &key); err != nil {
-			t.Fatal(err)
-		}
-		if sdh {
-			lang += " sdh"
-		}
-		gotSubs[name] = lang
-		if _, err := os.Stat(filepath.Join(cache, key, "subtitle.vtt")); err != nil {
-			t.Errorf("%s: no copy: %v", name, err)
+// checkPrefixes wants the same keys in got and want, each value in got starting with want's.
+func checkPrefixes(t *testing.T, what string, got, want map[string]string) {
+	t.Helper()
+	for k, v := range got {
+		if w, ok := want[k]; !ok {
+			t.Errorf("%s: unexpected %q", what, k)
+		} else if !strings.HasPrefix(v, w) {
+			t.Errorf("%s: %q = %q, want prefix %q", what, k, v, w)
 		}
 	}
-	if err := subRows.Err(); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(gotSubs, wantSubs) {
-		t.Errorf("sidecars = %v, want %v", gotSubs, wantSubs)
+	for k := range want {
+		if _, ok := got[k]; !ok {
+			t.Errorf("%s: missing %q", what, k)
+		}
 	}
 }

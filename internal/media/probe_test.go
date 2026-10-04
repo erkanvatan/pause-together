@@ -34,6 +34,10 @@ func TestFFprobeClips(t *testing.T) {
 		{"Movies/Surround Test (2021).mkv", "avc1.6400", "", 6},
 		{"Movies/Seven One Test (2022).mkv", "avc1.6400", "", 8},
 		{"Movies/Ten Bit Test (2023).mkv", "", UnplayableH264Profile, 2},
+		{"Movies/VP9 Test (2015).webm", "vp09.00.", "", 1},
+		{"Movies/AV1 Test (2014).mp4", "av01.0.", "", 2},
+		{"Movies/VP8 Test (2013).webm", "", UnplayableCodec, 2},
+		{"Movies/MPEG-2 Test (2012).ts", "", UnplayableCodec, 2},
 		{"TV/Test Show (2024)/Season 01/Test Show (2024) - s01e01 - Pilot.mkv", "hvc1.1.6.L", "", 2},
 	}
 	for _, tt := range tests {

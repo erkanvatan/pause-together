@@ -197,6 +197,10 @@ func TestFFmpegPrepareClips(t *testing.T) {
 			AudioTrack{Stream: 1, Codec: "aac", Channels: 8, Layout: "7.1"}, "", ""},
 		{"Movies/Two Audio Test (2025).mkv", "h264",
 			AudioTrack{Stream: 2, Codec: "ac3", Channels: 6, Layout: "5.1(side)", Lang: "tur"}, "", "tur"},
+		{"Movies/VP9 Test (2015).webm", "vp9",
+			AudioTrack{Stream: 1, Codec: "opus", Channels: 1, Layout: "mono"}, "", ""},
+		{"Movies/AV1 Test (2014).mp4", "av1",
+			AudioTrack{Stream: 1, Codec: "aac", Channels: 2}, "", ""},
 		{"TV/Test Show (2024)/Season 01/Test Show (2024) - s01e01 - Pilot.mkv", "hevc",
 			AudioTrack{Stream: 1, Codec: "aac", Channels: 2}, "hvc1", ""},
 	}
