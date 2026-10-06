@@ -276,14 +276,14 @@
 			native = document.fullscreenElement === wrapper;
 		};
 		document.addEventListener('fullscreenchange', fullscreen);
-		screen.orientation?.addEventListener('change', turnScreen);
+		screen.orientation?.addEventListener('change', turnFreely);
 		return () => {
 			clearInterval(timer);
 			clearTimeout(retryTimer);
 			clearTimeout(idleTimer);
 			document.removeEventListener('visibilitychange', visibility);
 			document.removeEventListener('fullscreenchange', fullscreen);
-			screen.orientation?.removeEventListener('change', turnScreen);
+			screen.orientation?.removeEventListener('change', turnFreely);
 		};
 	});
 
@@ -436,15 +436,22 @@
 
 	function toggleFullscreen() {
 		if (full) exitFullscreen();
-		else if (document.fullscreenEnabled) wrapper.requestFullscreen().catch(() => (filled = true));
-		else filled = true;
+		else if (document.fullscreenEnabled) {
+			// Firefox: see below. Said before fullscreen, so Firefox never sees it as a play.
+			if (navigator.mediaSession) navigator.mediaSession.playbackState = 'playing';
+			wrapper.requestFullscreen().catch(() => {
+				if (navigator.mediaSession) navigator.mediaSession.playbackState = 'none';
+				filled = true;
+			});
+		} else filled = true;
 	}
 
-	// Firefox on Android turns fullscreen video sideways again on every play and pause, over the
-	// page's lock, so the screen flashes sideways and back. It goes by the media session's state, and a
-	// declared "playing" outranks the video's own. So in fullscreen the page says it's always playing,
-	// and Firefox sees no play or pause to act on. This runs before turnScreen's effect: in a paused
-	// room the switch to "playing" looks like a play, and the page's lock must come after it.
+	// Firefox on Android turns fullscreen video sideways on entering fullscreen and again on every
+	// play and pause, over the page's unlock. It goes by the media session's state, and a declared
+	// "playing" outranks the video's own. So in fullscreen the page says it's always playing, and
+	// Firefox sees no play or pause to act on. The page says so before asking for fullscreen: in a
+	// paused room, saying it after would look like a play, and Firefox would turn the screen sideways a
+	// second time, after the page's unlock.
 	$effect(() => {
 		if (!native || !navigator.mediaSession) return;
 		navigator.mediaSession.playbackState = 'playing';
@@ -453,21 +460,22 @@
 		};
 	});
 
-	// Phone browsers (Chrome and Firefox on Android) turn fullscreen video sideways and hold it there.
-	// The page's own lock outranks theirs. On a phone it turns the screen with the chat: upright while
-	// the chat is open, so it sits under the video, and sideways while it's closed, so the video fills
-	// the screen. A phone is too short sideways for the chat beside the video. Bigger screens get any
-	// orientation. Chrome locks again on its own on play (Firefox: see above), so the page locks once
-	// more then, and whenever the screen turns anyway. Leaving fullscreen drops the page's lock. Where
-	// the browser has no lock (iPhone, desktops), nothing happens.
-	function turnScreen() {
+	// The screen turns in fullscreen as the phone's own auto-rotate setting says, as on iPhone, which
+	// has no lock: the layout follows how the phone is held. But Chrome and Firefox on Android turn
+	// fullscreen video sideways and hold it there. The page unlocks the screen, which hands it back to
+	// the phone's setting. Not a lock to `any`: that follows the sensor even with auto-rotate off.
+	// Chrome locks again on its own on play (Firefox: see above), so the page unlocks once more then,
+	// and whenever the screen turns anyway. Where the browser has no lock (iPhone, desktops), nothing
+	// happens.
+	function turnFreely() {
 		if (!native) return;
-		// Asked each time: a foldable opens into a tablet. 480 px is `fit`'s 30rem: sideways, it never fits.
-		const phone = Math.min(screen.width, screen.height) < 480;
-		const way = !phone ? 'any' : chatOpen ? 'portrait' : 'landscape';
-		screen.orientation?.lock?.(way).catch(() => {});
+		try {
+			screen.orientation?.unlock?.();
+		} catch {
+			// A browser with no lock may refuse the unlock too.
+		}
 	}
-	$effect(turnScreen);
+	$effect(turnFreely);
 
 	function exitFullscreen() {
 		filled = false;
@@ -689,7 +697,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 					onerror={failed}
 					onwaiting={tick}
 					onplaying={() => {
-						turnScreen();
+						turnFreely();
 						tick();
 					}}
 					onseeking={tick}

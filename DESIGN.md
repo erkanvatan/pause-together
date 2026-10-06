@@ -244,11 +244,10 @@ labels.
   and the video box is the largest 16:9 that fits above the control bar, between black bars. A phone
   held sideways is shorter, so its page scrolls instead of shrinking the video to a strip.
 - Fullscreen fills the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
-  real fullscreen isn't available, the wrapper fills the window with CSS. On a phone, the chat
-  turns fullscreen: open, the screen stands upright, the video sits on top with the bar under it, and
-  the chat takes the lower half of what's in view, above the keyboard while it's up. Closed, the screen
-  lies sideways and the video fills it. The chat never sits beside the video on a phone. Bigger screens
-  turn freely, and so does iPhone, which can't lock the screen.
+  real fullscreen isn't available, the wrapper fills the window with CSS. In fullscreen every phone
+  turns as its auto-rotate setting says, and the layout follows how it's held. Upright, the video sits on top with the bar
+  under it, and the chat takes the lower half of what's in view, above the keyboard while it's up.
+  Sideways, the video fills the screen, with the chat beside it while it's open.
 - Spacing steps: 0.5rem inside lists and stacks, 1.5rem between groups, 2.5rem between sections,
   4rem between homepage columns on wide screens.
 - Text over video (subtitles, pills) sizes from the video box width (container query units), so it

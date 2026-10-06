@@ -537,18 +537,20 @@ So each room's video is **prepared once**, then served as a plain file.
 - While the copy is prepared, the player shows "Preparing… 42%" with a progress bar, or its place in line.
 - Fullscreen the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   `document.fullscreenEnabled` is false (iPhone Safari), fill the window with CSS instead.
-- In fullscreen on a phone, the chat turns the screen: upright while it's open, sideways while it's
-  closed, so the chat never squeezes in beside the video. Chrome and Firefox on Android hold
-  fullscreen video sideways, so the page locks the orientation itself (`screen.orientation.lock`:
-  `portrait` or `landscape`) on entering fullscreen, on opening or closing the chat, on play
-  (Chrome locks again then), and whenever the screen turns anyway. Firefox locks again on every play
-  and pause, going by the media session's state, so in fullscreen the page declares it always
-  "playing" (`navigator.mediaSession.playbackState`), or a pause would flash the screen sideways and
-  back. So in fullscreen the phone's media notification shows "playing" while the room is paused.
-  A phone is a screen under 30rem on its short side. Bigger screens get `any`.
-  iPhone has no lock and turns freely. Held upright, the chat takes the lower half, and the control bar and the
+- In fullscreen every phone turns as its own auto-rotate setting says, the same on iPhone and
+  Android: the layout follows how the phone is held, never the chat. iPhone has no lock. Chrome and
+  Firefox on Android hold fullscreen video sideways, so the page unlocks the orientation
+  (`screen.orientation.unlock`) on entering fullscreen, on play (Chrome locks again then), and
+  whenever the screen turns. Not `lock('any')`: it follows the sensor even with auto-rotate off.
+  Firefox locks again on every play and pause, going by the media session's state, so in fullscreen
+  the page declares it always "playing" (`navigator.mediaSession.playbackState`), or a pause would
+  flash the screen sideways and back. It declares that before asking for fullscreen: in a paused
+  room, declaring it after looks like a play, and Firefox turns the screen sideways a second time,
+  after the page's unlock. So in fullscreen the phone's media notification shows "playing" while
+  the room is paused. Held upright, the chat takes the lower half, and the control bar and the
   subtitle panel sit in the black under the video, panel under the bar, covering none of it. The panel
   pushes the chat down, not the video up, so the subtitles stay in view while their timing is set.
+  Held sideways, the chat sits beside the video, as on any landscape screen.
 - In fullscreen the wrapper is padded to the visual viewport, so a phone's keyboard pushes the chat's
   box up above it instead of covering it.
 - Controls fade after 3 s with no mouse move, touch or key while the video plays: the round buttons
