@@ -89,7 +89,6 @@ flowchart LR
 ### Prerequisites
 
 - Linux host with [Docker](https://docs.docker.com/engine/install/) and Docker Compose
-- [Task](https://taskfile.dev/installation/)
 - [Tailscale](https://tailscale.com/download) on the host and on every guest device
 
 ### Setup
@@ -107,7 +106,7 @@ flowchart LR
    | Variable | What it is | Default |
    | --- | --- | --- |
    | `MEDIA_ROOT` | Folder with all your media. Mounted read-only. Must exist. | `~/Videos` |
-   | `DATA_DIR` | Folder for the database, cache and backups. `task up` creates it. | `~/.local/share/pausetogether` |
+   | `DATA_DIR` | Folder for the database, cache and backups. Must exist. | `~/.local/share/pausetogether` |
    | `PUBLIC_BIND` | Host IP for the guest port. Set it to your [Tailscale IP](#on-the-host). | `127.0.0.1` |
    | `GUEST_PORT`, `ADMIN_PORT` | Host ports. | `8420`, `8421` |
 
@@ -131,19 +130,16 @@ flowchart LR
 5. Build and start:
 
    ```sh
-   task up
+   docker compose up -d
    ```
 
-   It keeps running across reboots until you stop it with `task down`. After that, it stays off
-   until the next `task up`.
+   It keeps running across reboots until you stop it with `docker compose down`. After that, it stays off
+   until the next `docker compose up -d`.
 
 6. Open `http://localhost:8421` on the host. Go to the admin page and add a library: a folder under
    your media root, plus its type.
 
 7. Let guests in: see [Connecting devices with Tailscale](#connecting-devices-with-tailscale).
-
-> [!TIP]
-> `task logs` follows the server log. `task down` stops the server, so check nobody is mid-movie.
 
 ### Connecting devices with Tailscale
 
@@ -171,8 +167,7 @@ You set it up once on the host. Each guest installs the app, accepts your invite
    tailscale ip -4        # e.g. 100.101.102.103
    ```
 
-   Put it in `.env` as `PUBLIC_BIND=100.101.102.103`, then run `task up`. If the server is already
-   running, run `task up` again to pick up the change.
+   Put it in `.env` as `PUBLIC_BIND=100.101.102.103`, then run `docker compose up -d`.
 
 3. Turn off key expiry for the host. By default Tailscale logs every device out after 180 days, and
    guests would find the server gone. On the [Machines page](https://login.tailscale.com/admin/machines),
@@ -205,7 +200,7 @@ The same name makes them the same person again.
 
 | Problem | What to check |
 | --- | --- |
-| Page won't load | Tailscale is on, on both the host and the guest device. `PUBLIC_BIND` is the host's Tailscale IP, and `task up` ran after you set it. The address has `http://` and `:8420`. |
+| Page won't load | Tailscale is on, on both the host and the guest device. `PUBLIC_BIND` is the host's Tailscale IP, and `docker compose up -d` ran after you set it. The address has `http://` and `:8420`. |
 | Worked before, stopped | Tailscale got turned off on the device. Or the host's key expired: see step 3 above. |
 | Video keeps buffering | While the guest watches, run `tailscale status` on the host and find their device. `direct` is good. `relay` means traffic goes through Tailscale's servers, which is slower. Strict networks (work, school, some mobile data) often force a relay. Also check the host's upload speed. |
 
@@ -333,7 +328,7 @@ These never show up in the picker:
 
 ## Development
 
-Everything runs in Docker through Task. You don't need Go or Node on the host.
+Everything runs in Docker through [Task](https://taskfile.dev/installation/). You don't need Go or Node on the host.
 
 ```sh
 task dev          # dev stack with hot reload: http://localhost:5173
