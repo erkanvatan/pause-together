@@ -655,11 +655,14 @@ Compact on a phone's small video box, so it never spills out of it. -->
 	</div>
 {/snippet}
 
+<!-- Clipped, not overflow-hidden: a hidden box still scrolls from code, and iPhone Safari scrolls it to
+bring the chat's box above the keyboard, then leaves the player scrolled out of place. A clipped box
+can't scroll at all. -->
 <div
 	bind:this={wrapper}
 	style:padding-top={keyboard.top ? `${keyboard.top}px` : undefined}
 	style:padding-bottom={keyboard.bottom ? `${keyboard.bottom}px` : undefined}
-	class="flex overflow-hidden bg-black portrait:flex-col {full
+	class="flex overflow-clip bg-black portrait:flex-col {full
 		? 'fixed inset-0 z-30 h-dvh'
 		: `max-sm:-mx-4 min-h-0 fit:flex-1 sm:rounded-panel ${chatOpen ? 'portrait:flex-1' : ''}`}"
 >
