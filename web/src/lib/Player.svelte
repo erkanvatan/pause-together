@@ -248,10 +248,13 @@
 			// the wrapper has no keyboard: the browser may report the keyboard gone before it scrolls back,
 			// and an old offset would hold the player out of place until the next touch.
 			const none = Math.abs(view.scale - 1) > 0.01 || view.height >= r.height - 1;
-			// How far the view sits below the wrapper's top. The browser's own fullscreen stays put when
-			// the view scrolls (Firefox on Android scrolls it after a keyboard blip), so padding it by the
-			// scroll would push the chat's box under the keyboard.
-			const shift = none || native ? 0 : view.offsetTop - r.top;
+			// How far the view sits below the wrapper's top. The CSS fill is pinned to the top of the page's
+			// layout, where offsetTop counts from. Not offsetTop - r.top: iPhone Safari measures r from the
+			// view, so r.top already moved up by the scroll, and taking it off again padded the wrapper by
+			// twice the scroll, its whole height. The browser's own fullscreen stays put when the view
+			// scrolls (Firefox on Android scrolls it after a keyboard blip), so padding it by the scroll
+			// would push the chat's box under the keyboard.
+			const shift = none || native ? 0 : view.offsetTop;
 			const top = Math.max(0, shift);
 			const bottom = none ? 0 : Math.max(0, r.height - shift - view.height);
 			// Scrolling fires every frame: only a change re-styles the wrapper.
