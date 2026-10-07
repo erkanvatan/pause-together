@@ -17,6 +17,8 @@ export const CLOCK_SAMPLES = 10;
 export const PING_EVERY_MS = 3000;
 // No pong for this long: the connection is dead, even if the browser hasn't noticed.
 export const PONG_TIMEOUT_MS = 10000;
+// Not open after this long: the socket is stuck opening, and the page gives up on it and tries again.
+export const OPEN_TIMEOUT_MS = 10000;
 // Reconnect backoff: the first retry waits RECONNECT_MIN_MS, each next one twice as long, at most
 // RECONNECT_MAX_MS.
 export const RECONNECT_MIN_MS = 500;

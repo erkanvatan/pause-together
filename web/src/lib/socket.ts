@@ -3,6 +3,7 @@ import { version } from '$app/environment';
 import { CLOSE_NOT_FOUND, type ClientMessage, type ServerMessage } from '$lib/protocol';
 import { Clock } from '$lib/sync/clock';
 import {
+	OPEN_TIMEOUT_MS,
 	PING_EVERY_MS,
 	PONG_TIMEOUT_MS,
 	RECONNECT_MAX_MS,
@@ -25,6 +26,7 @@ export class RoomSocket {
 	private attempt = 0; // reconnects since the last good connection
 	private lastPong = 0;
 	private pingTimer: ReturnType<typeof setInterval> | undefined;
+	private openTimer: ReturnType<typeof setTimeout> | undefined;
 	private retryTimer: ReturnType<typeof setTimeout> | undefined;
 	private closed = false;
 
@@ -65,7 +67,11 @@ export class RoomSocket {
 		const ws = new WebSocket(`${scheme}//${location.host}/ws?room=${this.roomId}`);
 		this.ws = ws;
 		this.clock.reset();
+		// A socket stuck opening never opens nor closes, and would leave the page waiting for the room
+		// forever: give up on it like on a dead one.
+		this.openTimer = setTimeout(() => this.lost(), OPEN_TIMEOUT_MS);
 		ws.onopen = () => {
+			clearTimeout(this.openTimer);
 			this.lastPong = performance.now();
 			this.ping();
 			this.pingTimer = setInterval(() => this.ping(), PING_EVERY_MS);
@@ -118,6 +124,7 @@ export class RoomSocket {
 	// Without a code the server counts it as a dropped connection, and gives the page time to come back.
 	private drop(code?: number) {
 		clearInterval(this.pingTimer);
+		clearTimeout(this.openTimer);
 		const ws = this.ws;
 		this.ws = null;
 		if (!ws) return;

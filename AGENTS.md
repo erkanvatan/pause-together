@@ -498,7 +498,9 @@ So each room's video is **prepared once**, then served as a plain file.
   and the first pong gives a new one. After a restart every room is paused, so nothing needs the offset
   until someone presses play. Clients time with `performance.now()`, never `Date.now()` (it can jump).
 - The clock ping, sent every few seconds, doubles as the heartbeat. No ping for 10 s → the socket
-  counts as disconnected. The client reconnects with backoff and gets the full state.
+  counts as disconnected. The client reconnects with backoff and gets the full state. A socket
+  that hasn't opened after 10 s counts as disconnected too: one stuck opening (no open, no close, seen
+  in Firefox) would otherwise leave the page waiting for the room forever.
 - Drift: ignore it under 200 ms. Up to 1 s, nudge `playbackRate` by 5–10%. Beyond that, seek.
 - Play, pause and seek apply locally at once, then snap to the server's state when it arrives. The seek
   bar sends a seek only when the user lets go.
