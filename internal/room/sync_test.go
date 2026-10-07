@@ -251,15 +251,71 @@ func TestSync(t *testing.T) {
 		sc.check("waiting", sc.waiting(), []Who{alice})
 	})
 
-	t.Run("Alice's TV leaves, her phone stays → room waits for Alice", func(t *testing.T) {
+	t.Run("Alice's TV leaves, her phone stays → room plays on", func(t *testing.T) {
 		sc, a, _ := watching(t)
 		phone := sc.joinOn(alice, "phone")
 		sc.status(phone, Ready)
 		sc.at(10_000).leave(a)
 		sc.at(14_000)
-		sc.check("waiting", sc.waiting(), []Who{alice})
+		sc.check("waiting", sc.waiting(), []Who{})
+		sc.check("running", sc.running(), true)
+		sc.leave(phone)
+		sc.at(18_000)
+		sc.check("waiting once her phone leaves too", sc.waiting(), []Who{alice})
+	})
+
+	t.Run("Alice's TV leaves, her phone is hidden → room waits for Alice away, not left", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		phone := sc.joinOn(alice, "phone")
 		sc.status(phone, Ready)
-		sc.check("waiting after her phone reports", sc.waiting(), []Who{alice})
+		sc.at(10_000).status(phone, Away)
+		sc.leave(a)
+		sc.at(14_000)
+		sc.check("waits", sc.waits(), []Wait{{Who: alice, Reason: WaitAway, SinceMs: 10_000}})
+		sc.status(phone, Ready)
+		sc.check("waiting once her phone is back", sc.waiting(), []Who{})
+	})
+
+	t.Run("Alice's TV leaves while her phone hasn't tapped in → room waits until the phone is ready", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		phone := sc.joinOn(alice, "phone")
+		sc.at(10_000).leave(a)
+		sc.at(14_000)
+		sc.check("waiting", sc.waiting(), []Who{alice})
+		sc.status(phone, Ready, 13_000)
+		sc.check("waiting after her phone is ready", sc.waiting(), []Who{})
+	})
+
+	t.Run("Alice left, her phone can't play → room still waits for Alice", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		sc.at(10_000).leave(a)
+		phone := sc.joinOn(alice, "phone")
+		sc.status(phone, CantPlay)
+		sc.at(14_000)
+		sc.check("waiting", sc.waiting(), []Who{alice})
+	})
+
+	t.Run("Alice's phone, ready before, can't play the new video; her TV leaves → room waits for Alice", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		phone := sc.joinOn(alice, "phone")
+		sc.status(phone, Ready)
+		sc.status(phone, CantPlay)
+		sc.at(10_000).leave(a)
+		sc.at(14_000)
+		sc.check("waiting", sc.waiting(), []Who{alice})
+		sc.status(phone, CantPlay)
+		sc.check("waiting after her phone reports again", sc.waiting(), []Who{alice})
+	})
+
+	t.Run("Alice's phone is skipped by Play anyway; her TV leaves → room waits for Alice", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		phone := sc.joinOn(alice, "phone")
+		sc.status(phone, Ready)
+		sc.at(10_000).status(phone, Buffering)
+		sc.at(14_000).playAnyway()
+		sc.leave(a)
+		sc.at(18_000)
+		sc.check("waiting", sc.waiting(), []Who{alice})
 	})
 
 	t.Run("Alice leaves to rename, comes back as Bo → room no longer waits for Alice", func(t *testing.T) {

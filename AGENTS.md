@@ -508,10 +508,12 @@ So each room's video is **prepared once**, then served as a plain file.
   3 s pauses the room ("Waiting for Alice"). It resumes when everyone is ready. Anyone can press "Play
   anyway": the blocking client is then skipped until it catches up or comes back.
 - Leaving (closing the tab, or going to another page) counts as away, so the room pauses 3 s later
-  too. It waits until that browser is back and ready on a new socket. "Play anyway" forgets them
-  instead of skipping: they can't catch up. Closing one of two tabs doesn't count: the browser is
-  still there. Leaving goes by browser, not by person: one person's TV and phone (both "Dad") are two
-  browsers, and the room waits for the TV even while the phone stays. A browser that comes back under
+  too. It waits until that browser is back and ready on a new socket, or another device of the same
+  person is ready. "Play anyway" forgets them instead of skipping: they can't catch up. Closing one of
+  two tabs doesn't count: the browser is still there. Nor does one of a person's devices leaving while
+  another of theirs watches along: one person's TV and phone (both "Dad") are one person watching, so
+  the room plays on when the TV closes and the phone stays. A device that hasn't tapped in yet, can't
+  play the video, or was skipped by "Play anyway" doesn't watch along. A browser that comes back under
   another name (a rename) clears its old wait.
 - Some clients never block, and none of them count as away:
   - a device marked "can't play" (it can't decode the video),
