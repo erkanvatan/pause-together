@@ -57,8 +57,9 @@
 			<p class="flex items-center gap-1.5">
 				<Brand />
 			</p>
-			<p class="text-haze">{strings.tagline}</p>
-			<p class="text-haze">{strings.about}</p>
+			<!-- The tagline is the brand's voice; the line under it says plainly what the app is. -->
+			<p class="text-lg">{strings.tagline}</p>
+			<p class="mt-1 text-haze">{strings.about}</p>
 		</div>
 		{#if room}
 			<p class="break-words">{strings.joining(room)}</p>

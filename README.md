@@ -53,7 +53,7 @@ watch in sync from PCs, tablets and phones. When one of them buffers or steps aw
     <td align="center"><sub><b>Picker.</b> A video that already has a room says so.</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/welcome.png" alt="The first visit to a room link: You're joining Movie night. What should we call you?" /></td>
+    <td><img src="docs/screenshots/welcome.png" alt="The first visit to a room link: what the app is, You're joining Movie night, and What should we call you?" /></td>
     <td><img src="docs/screenshots/admin.png" alt="The admin page: the guest link, three libraries, files we can't use grouped by reason, prepare jobs, language defaults and cache clean-up." /></td>
   </tr>
   <tr>
