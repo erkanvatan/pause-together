@@ -248,8 +248,9 @@ labels.
   the video to a strip.
 - Fullscreen fills the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   real fullscreen isn't available, the wrapper fills the window with CSS. In fullscreen every phone
-  turns as its auto-rotate setting says, and the layout follows how it's held. Upright, the video sits on top with the bar
-  under it, and the chat takes the lower half of what's in view, above the keyboard while it's up.
+  turns as its auto-rotate setting says, and the layout follows how it's held. Upright, the video takes the upper 40%, the
+  picture in its middle between black, and the chat takes the lower 60% of what's
+  in view, above the keyboard while it's up.
   Sideways, the video fills the screen, with the chat beside it while it's open.
 - Spacing steps: 0.5rem inside lists and stacks, 1.5rem between groups, 2.5rem between sections,
   4rem between homepage columns on wide screens.
@@ -321,12 +322,13 @@ Archived rooms show their title in haze.
 - **Transport:** three round buttons over the middle of the video: back 10 s, play or pause, forward
   10 s. The side ones are translucent midnight with a 6px blur; play/pause is the lamp. They shrink to
   92% while pressed. They fade after 3 s of no input while playing.
-- **Control bar:** label size, moonlight, the same in and out of fullscreen. Where the video is big
-  (the page fits a landscape screen, or fullscreen held sideways) it lies over the foot of the video's
-  box on a black fade (80% at the bottom, clear 3rem above the bar); subtitles slide up while it shows,
-  and what holds the middle centers above its place, shown or not. Elsewhere the video is short (a
-  phone, out of fullscreen or held upright), so the bar sits on the black under the picture and
-  keeps its space while hidden. It fades out with the transport (300ms). A narrow bar puts the seek bar and
+- **Control bar:** label size, moonlight, the same in and out of fullscreen. It lies over the foot of
+  the video's box on a black fade (80% at the bottom, clear 3rem above the bar; none where it sits in the black
+  under the picture), and what holds the
+  middle centers above its place, shown or not. A card too tall for the room above it (often on a phone
+  held upright) scrolls there. Subtitles stay put and the bar covers them. Only a short landscape page (a phone sideways) out
+  of fullscreen puts the bar on the black under the picture, keeping its space while hidden. It fades
+  out with the transport (300ms); an open subtitle panel stays. A narrow bar puts the seek bar and
   time on a row of their own, above the buttons.
 - **Holds the middle:** "Tap to join" (a large round primary button), "Preparing… 42%" (a pill with a
   thin lamp progress bar on dusk), "Waiting for …", "Host is offline" (stays up while the video
@@ -349,6 +351,32 @@ Archived rooms show their title in haze.
   fullscreen it pushes the chat down and the video stays put), in two labelled groups: "For
   everyone" (subtitle, timing) and "On this screen" (size). Group labels are semibold moonlight,
   field labels haze.
+
+#### Named Rules (decided by the owner; don't revert them)
+Each was chosen over the alternative named here, knowing its cost. A review that flags that cost is
+not a reason to change it: ask the owner first.
+
+**The Bar Over Rule.** Held upright out of fullscreen, the control bar lies over the video's foot, so
+the chat gets all the height under the picture. On a phone the bar covers about 40% of the picture
+while it shows, which is always while paused. Not: the bar in a black strip under the picture.
+
+**The Still Subtitles Rule.** Subtitles never move when the bar shows or fades. They sit low on the
+picture and the bar covers them while it shows, the subtitle panel open or not. Only where the panel
+lies over the video (a big landscape screen) do they sit above it. Not: subtitles that slide up with
+the bar, or that lift above the bar while the panel is open.
+
+**The Fading Bar Rule.** The bar and the transport fade while the subtitle panel is open; the panel
+stays, so it doesn't crowd the picture. Over the video, the panel then floats above the faded row's
+place. Not: an open panel holding the controls up.
+
+**The Bar Stays Rule.** A card taller than the room above the bar scrolls there; the bar never steps
+aside. On an iPhone's CSS fullscreen the bar holds the only way out. Not: hiding the bar while a card
+doesn't fit.
+
+**The Upright Fullscreen Rule.** Fullscreen held upright gives the video 40% of what's in view and
+the chat 60%. The picture sits in the middle of its 40%, between black; on a phone the bar then lies
+on the picture's foot. Not: 50/50, the video at its own height (fullscreen looked like the page), or
+the picture at the top with the bar in the black under it.
 
 ### Pills
 A short line over the video: "Host is offline, reconnecting…" (with a small ember signal icon), "Alice

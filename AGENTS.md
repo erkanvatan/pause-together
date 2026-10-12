@@ -169,7 +169,8 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
                      fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
                      Subtitles.svelte (the subtitle overlay), prefs.ts (per-device player settings in
-                     localStorage), time.ts (1:40:00), chat.ts (pure: message length, the message list, name colors),
+                     localStorage), time.ts (1:40:00), layout.ts (pure: where the control bar, subtitles
+                     and the video's middle sit), chat.ts (pure: message length, the message list, name colors),
                      Chat.svelte (the chat panel, with who's watching), Icon.svelte (inline SVG icons);
                      sync/ (pure): clock.ts (server clock offset), drift.ts (drift fix, follow step), state.ts
                      (target position, local intents), status.ts (what the player reports, and when),
@@ -567,23 +568,32 @@ So each room's video is **prepared once**, then served as a plain file.
   flash the screen sideways and back. It declares that before asking for fullscreen: in a paused
   room, declaring it after looks like a play, and Firefox turns the screen sideways a second time,
   after the page's unlock. So in fullscreen the phone's media notification shows "playing" while
-  the room is paused. Held upright, the chat takes the lower half, and the control bar and the
-  subtitle panel sit in the black under the video, panel under the bar, covering none of it. The panel
-  pushes the chat down, not the video up, so the subtitles stay in view while their timing is set.
-  Held sideways, the chat sits beside the video, as on any landscape screen.
+  the room is paused. Held upright, the video takes the upper 40%, the picture in its middle
+  with black above and below, and the chat the rest. The bar sits in the black where there's room
+  for it; on a phone it usually lies on the picture's foot. The subtitles sit on the picture's foot,
+  under the bar while it shows, as everywhere, and the transport centers on the picture. The
+  subtitle panel sits under the video and pushes the chat down, not the video up, so the subtitles
+  stay in view while their timing is set. Held sideways, the chat sits beside the video, as on any
+  landscape screen.
 - In fullscreen the wrapper is padded to the visual viewport, so a phone's keyboard pushes the chat's
   box up above it instead of covering it.
 - In fullscreen, and where the page fits a landscape screen, the video's box fills the player: the
   picture keeps its own shape inside it, between black bars. Subtitles size and wrap to the
   picture's width, not the box's, and pills size to it.
-- The control bar looks the same in and out of fullscreen. Where the video is big (the page fits a
-  landscape screen, or fullscreen held sideways) it lies over the foot of the box at full width, so
-  hiding it never resizes the video; subtitles move up while it shows, and what holds the video's middle centers
-  above its place, shown or not, so it doesn't bob as the bar fades. Elsewhere the video is short (a
-  phone, out of fullscreen or held upright), so the bar sits in the black under the picture and keeps
-  its space while hidden.
+- The control bar looks the same in and out of fullscreen. It lies over the foot of the box at full
+  width, so hiding it never resizes the video, and held upright the chat gets all the height under the
+  picture. What holds the video's middle centers above the bar's place, shown or not, so it doesn't bob
+  as the bar fades. A card ("Tap to join", "Waiting for …", the end, a problem) taller than the room
+  above the bar (often on a phone held upright) scrolls there; the bar never steps aside for it, so
+  exit fullscreen and mute stay in reach. Only a short landscape page out of
+  fullscreen (a phone sideways) puts the bar in the black under the picture, keeping its space while
+  hidden.
+- Subtitles never move when the bar shows or fades: they sit low over the picture, and the bar covers
+  them while it shows. Where the bar sits under the picture (a phone sideways out of fullscreen, or in
+  the black of fullscreen held upright) they sit above it. While the subtitle panel lies over the video (a big landscape screen)
+  they sit above it, so their timing is set by text in view.
 - Controls fade after 3 s with no mouse move, touch or key while the video plays: the round buttons
-  and the bar together. Never while paused, the subtitle panel is open, the seek bar is held, the
+  and the bar together. An open subtitle panel stays. Never while paused, the seek bar is held, the
   mouse is on the bar, or a key has put the focus on one of them (a click's focus doesn't count). On
   touch screens, a tap on bare video hides them.
 - Over the video's middle: back 10 s, play or pause, forward 10 s. Hidden while "Tap to join", "Waiting
@@ -624,7 +634,7 @@ So each room's video is **prepared once**, then served as a plain file.
   appear in chat.
 - UI: open on entering the room, except on a phone (a touch screen, short side under 30rem), where it starts
   closed in landscape: held sideways, the video needs the whole width. A side panel on wide screens.
-  On portrait screens it sits under the video and fills the rest of the screen (the lower half in
+  On portrait screens it sits under the video and fills the rest of the screen (the lower 60% in
   fullscreen), not a floating sheet. There it can't be closed (no chat button, no close, no H key):
   the space under the video would sit empty. Closing it counts in landscape only, so a closed chat
   comes back when the phone turns upright and goes again when it turns sideways. While it's closed,

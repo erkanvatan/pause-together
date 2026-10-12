@@ -18,7 +18,7 @@
 		offsetMs: number; // positive shows the text later
 		size: SubtitleSize;
 		videoMs: () => number; // where the video is now
-		lift?: number; // px of controls over the video's bottom edge; the text sits above them
+		lift?: number; // px over the box's foot the text sits above: the bar under the picture, or the subtitle panel
 	} = $props();
 
 	// Relative to the picture's width (the player's --picture), so fullscreen makes the text bigger;

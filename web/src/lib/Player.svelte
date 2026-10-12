@@ -8,6 +8,7 @@
 	import type { Room, SubtitleChoice, VideoDetail, VideoSummary } from '$lib/api';
 	import { jobText } from '$lib/admin';
 	import Icon from '$lib/Icon.svelte';
+	import { barLayout } from '$lib/layout';
 	import {
 		codecName,
 		episodeCode,
@@ -118,6 +119,7 @@
 	const durationMs = $derived(playState?.durationMs ?? 0);
 
 	let subtitlesOpen = $state(false); // the subtitle panel
+	let panel = $state<HTMLDivElement>(); // the subtitle panel, while open
 	let panelHeight = $state(0); // its height: in fullscreen held upright it pushes the chat down
 	const options = $derived(detail ? subtitleOptions(detail) : []);
 	const subtitleKey = $derived(
@@ -131,25 +133,25 @@
 	let native = $state(false); // the browser's fullscreen
 	let filled = $state(false); // the CSS fill
 	const full = $derived(native || filled);
-	// Fullscreen held upright: the video is as wide as the screen, with black above and below it, and the
-	// chat under it.
+	// Held upright the video is as wide as the screen, and the chat takes the rest under it. Out of
+	// fullscreen the video keeps its own height; in fullscreen it takes the upper 40%, the picture in its
+	// middle, with black above and below.
 	const portrait = new MediaQuery('(orientation: portrait)');
 	// The page fits the screen: app.css's `fit` variant, which the layout below follows. Change both.
 	const fits = new MediaQuery('(orientation: landscape) and (min-height: 30rem)');
 	// The video box fills the player in fullscreen, and where the page fits the screen: the bar stays
 	// full width, and the picture sits inside at its own shape, between black bars.
 	const fill = $derived(full || fits.current);
+	const tall = $derived(full && portrait.current); // fullscreen held upright
 	let aspect = $state(16 / 9); // the picture's shape, as the video last said
 	// On loadedmetadata too: not every browser fires resize for the first size.
 	function measure() {
 		if (video.videoHeight) aspect = video.videoWidth / video.videoHeight;
 	}
-	// The control bar lies over the box's foot where the video is big: the page fits a landscape
-	// screen, or fullscreen held sideways. Elsewhere the video is short (a phone's is about 220 px tall
-	// upright, 290 px sideways), and the bar would cover its foot, the subtitles and what holds the
-	// middle: there it sits in the black under the picture, with the same look, and keeps its space
-	// while it fades.
-	const barOver = $derived(full ? !portrait.current : fits.current);
+	// The control bar lies over the box's foot: held upright it leaves the chat all the height under the
+	// picture. Only a short landscape page out of fullscreen (a phone sideways, about 290 px of video)
+	// keeps it in the black under the picture, with the same look, and keeps its space while it fades.
+	const barOver = $derived(full || fits.current || portrait.current);
 	// The subtitle panel lies over the video's foot, above the bar, only on a big landscape screen, in or
 	// out of fullscreen. Elsewhere the video is small (a phone, a small window), and the panel with the
 	// bar would cover the subtitles its timing is set by, so it goes under the video.
@@ -160,19 +162,21 @@
 	let keyboard = $state({ top: 0, bottom: 0 });
 
 	// The controls step aside while the video plays and nobody touches them: the buttons in the middle
-	// and the bar. Never while paused, the subtitle panel is open, the seek bar is held, the mouse is on
-	// the bar, or a key has put the focus on one of them.
+	// and the bar. The subtitle panel stays while it's open. Never while paused, the seek bar is held, the
+	// mouse is on the bar, or a key has put the focus on one of them.
 	let box: HTMLDivElement; // the video box; a tap on it, not on a control, hides the controls
 	let bar: HTMLDivElement; // the control bar, with the subtitle panel when that lies over the video
 	let idle = $state(false);
 	let idleTimer: ReturnType<typeof setTimeout> | undefined;
 	let overBar = $state(false);
 	let barHeight = $state(0);
+	let boxWidth = $state(0);
+	let boxHeight = $state(0);
 	// The control a key put the focus on (Tab), which shows a ring. A click or a tap focuses a button too:
 	// the controls fade after one as usual, even once a later key press gives it a ring.
 	let byKey = false; // the last input was Tab, not a pointer or another key
 	let keyFocused: Element | null = null;
-	const canFade = $derived(joined && !!playState?.playing && !subtitlesOpen && dragMs === null);
+	const canFade = $derived(joined && !!playState?.playing && dragMs === null);
 	const faded = $derived(idle && canFade && !overBar);
 	// Hiding waits for the fade to end; showing doesn't, or Tab would find them still hidden and skip them.
 	const fade = $derived(
@@ -183,13 +187,15 @@
 
 	// A control a click focused stays focused as it fades: Space would press a button unseen, or do
 	// nothing on the seek bar. Let go of it, so Space plays and pauses. Not the volume slider: its arrows
-	// change this screen's volume, and would skip the room for everyone without it. A key's focus never
+	// change this screen's volume, and would skip the room for everyone without it. Not the subtitle
+	// panel: it doesn't fade, and a finger may have just opened one of its lists. A key's focus never
 	// fades: it holds the controls up.
 	let volumeSlider = $state<HTMLInputElement>(); // only where volume works
 	$effect(() => {
 		if (!faded) return;
 		const a = document.activeElement;
-		if (a instanceof HTMLElement && box.contains(a) && a !== volumeSlider) a.blur();
+		if (a instanceof HTMLElement && box.contains(a) && a !== volumeSlider && !panel?.contains(a))
+			a.blur();
 	});
 
 	// Where the room's prepared copy stands, shown in the video box; '' when there's nothing to say, or
@@ -229,6 +235,19 @@
 		if (atEnd) return next ? 'next' : next === null ? 'end' : '';
 		return playState?.waiting.length ? '' : 'transport';
 	});
+	// Where the subtitles, what holds the middle and the bar's dark fade sit: layout.ts.
+	const layout = $derived(
+		barLayout({
+			tall,
+			barOver,
+			panelOver: panelOver && subtitlesOpen,
+			transport: middle === 'transport',
+			barHeight,
+			boxWidth,
+			boxHeight,
+			aspect
+		})
+	);
 
 	// Only src changes, never the element: a new one may need a fresh tap on iOS.
 	$effect(() => {
@@ -247,8 +266,8 @@
 		});
 	});
 
-	// The controls get their full time again whenever they start to be allowed to fade: play starts,
-	// the subtitle panel closes, the seek bar is let go.
+	// The controls get their full time again whenever they start to be allowed to fade: play starts, the
+	// seek bar is let go.
 	$effect.pre(() => {
 		if (canFade) untrack(wake);
 	});
@@ -608,8 +627,9 @@
 {#snippet subtitlePanel()}
 	{#if subtitlesOpen}
 		<div
+			bind:this={panel}
 			bind:clientHeight={panelHeight}
-			class="flex flex-wrap items-center gap-x-8 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm"
+			class="pointer-events-auto relative z-10 flex flex-wrap items-center gap-x-8 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm"
 		>
 			<!-- Subtitle and timing change the room for everyone; size, only this screen. Said, so a guest
 			fixing their own view doesn't move everyone's. -->
@@ -717,10 +737,12 @@ can't scroll at all. -->
 		? 'fixed inset-0 z-30 h-dvh'
 		: `max-sm:-mx-4 min-h-0 fit:flex-1 sm:rounded-panel portrait:flex-1`}"
 >
-	<!-- In portrait, the video keeps its own height and the chat takes the rest; in fullscreen the
-	video takes the upper half plus the subtitle panel: the panel
-	pushes the chat down, and the video stays put to show the subtitles it times. The pointer handlers only show and hide the controls; the buttons inside do the rest. No text selection or iOS
-	callout: a long press on the video would select a subtitle or button label. Chat stays selectable. -->
+	<!-- In portrait, the video keeps its own height and the chat takes the rest; in fullscreen the video
+	takes the upper 40% plus the subtitle panel. The panel pushes the chat down, and the video stays put
+	to show the subtitles it times. The
+	pointer handlers only show and hide the controls; the buttons inside do the rest. No text selection
+	or iOS callout: a long press on the video would select a subtitle or button label. Chat stays
+	selectable. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		onpointerdown={pointerDown}
@@ -735,10 +757,10 @@ can't scroll at all. -->
 		onfocusout={() => {
 			if (document.hasFocus()) keyFocused = null;
 		}}
-		style:flex={full && portrait.current
-			? `0 1 calc(50% + ${subtitlesOpen ? panelHeight : 0}px)`
-			: undefined}
-		class="relative flex min-w-0 flex-1 flex-col select-none [-webkit-touch-callout:none] {full ? 'portrait:min-h-0' : 'portrait:flex-none'}"
+		style:flex={tall ? `0 1 calc(40% + ${subtitlesOpen ? panelHeight : 0}px)` : undefined}
+		class="relative flex min-w-0 flex-1 flex-col select-none [-webkit-touch-callout:none] {full
+			? 'portrait:min-h-0'
+			: 'portrait:flex-none'}"
 	>
 		<!-- The container for the subtitles' and pills' sizes. Not the wrapper: it holds the chat too.
 		They size to --picture, the picture's width: a filled box is wider than the picture when the
@@ -748,6 +770,8 @@ can't scroll at all. -->
 		browser. -->
 		<div
 			bind:this={box}
+			bind:clientWidth={boxWidth}
+			bind:clientHeight={boxHeight}
 			style:padding-bottom={barOver ? undefined : `${barHeight}px`}
 			style:--picture={fill
 				? `min(100cqi, 100cqh * ${aspect})`
@@ -779,8 +803,7 @@ can't scroll at all. -->
 					tick();
 				}}
 				onresize={measure}
-				style:height={fill ? (barOver ? '100%' : `calc(100% - ${barHeight}px)`) : undefined}
-				class={fill ? 'absolute inset-x-0 top-0 w-full object-contain' : 'aspect-video w-full'}
+				class={fill ? 'absolute inset-0 size-full object-contain' : 'aspect-video w-full'}
 			></video>
 
 			{#if src && !cantPlay}
@@ -789,7 +812,7 @@ can't scroll at all. -->
 					{offsetMs}
 					size={subtitleSize}
 					videoMs={() => video.currentTime * 1000}
-					lift={barOver && faded ? 0 : barHeight}
+					lift={layout.lift}
 				/>
 			{/if}
 
@@ -798,137 +821,142 @@ can't scroll at all. -->
 				<div class="fade-out-video absolute inset-0 bg-black"></div>
 			{/if}
 
-			<!-- What holds the middle centers above the bar, never under it. -->
+			<!-- What holds the middle centers above the bar, never under it; in fullscreen held upright the
+			transport centers on the picture. A card taller than that room (on a phone held upright, a short
+			video) scrolls there: the bar never steps aside, so exit fullscreen and mute stay in reach. -->
 			<div
-				style:bottom="{barHeight}px"
-				class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center @max-md:p-2"
+				style:bottom="{layout.middleBottom}px"
+				class="absolute inset-0 flex flex-col items-center overflow-x-hidden overflow-y-auto p-4 text-center @max-md:p-2"
 			>
-				{#if middle === 'transport'}
-					<div
-						class="flex items-center gap-6 sm:gap-10 {fade}"
-					>
-						<button
-							onclick={() => skip(-skipMs)}
-							disabled={!online || durationMs === 0}
-							aria-label={strings.skipBack(skipMs / 1000)}
-							title={strings.withKey(strings.skipBack(skipMs / 1000), strings.keys.back)}
-							class="transport size-12 sm:size-14"
+				<!-- Auto margins center it, and unlike centering keep its top in reach when it's too tall. -->
+				<div class="my-auto flex w-full flex-col items-center gap-3">
+					{#if middle === 'transport'}
+						<div
+							class="flex items-center gap-6 sm:gap-10 {fade}"
 						>
-							<Icon name="skip-back" step={skipMs / 1000} class="size-7 sm:size-8" />
-						</button>
-						<button
-							onclick={togglePlay}
-							disabled={!online || !playState}
-							aria-label={playState?.playing ? strings.pause : strings.play}
-							title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
-							class="transport transport-main size-16 sm:size-20"
-						>
-							<Icon name={playState?.playing ? 'pause' : 'play'} class="size-8 sm:size-10" />
-						</button>
-						<button
-							onclick={() => skip(skipMs)}
-							disabled={!online || durationMs === 0}
-							aria-label={strings.skipForward(skipMs / 1000)}
-							title={strings.withKey(strings.skipForward(skipMs / 1000), strings.keys.forward)}
-							class="transport size-12 sm:size-14"
-						>
-							<Icon name="skip-forward" step={skipMs / 1000} class="size-7 sm:size-8" />
-						</button>
-					</div>
-				{:else if middle === 'offline'}
-					<!-- It stays up while the video plays: this screen is on its own until the host is back. -->
-					{@render notice(strings.hostOffline, strings.hostOfflineWhy, false, false)}
-				{:else if middle === 'cantPlay'}
-					<!-- Unplayable for the server is unplayable for everyone: only another pick helps. -->
-					{@const everywhere = room.video.unplayable !== ''}
-					{@render notice(
-						unplayable,
-						everywhere
-							? strings.cantPlayAnywhere
-							: strings.cantPlayHereWhy(codecName(room.video.codecString)),
-						false,
-						everywhere
-					)}
-				{:else if middle === 'failed' && prepare}
-					{@render notice(
-						strings.prepareFailed,
-						strings.prepareFailedWhy[prepare.error] ?? strings.prepareFailedWhy.failed,
-						true,
-						true
-					)}
-				{:else if middle === 'tap'}
-					<button onclick={join} class="btn btn-primary min-h-14 rounded-full px-7 text-lg">
-						<Icon name="play" class="size-6" />
-						{coarse ? strings.tapToJoin : strings.clickToJoin}
-					</button>
-				{:else if middle === 'connecting'}
-					<!-- Late, so a quick connect never flashes it. -->
-					<p class="pill appear-late">{strings.gettingReady}</p>
-				{:else if middle === 'preparing'}
-					<div class="flex w-full max-w-64 flex-col items-center gap-3 @max-md:gap-1.5">
-						<p class="pill whitespace-nowrap tabular-nums">{preparing}</p>
-						{#if prepare?.state === 'running'}
-							<div class="h-1 w-full overflow-hidden rounded-full bg-dusk">
-								<div class="h-full bg-lamp" style:width="{prepare.progress * 100}%"></div>
-							</div>
-						{/if}
-						<p class="text-sm text-balance text-haze">{strings.preparingWhy}</p>
-					</div>
-				{:else if middle === 'next' && next}
-					<!-- An episode's end gets its own title card too: the evening may go on, or stop here. -->
-					<div class="flex max-w-full flex-col items-center gap-4 @max-md:gap-2">
-						<p class="font-display text-3xl font-bold @max-md:text-2xl">
-							{strings.episodeEnded(episodeCode(room.video))}
-						</p>
-						<div class="flex max-w-full flex-col items-center gap-2">
 							<button
-								onclick={nextEpisode}
-								disabled={!online || nexting}
-								class="btn btn-primary max-w-full break-words"
+								onclick={() => skip(-skipMs)}
+								disabled={!online || durationMs === 0}
+								aria-label={strings.skipBack(skipMs / 1000)}
+								title={strings.withKey(strings.skipBack(skipMs / 1000), strings.keys.back)}
+								class="transport size-12 sm:size-14"
 							>
-								{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
+								<Icon name="skip-back" step={skipMs / 1000} class="size-7 sm:size-8" />
 							</button>
-							<button onclick={pickAnother} disabled={!online} class="btn btn-quiet">
+							<button
+								onclick={togglePlay}
+								disabled={!online || !playState}
+								aria-label={playState?.playing ? strings.pause : strings.play}
+								title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
+								class="transport transport-main size-16 sm:size-20"
+							>
+								<Icon name={playState?.playing ? 'pause' : 'play'} class="size-8 sm:size-10" />
+							</button>
+							<button
+								onclick={() => skip(skipMs)}
+								disabled={!online || durationMs === 0}
+								aria-label={strings.skipForward(skipMs / 1000)}
+								title={strings.withKey(strings.skipForward(skipMs / 1000), strings.keys.forward)}
+								class="transport size-12 sm:size-14"
+							>
+								<Icon name="skip-forward" step={skipMs / 1000} class="size-7 sm:size-8" />
+							</button>
+						</div>
+					{:else if middle === 'offline'}
+						<!-- It stays up while the video plays: this screen is on its own until the host is back. -->
+						{@render notice(strings.hostOffline, strings.hostOfflineWhy, false, false)}
+					{:else if middle === 'cantPlay'}
+						<!-- Unplayable for the server is unplayable for everyone: only another pick helps. -->
+						{@const everywhere = room.video.unplayable !== ''}
+						{@render notice(
+							unplayable,
+							everywhere
+								? strings.cantPlayAnywhere
+								: strings.cantPlayHereWhy(codecName(room.video.codecString)),
+							false,
+							everywhere
+						)}
+					{:else if middle === 'failed' && prepare}
+						{@render notice(
+							strings.prepareFailed,
+							strings.prepareFailedWhy[prepare.error] ?? strings.prepareFailedWhy.failed,
+							true,
+							true
+						)}
+					{:else if middle === 'tap'}
+						<button onclick={join} class="btn btn-primary min-h-14 rounded-full px-7 text-lg">
+							<Icon name="play" class="size-6" />
+							{coarse ? strings.tapToJoin : strings.clickToJoin}
+						</button>
+					{:else if middle === 'connecting'}
+						<!-- Late, so a quick connect never flashes it. -->
+						<p class="pill appear-late">{strings.gettingReady}</p>
+					{:else if middle === 'preparing'}
+						<div class="flex w-full max-w-64 flex-col items-center gap-3 @max-md:gap-1.5">
+							<p class="pill whitespace-nowrap tabular-nums">{preparing}</p>
+							{#if prepare?.state === 'running'}
+								<div class="h-1 w-full overflow-hidden rounded-full bg-dusk">
+									<div class="h-full bg-lamp" style:width="{prepare.progress * 100}%"></div>
+								</div>
+							{/if}
+							<p class="text-sm text-balance text-haze">{strings.preparingWhy}</p>
+						</div>
+					{:else if middle === 'next' && next}
+						<!-- An episode's end gets its own title card too: the evening may go on, or stop here. -->
+						<div class="flex max-w-full flex-col items-center gap-4 @max-md:gap-2">
+							<p class="font-display text-3xl font-bold @max-md:text-2xl">
+								{strings.episodeEnded(episodeCode(room.video))}
+							</p>
+							<div class="flex max-w-full flex-col items-center gap-2">
+								<button
+									onclick={nextEpisode}
+									disabled={!online || nexting}
+									class="btn btn-primary max-w-full break-words"
+								>
+									{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
+								</button>
+								<button onclick={pickAnother} disabled={!online} class="btn btn-quiet">
+									{strings.watchSomethingElse}
+								</button>
+							</div>
+						</div>
+					{:else if middle === 'end'}
+						<!-- A film's last frame is the room's last shared moment: a title card, and what's next. -->
+						<div class="flex flex-col items-center gap-4 @max-md:gap-2">
+							<p class="font-display text-3xl font-bold @max-md:text-2xl">{strings.theEnd}</p>
+							<button onclick={pickAnother} disabled={!online} class="btn btn-primary">
 								{strings.watchSomethingElse}
 							</button>
 						</div>
-					</div>
-				{:else if middle === 'end'}
-					<!-- A film's last frame is the room's last shared moment: a title card, and what's next. -->
-					<div class="flex flex-col items-center gap-4 @max-md:gap-2">
-						<p class="font-display text-3xl font-bold @max-md:text-2xl">{strings.theEnd}</p>
-						<button onclick={pickAnother} disabled={!online} class="btn btn-primary">
-							{strings.watchSomethingElse}
-						</button>
-					</div>
-				{:else if middle === 'missing'}
-					{@render notice(
-						strings.videoMissing,
-						strings.videoGone(shownMs >= 1000 ? formatTime(shownMs) : ''),
-						true,
-						true
-					)}
-				{/if}
-				<!-- Offline, who the room waits for is stale, and "Play anyway" can't reach anyone. -->
-				{#if waits && !offline}
-					<div
-						class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 px-5 py-4 @max-md:gap-2 @max-md:p-3"
-					>
-						<div class="flex flex-col items-center gap-1">
-							<p class="text-lg break-words">{waits.headline}</p>
-							{#each waits.lines as line, i (i)}
-								<p class="text-sm break-words text-haze tabular-nums">{line}</p>
-							{/each}
-						</div>
-						<button
-							onclick={() => socket?.send({ type: 'playAnyway' })}
-							disabled={!online}
-							class="btn btn-quiet max-w-full break-words"
+					{:else if middle === 'missing'}
+						{@render notice(
+							strings.videoMissing,
+							strings.videoGone(shownMs >= 1000 ? formatTime(shownMs) : ''),
+							true,
+							true
+						)}
+					{/if}
+					<!-- Offline, who the room waits for is stale, and "Play anyway" can't reach anyone. -->
+					{#if waits && !offline}
+						<div
+							class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 px-5 py-4 @max-md:gap-2 @max-md:p-3"
 						>
-							{waits.action}
-						</button>
-					</div>
-				{/if}
+							<div class="flex flex-col items-center gap-1">
+								<p class="text-lg break-words">{waits.headline}</p>
+								{#each waits.lines as line, i (i)}
+									<p class="text-sm break-words text-haze tabular-nums">{line}</p>
+								{/each}
+							</div>
+							<button
+								onclick={() => socket?.send({ type: 'playAnyway' })}
+								disabled={!online}
+								class="btn btn-quiet max-w-full break-words"
+							>
+								{waits.action}
+							</button>
+						</div>
+					{/if}
+				</div>
 			</div>
 
 			<div
@@ -955,29 +983,33 @@ can't scroll at all. -->
 			<p role="status" class="sr-only">{announce}</p>
 
 			<!-- The control bar, one element in every view, so turning the screen keeps a drag on the seek
-			bar, and the focus on a button. Landscape: over the box's foot on a dark fade. Upright: in the black under the picture,
-			where the box keeps room for it. -->
-			<div
-				class="pointer-events-none absolute inset-x-0 bottom-0 {barOver
-					? 'bg-linear-to-t from-black/80 via-black/60 via-60% to-transparent pt-12'
-					: ''} {fade}"
-			>
+			bar, and the focus on a button. Over the box's foot on a dark fade (none in the black under the
+			picture, in fullscreen held upright); only a short landscape page out of fullscreen puts it in the
+			black under the picture, where the box keeps room for it. Only what shows takes the pointer: the
+			faded row must not hold the controls up under a resting mouse. -->
+			<div class="pointer-events-none absolute inset-x-0 bottom-0">
 				<!-- svelte-ignore a11y_no_static_element_interactions (keeps the controls up under the mouse) -->
 				<div
 					bind:this={bar}
 					bind:clientHeight={barHeight}
 					onpointerenter={() => (overBar = true)}
 					onpointerleave={() => (overBar = false)}
-					class="pointer-events-auto"
+					class="pointer-events-none"
 				>
-					<!-- Above the bar, where it shows, so Tab and screen readers meet it in that order. -->
+					<!-- Above the bar, where it shows, so Tab and screen readers meet it in that order. It
+					doesn't fade with the bar. -->
 					{#if panelOver}
 						{@render subtitlePanel()}
 					{/if}
 
 					<!-- Laid out by the bar's own width, not the screen's: the chat panel takes part of a wide
-					one. A narrow bar puts the seek bar and time on a row of their own, above the buttons. -->
-					<div class="@container/bar">
+					one. A narrow bar puts the seek bar and time on a row of their own, above the buttons. The
+					fade's dark top is drawn above the row, not laid out, so it never pushes the panel up. -->
+					<div
+						class="pointer-events-auto relative @container/bar {layout.shade
+							? 'before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-12 before:bg-linear-to-t before:from-black/60 before:to-transparent bg-linear-to-t from-black/80 to-black/60'
+							: ''} {fade}"
+					>
 						<div class="flex flex-wrap items-center gap-x-1 px-1 py-1 @xl/bar:gap-x-2 @xl/bar:px-2">
 							<button
 								onclick={togglePlay}
@@ -1081,7 +1113,7 @@ can't scroll at all. -->
 	{#if chatShown}
 		<!-- Landscape: the panel takes the row's height. Portrait: the screen's rest under the video, in
 		fullscreen of what's in view (above the keyboard, while it's up); it gives up more while the
-		subtitle panel is open. Absolute inside, so its messages never make the player taller. -->
+		subtitle panel is open, never all: in fullscreen the video shrinks first. Absolute inside, so its messages never make the player taller. -->
 		<aside
 			class="relative z-10 border-line landscape:w-72 landscape:shrink-0 landscape:border-l lg:landscape:w-80 portrait:border-t portrait:flex-1 {subtitlesOpen
 				? 'portrait:min-h-56'
