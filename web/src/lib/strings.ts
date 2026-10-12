@@ -5,6 +5,8 @@ export const strings = {
 	locale: 'en', // for language names, sorting titles, and joining names into a list
 	appName: 'PauseTogether',
 	tagline: "Distance can't pause us.",
+	// What the app is, in plain words, for a first visit: the tagline doesn't say it.
+	about: 'Watch videos together with people far away, at the same second.',
 
 	namePrompt: 'What should we call you?',
 	nameWhy: "Pick a name so the others know it's you.",

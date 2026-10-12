@@ -58,6 +58,7 @@
 				<Brand />
 			</p>
 			<p class="text-haze">{strings.tagline}</p>
+			<p class="text-haze">{strings.about}</p>
 		</div>
 		{#if room}
 			<p class="break-words">{strings.joining(room)}</p>
