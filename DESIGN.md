@@ -378,6 +378,11 @@ the chat 60%. The picture sits in the middle of its 40%, between black; on a pho
 on the picture's foot. Not: 50/50, the video at its own height (fullscreen looked like the page), or
 the picture at the top with the bar in the black under it.
 
+**The Page-Wide Keys Rule.** The player's keys (Space, K, J, L, the arrows, F, C, H, M) work
+anywhere on the room page, as on YouTube, not only with focus in the player. They stay off while
+typing or with a dialog open. The cost: single-letter keys with no modifier and no off switch fail
+WCAG 2.1.4, and voice control can fire them. Not: letters only with focus in the player.
+
 ### Pills
 A short line over the video: "Host is offline, reconnecting…" (with a small ember signal icon), "Alice
 paused" (with a small lamp pause icon), "Alice is 3 s behind", chat toasts. Midnight at 88% (so person colors stay readable over a white frame), gentle corners, sized with the video width (at least 1rem), so they stay
