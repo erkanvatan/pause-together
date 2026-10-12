@@ -573,9 +573,12 @@ So each room's video is **prepared once**, then served as a plain file.
   Held sideways, the chat sits beside the video, as on any landscape screen.
 - In fullscreen the wrapper is padded to the visual viewport, so a phone's keyboard pushes the chat's
   box up above it instead of covering it.
+- In fullscreen, and where the page fits a landscape screen, the video's box fills the player: the
+  picture keeps its own shape inside it, between black bars. Subtitles size and wrap to the
+  picture's width, not the box's, and pills size to it.
 - The control bar looks the same in and out of fullscreen. Where the video is big (the page fits a
-  landscape screen, or fullscreen held sideways) it lies over the foot of the video, so hiding it
-  never resizes the video; subtitles move up while it shows, and what holds the video's middle centers
+  landscape screen, or fullscreen held sideways) it lies over the foot of the box at full width, so
+  hiding it never resizes the video; subtitles move up while it shows, and what holds the video's middle centers
   above its place, shown or not, so it doesn't bob as the bar fades. Elsewhere the video is short (a
   phone, out of fullscreen or held upright), so the bar sits in the black under the picture and keeps
   its space while hidden.

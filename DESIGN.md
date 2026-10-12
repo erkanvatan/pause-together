@@ -242,9 +242,10 @@ labels.
   always show it.
 - On phones the video runs edge to edge (it cancels the gutter). A landscape window at least 30rem
   tall (the `fit` variant in `app.css`) never scrolls: the player fills what's left of the screen,
-  and the video box is the largest 16:9 that fits, between black bars, with the control bar over its
-  foot. A phone held sideways is shorter, so its page scrolls instead of shrinking the video to a
-  strip.
+  and the video box fills it, as in fullscreen: the picture keeps its own shape between black bars,
+  and the control bar lies over the box's foot at full width. Subtitles size and wrap to the
+  picture, not the box, and pills size to it. A phone held sideways is shorter, so its page scrolls instead of shrinking
+  the video to a strip.
 - Fullscreen fills the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   real fullscreen isn't available, the wrapper fills the window with CSS. In fullscreen every phone
   turns as its auto-rotate setting says, and the layout follows how it's held. Upright, the video sits on top with the bar
@@ -252,8 +253,8 @@ labels.
   Sideways, the video fills the screen, with the chat beside it while it's open.
 - Spacing steps: 0.5rem inside lists and stacks, 1.5rem between groups, 2.5rem between sections,
   4rem between homepage columns on wide screens.
-- Text over video (subtitles, pills) sizes from the video box width (container query units), so it
-  grows in fullscreen.
+- Text over video (subtitles, pills) sizes from the picture's width (`--picture` on the video box,
+  from container query units), so it grows in fullscreen. Subtitles wrap to it too.
 
 ## Elevation & Depth
 
@@ -321,8 +322,8 @@ Archived rooms show their title in haze.
   10 s. The side ones are translucent midnight with a 6px blur; play/pause is the lamp. They shrink to
   92% while pressed. They fade after 3 s of no input while playing.
 - **Control bar:** label size, moonlight, the same in and out of fullscreen. Where the video is big
-  (the page fits a landscape screen, or fullscreen held sideways) it lies over the foot of the video
-  on a black fade (80% at the bottom, clear 3rem above the bar); subtitles slide up while it shows,
+  (the page fits a landscape screen, or fullscreen held sideways) it lies over the foot of the video's
+  box on a black fade (80% at the bottom, clear 3rem above the bar); subtitles slide up while it shows,
   and what holds the middle centers above its place, shown or not. Elsewhere the video is short (a
   phone, out of fullscreen or held upright), so the bar sits on the black under the picture and
   keeps its space while hidden. It fades out with the transport (300ms). A narrow bar puts the seek bar and
@@ -381,7 +382,8 @@ stands between the title and the video, so the video starts high on a phone.
 - **Do** keep Lamp Amber for the next action, focus, progress and presence.
 - **Do** make every control at least 44 px (2.75rem) on touch screens.
 - **Do** separate surfaces with the midnight/dusk step and a 1px line border.
-- **Do** put text over video on translucent midnight and size it from the video box width.
+- **Do** put text over video on translucent midnight and size it from the picture's width
+  (`--picture`).
 - **Do** leave room for longer Turkish strings: wrap and `break-words` instead of fixed widths.
 - **Do** honor reduced motion: transitions turn off and animations collapse to near zero.
 

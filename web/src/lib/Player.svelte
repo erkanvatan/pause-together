@@ -136,7 +136,15 @@
 	const portrait = new MediaQuery('(orientation: portrait)');
 	// The page fits the screen: app.css's `fit` variant, which the layout below follows. Change both.
 	const fits = new MediaQuery('(orientation: landscape) and (min-height: 30rem)');
-	// The control bar lies over the video's foot where the video is big: the page fits a landscape
+	// The video box fills the player in fullscreen, and where the page fits the screen: the bar stays
+	// full width, and the picture sits inside at its own shape, between black bars.
+	const fill = $derived(full || fits.current);
+	let aspect = $state(16 / 9); // the picture's shape, as the video last said
+	// On loadedmetadata too: not every browser fires resize for the first size.
+	function measure() {
+		if (video.videoHeight) aspect = video.videoWidth / video.videoHeight;
+	}
+	// The control bar lies over the box's foot where the video is big: the page fits a landscape
 	// screen, or fullscreen held sideways. Elsewhere the video is short (a phone's is about 220 px tall
 	// upright, 290 px sideways), and the bar would cover its foot, the subtitles and what holds the
 	// middle: there it sits in the black under the picture, with the same look, and keeps its space
@@ -732,331 +740,333 @@ can't scroll at all. -->
 			: undefined}
 		class="relative flex min-w-0 flex-1 flex-col select-none [-webkit-touch-callout:none] {full ? 'portrait:min-h-0' : 'portrait:flex-none'}"
 	>
-		<!-- When the page fits the screen, the video box is the largest 16:9 that fits in this space,
-		between black bars. The box narrows with it, not just the picture, so subtitles size and wrap to
-		the picture, and the bar lies over the picture's foot. -->
+		<!-- The container for the subtitles' and pills' sizes. Not the wrapper: it holds the chat too.
+		They size to --picture, the picture's width: a filled box is wider than the picture when the
+		screen is wider than its shape. Its cqi and cqh resolve where it's used, so nothing that uses it
+		may sit in a container of its own. A filled box holds the video absolutely, not by a percentage
+		height: the page's height is only a min-height, which a percentage can't resolve against in every
+		browser. -->
 		<div
-			class={full
-				? 'flex min-h-0 flex-1 flex-col'
-				: 'fit:flex fit:min-h-0 fit:flex-1 fit:items-center fit:justify-center fit:[container-type:size]'}
+			bind:this={box}
+			style:padding-bottom={barOver ? undefined : `${barHeight}px`}
+			style:--picture={fill
+				? `min(100cqi, 100cqh * ${aspect})`
+				: `min(100cqi, 100cqi * 9 / 16 * ${aspect})` /* the video's aspect-video box */}
+			class="relative {fill ? 'min-h-0 flex-1 [container-type:size]' : '@container'} {faded
+				? 'cursor-none'
+				: ''}"
 		>
-			<!-- The container for the subtitles' and pills' cqi sizes. Not the wrapper: it holds the chat too. -->
+			<video
+				bind:this={video}
+				bind:volume
+				bind:muted
+				playsinline
+				preload="metadata"
+				disablepictureinpicture
+				disableremoteplayback
+				onerror={failed}
+				onwaiting={tick}
+				onplaying={() => {
+					turnFreely();
+					tick();
+				}}
+				onseeking={tick}
+				onseeked={tick}
+				oncanplay={tick}
+				onpause={tick}
+				onloadedmetadata={() => {
+					measure();
+					tick();
+				}}
+				onresize={measure}
+				style:height={fill ? (barOver ? '100%' : `calc(100% - ${barHeight}px)`) : undefined}
+				class={fill ? 'absolute inset-x-0 top-0 w-full object-contain' : 'aspect-video w-full'}
+			></video>
+
+			{#if src && !cantPlay}
+				<Subtitles
+					url={subUrl}
+					{offsetMs}
+					size={subtitleSize}
+					videoMs={() => video.currentTime * 1000}
+					lift={barOver && faded ? 0 : barHeight}
+				/>
+			{/if}
+
+			<!-- The end cards sit on black, not on whatever the last frame happens to be. -->
+			{#if middle === 'next' || middle === 'end'}
+				<div class="fade-out-video absolute inset-0 bg-black"></div>
+			{/if}
+
+			<!-- What holds the middle centers above the bar, never under it. -->
 			<div
-				bind:this={box}
-				style:padding-bottom={barOver ? undefined : `${barHeight}px`}
-				class="@container relative {full
-					? 'min-h-0 flex-1'
-					: 'mx-auto w-full fit:w-[min(100cqw,100cqh*16/9)]'} {faded
-					? 'cursor-none'
-					: ''}"
+				style:bottom="{barHeight}px"
+				class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center @max-md:p-2"
 			>
-				<video
-					bind:this={video}
-					bind:volume
-					bind:muted
-					playsinline
-					preload="metadata"
-					disablepictureinpicture
-					disableremoteplayback
-					onerror={failed}
-					onwaiting={tick}
-					onplaying={() => {
-						turnFreely();
-						tick();
-					}}
-					onseeking={tick}
-					onseeked={tick}
-					oncanplay={tick}
-					onpause={tick}
-					onloadedmetadata={tick}
-					class={full ? 'h-full w-full object-contain' : 'aspect-video w-full'}
-				></video>
-
-				{#if src && !cantPlay}
-					<Subtitles
-						url={subUrl}
-						{offsetMs}
-						size={subtitleSize}
-						videoMs={() => video.currentTime * 1000}
-						lift={barOver && faded ? 0 : barHeight}
-					/>
-				{/if}
-
-				<!-- The end cards sit on black, not on whatever the last frame happens to be. -->
-				{#if middle === 'next' || middle === 'end'}
-					<div class="fade-out-video absolute inset-0 bg-black"></div>
-				{/if}
-
-				<!-- What holds the middle centers above the bar, never under it. -->
-				<div
-					style:bottom="{barHeight}px"
-					class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center @max-md:p-2"
-				>
-					{#if middle === 'transport'}
-						<div
-							class="flex items-center gap-6 sm:gap-10 {fade}"
+				{#if middle === 'transport'}
+					<div
+						class="flex items-center gap-6 sm:gap-10 {fade}"
+					>
+						<button
+							onclick={() => skip(-skipMs)}
+							disabled={!online || durationMs === 0}
+							aria-label={strings.skipBack(skipMs / 1000)}
+							title={strings.withKey(strings.skipBack(skipMs / 1000), strings.keys.back)}
+							class="transport size-12 sm:size-14"
 						>
-							<button
-								onclick={() => skip(-skipMs)}
-								disabled={!online || durationMs === 0}
-								aria-label={strings.skipBack(skipMs / 1000)}
-								title={strings.withKey(strings.skipBack(skipMs / 1000), strings.keys.back)}
-								class="transport size-12 sm:size-14"
-							>
-								<Icon name="skip-back" step={skipMs / 1000} class="size-7 sm:size-8" />
-							</button>
-							<button
-								onclick={togglePlay}
-								disabled={!online || !playState}
-								aria-label={playState?.playing ? strings.pause : strings.play}
-								title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
-								class="transport transport-main size-16 sm:size-20"
-							>
-								<Icon name={playState?.playing ? 'pause' : 'play'} class="size-8 sm:size-10" />
-							</button>
-							<button
-								onclick={() => skip(skipMs)}
-								disabled={!online || durationMs === 0}
-								aria-label={strings.skipForward(skipMs / 1000)}
-								title={strings.withKey(strings.skipForward(skipMs / 1000), strings.keys.forward)}
-								class="transport size-12 sm:size-14"
-							>
-								<Icon name="skip-forward" step={skipMs / 1000} class="size-7 sm:size-8" />
-							</button>
-						</div>
-					{:else if middle === 'offline'}
-						<!-- It stays up while the video plays: this screen is on its own until the host is back. -->
-						{@render notice(strings.hostOffline, strings.hostOfflineWhy, false, false)}
-					{:else if middle === 'cantPlay'}
-						<!-- Unplayable for the server is unplayable for everyone: only another pick helps. -->
-						{@const everywhere = room.video.unplayable !== ''}
-						{@render notice(
-							unplayable,
-							everywhere
-								? strings.cantPlayAnywhere
-								: strings.cantPlayHereWhy(codecName(room.video.codecString)),
-							false,
-							everywhere
-						)}
-					{:else if middle === 'failed' && prepare}
-						{@render notice(
-							strings.prepareFailed,
-							strings.prepareFailedWhy[prepare.error] ?? strings.prepareFailedWhy.failed,
-							true,
-							true
-						)}
-					{:else if middle === 'tap'}
-						<button onclick={join} class="btn btn-primary min-h-14 rounded-full px-7 text-lg">
-							<Icon name="play" class="size-6" />
-							{coarse ? strings.tapToJoin : strings.clickToJoin}
+							<Icon name="skip-back" step={skipMs / 1000} class="size-7 sm:size-8" />
 						</button>
-					{:else if middle === 'connecting'}
-						<!-- Late, so a quick connect never flashes it. -->
-						<p class="pill appear-late">{strings.gettingReady}</p>
-					{:else if middle === 'preparing'}
-						<div class="flex w-full max-w-64 flex-col items-center gap-3 @max-md:gap-1.5">
-							<p class="pill whitespace-nowrap tabular-nums">{preparing}</p>
-							{#if prepare?.state === 'running'}
-								<div class="h-1 w-full overflow-hidden rounded-full bg-dusk">
-									<div class="h-full bg-lamp" style:width="{prepare.progress * 100}%"></div>
-								</div>
-							{/if}
-							<p class="text-sm text-balance text-haze">{strings.preparingWhy}</p>
-						</div>
-					{:else if middle === 'next' && next}
-						<!-- An episode's end gets its own title card too: the evening may go on, or stop here. -->
-						<div class="flex max-w-full flex-col items-center gap-4 @max-md:gap-2">
-							<p class="font-display text-3xl font-bold @max-md:text-2xl">
-								{strings.episodeEnded(episodeCode(room.video))}
-							</p>
-							<div class="flex max-w-full flex-col items-center gap-2">
-								<button
-									onclick={nextEpisode}
-									disabled={!online || nexting}
-									class="btn btn-primary max-w-full break-words"
-								>
-									{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
-								</button>
-								<button onclick={pickAnother} disabled={!online} class="btn btn-quiet">
-									{strings.watchSomethingElse}
-								</button>
+						<button
+							onclick={togglePlay}
+							disabled={!online || !playState}
+							aria-label={playState?.playing ? strings.pause : strings.play}
+							title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
+							class="transport transport-main size-16 sm:size-20"
+						>
+							<Icon name={playState?.playing ? 'pause' : 'play'} class="size-8 sm:size-10" />
+						</button>
+						<button
+							onclick={() => skip(skipMs)}
+							disabled={!online || durationMs === 0}
+							aria-label={strings.skipForward(skipMs / 1000)}
+							title={strings.withKey(strings.skipForward(skipMs / 1000), strings.keys.forward)}
+							class="transport size-12 sm:size-14"
+						>
+							<Icon name="skip-forward" step={skipMs / 1000} class="size-7 sm:size-8" />
+						</button>
+					</div>
+				{:else if middle === 'offline'}
+					<!-- It stays up while the video plays: this screen is on its own until the host is back. -->
+					{@render notice(strings.hostOffline, strings.hostOfflineWhy, false, false)}
+				{:else if middle === 'cantPlay'}
+					<!-- Unplayable for the server is unplayable for everyone: only another pick helps. -->
+					{@const everywhere = room.video.unplayable !== ''}
+					{@render notice(
+						unplayable,
+						everywhere
+							? strings.cantPlayAnywhere
+							: strings.cantPlayHereWhy(codecName(room.video.codecString)),
+						false,
+						everywhere
+					)}
+				{:else if middle === 'failed' && prepare}
+					{@render notice(
+						strings.prepareFailed,
+						strings.prepareFailedWhy[prepare.error] ?? strings.prepareFailedWhy.failed,
+						true,
+						true
+					)}
+				{:else if middle === 'tap'}
+					<button onclick={join} class="btn btn-primary min-h-14 rounded-full px-7 text-lg">
+						<Icon name="play" class="size-6" />
+						{coarse ? strings.tapToJoin : strings.clickToJoin}
+					</button>
+				{:else if middle === 'connecting'}
+					<!-- Late, so a quick connect never flashes it. -->
+					<p class="pill appear-late">{strings.gettingReady}</p>
+				{:else if middle === 'preparing'}
+					<div class="flex w-full max-w-64 flex-col items-center gap-3 @max-md:gap-1.5">
+						<p class="pill whitespace-nowrap tabular-nums">{preparing}</p>
+						{#if prepare?.state === 'running'}
+							<div class="h-1 w-full overflow-hidden rounded-full bg-dusk">
+								<div class="h-full bg-lamp" style:width="{prepare.progress * 100}%"></div>
 							</div>
-						</div>
-					{:else if middle === 'end'}
-						<!-- A film's last frame is the room's last shared moment: a title card, and what's next. -->
-						<div class="flex flex-col items-center gap-4 @max-md:gap-2">
-							<p class="font-display text-3xl font-bold @max-md:text-2xl">{strings.theEnd}</p>
-							<button onclick={pickAnother} disabled={!online} class="btn btn-primary">
+						{/if}
+						<p class="text-sm text-balance text-haze">{strings.preparingWhy}</p>
+					</div>
+				{:else if middle === 'next' && next}
+					<!-- An episode's end gets its own title card too: the evening may go on, or stop here. -->
+					<div class="flex max-w-full flex-col items-center gap-4 @max-md:gap-2">
+						<p class="font-display text-3xl font-bold @max-md:text-2xl">
+							{strings.episodeEnded(episodeCode(room.video))}
+						</p>
+						<div class="flex max-w-full flex-col items-center gap-2">
+							<button
+								onclick={nextEpisode}
+								disabled={!online || nexting}
+								class="btn btn-primary max-w-full break-words"
+							>
+								{strings.nextEpisodeNamed(episodeCode(next), next.episodeTitle)}
+							</button>
+							<button onclick={pickAnother} disabled={!online} class="btn btn-quiet">
 								{strings.watchSomethingElse}
 							</button>
 						</div>
-					{:else if middle === 'missing'}
-						{@render notice(
-							strings.videoMissing,
-							strings.videoGone(shownMs >= 1000 ? formatTime(shownMs) : ''),
-							true,
-							true
-						)}
-					{/if}
-					<!-- Offline, who the room waits for is stale, and "Play anyway" can't reach anyone. -->
-					{#if waits && !offline}
-						<div
-							class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 px-5 py-4 @max-md:gap-2 @max-md:p-3"
+					</div>
+				{:else if middle === 'end'}
+					<!-- A film's last frame is the room's last shared moment: a title card, and what's next. -->
+					<div class="flex flex-col items-center gap-4 @max-md:gap-2">
+						<p class="font-display text-3xl font-bold @max-md:text-2xl">{strings.theEnd}</p>
+						<button onclick={pickAnother} disabled={!online} class="btn btn-primary">
+							{strings.watchSomethingElse}
+						</button>
+					</div>
+				{:else if middle === 'missing'}
+					{@render notice(
+						strings.videoMissing,
+						strings.videoGone(shownMs >= 1000 ? formatTime(shownMs) : ''),
+						true,
+						true
+					)}
+				{/if}
+				<!-- Offline, who the room waits for is stale, and "Play anyway" can't reach anyone. -->
+				{#if waits && !offline}
+					<div
+						class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 px-5 py-4 @max-md:gap-2 @max-md:p-3"
+					>
+						<div class="flex flex-col items-center gap-1">
+							<p class="text-lg break-words">{waits.headline}</p>
+							{#each waits.lines as line, i (i)}
+								<p class="text-sm break-words text-haze tabular-nums">{line}</p>
+							{/each}
+						</div>
+						<button
+							onclick={() => socket?.send({ type: 'playAnyway' })}
+							disabled={!online}
+							class="btn btn-quiet max-w-full break-words"
 						>
-							<div class="flex flex-col items-center gap-1">
-								<p class="text-lg break-words">{waits.headline}</p>
-								{#each waits.lines as line, i (i)}
-									<p class="text-sm break-words text-haze tabular-nums">{line}</p>
-								{/each}
+							{waits.action}
+						</button>
+					</div>
+				{/if}
+			</div>
+
+			<div
+				class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1"
+			>
+				<!-- Unless the middle says it. -->
+				{#if offline && middle !== 'offline'}
+					<p class="pill flex animate-[appear_300ms_both] items-center gap-1.5 break-words">
+						<Icon name="offline" class="size-[0.9em] shrink-0 text-ember" />{strings.hostOffline}
+					</p>
+				{/if}
+				{#if note}
+					<p class="pill flex items-center gap-1.5 break-words">
+						<Icon name="pause" class="size-[0.9em] shrink-0 text-lamp" />{note}
+					</p>
+				{/if}
+				{#each behind as b (b.userId)}
+					<p class="pill break-words">{strings.behind(b.name, b.ms)}</p>
+				{/each}
+				{#if !chatShown}
+					{@render overlay()}
+				{/if}
+			</div>
+			<p role="status" class="sr-only">{announce}</p>
+
+			<!-- The control bar, one element in every view, so turning the screen keeps a drag on the seek
+			bar, and the focus on a button. Landscape: over the box's foot on a dark fade. Upright: in the black under the picture,
+			where the box keeps room for it. -->
+			<div
+				class="pointer-events-none absolute inset-x-0 bottom-0 {barOver
+					? 'bg-linear-to-t from-black/80 via-black/60 via-60% to-transparent pt-12'
+					: ''} {fade}"
+			>
+				<!-- svelte-ignore a11y_no_static_element_interactions (keeps the controls up under the mouse) -->
+				<div
+					bind:this={bar}
+					bind:clientHeight={barHeight}
+					onpointerenter={() => (overBar = true)}
+					onpointerleave={() => (overBar = false)}
+					class="pointer-events-auto"
+				>
+					<!-- Above the bar, where it shows, so Tab and screen readers meet it in that order. -->
+					{#if panelOver}
+						{@render subtitlePanel()}
+					{/if}
+
+					<!-- Laid out by the bar's own width, not the screen's: the chat panel takes part of a wide
+					one. A narrow bar puts the seek bar and time on a row of their own, above the buttons. -->
+					<div class="@container/bar">
+						<div class="flex flex-wrap items-center gap-x-1 px-1 py-1 @xl/bar:gap-x-2 @xl/bar:px-2">
+							<button
+								onclick={togglePlay}
+								disabled={!online || !toggleable}
+								aria-label={playState?.playing ? strings.pause : strings.play}
+								title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
+								class="icon-btn"
+							>
+								<Icon name={playState?.playing ? 'pause' : 'play'} />
+							</button>
+							<div
+								class="flex min-w-0 flex-1 items-center gap-3 px-2 @max-xl/bar:order-first @max-xl/bar:basis-full"
+							>
+								<input
+									type="range"
+									aria-label={strings.position}
+									min="0"
+									max={durationMs}
+									step="1000"
+									value={dragMs ?? shownMs}
+									aria-valuetext={strings.positionOf(formatTime(dragMs ?? shownMs), formatTime(durationMs))}
+									disabled={!online || durationMs === 0 || stuck}
+									oninput={(e) => (dragMs = Number(e.currentTarget.value))}
+									onkeydown={(e) => {
+										// An arrow skips 10 s, as everywhere else. The slider's own 1 s step would seek the
+										// whole room once per press.
+										if (e.ctrlKey || e.metaKey || e.altKey) return;
+										const back = e.key === 'ArrowLeft' || e.key === 'ArrowDown';
+										if (!back && e.key !== 'ArrowRight' && e.key !== 'ArrowUp') return;
+										e.preventDefault();
+										if (!e.repeat && online && durationMs > 0) skip(back ? -skipMs : skipMs);
+									}}
+									onchange={(e) => {
+										dragMs = null;
+										intent({ type: 'seek', positionMs: Number(e.currentTarget.value) });
+									}}
+									class="h-11 min-w-0 flex-1"
+								/>
+								<span class="text-sm whitespace-nowrap tabular-nums">
+									{formatTime(dragMs ?? shownMs)} / {formatTime(durationMs)}
+								</span>
 							</div>
 							<button
-								onclick={() => socket?.send({ type: 'playAnyway' })}
-								disabled={!online}
-								class="btn btn-quiet max-w-full break-words"
+								onclick={() => (muted = !muted)}
+								aria-label={muted ? strings.unmute : strings.mute}
+								title={strings.withKey(muted ? strings.unmute : strings.mute, strings.keys.mute)}
+								class="icon-btn"
 							>
-								{waits.action}
+								<Icon name={muted ? 'muted' : 'volume'} />
 							</button>
-						</div>
-					{/if}
-				</div>
-
-				<div
-					class="pointer-events-none absolute top-2 left-2 flex max-w-[70%] flex-col items-start gap-1"
-				>
-					<!-- Unless the middle says it. -->
-					{#if offline && middle !== 'offline'}
-						<p class="pill flex animate-[appear_300ms_both] items-center gap-1.5 break-words">
-							<Icon name="offline" class="size-[0.9em] shrink-0 text-ember" />{strings.hostOffline}
-						</p>
-					{/if}
-					{#if note}
-						<p class="pill flex items-center gap-1.5 break-words">
-							<Icon name="pause" class="size-[0.9em] shrink-0 text-lamp" />{note}
-						</p>
-					{/if}
-					{#each behind as b (b.userId)}
-						<p class="pill break-words">{strings.behind(b.name, b.ms)}</p>
-					{/each}
-					{#if !chatShown}
-						{@render overlay()}
-					{/if}
-				</div>
-				<p role="status" class="sr-only">{announce}</p>
-
-				<!-- The control bar, one element in every view, so turning the screen keeps a drag on the seek
-				bar, and the focus on a button. Landscape: over the video's foot on a dark fade. Upright: in the black under the picture,
-				where the box keeps room for it. -->
-				<div
-					class="pointer-events-none absolute inset-x-0 bottom-0 {barOver
-						? 'bg-linear-to-t from-black/80 via-black/60 via-60% to-transparent pt-12'
-						: ''} {fade}"
-				>
-					<!-- svelte-ignore a11y_no_static_element_interactions (keeps the controls up under the mouse) -->
-					<div
-						bind:this={bar}
-						bind:clientHeight={barHeight}
-						onpointerenter={() => (overBar = true)}
-						onpointerleave={() => (overBar = false)}
-						class="pointer-events-auto"
-					>
-						<!-- Above the bar, where it shows, so Tab and screen readers meet it in that order. -->
-						{#if panelOver}
-							{@render subtitlePanel()}
-						{/if}
-
-						<!-- Laid out by the bar's own width, not the screen's: the chat panel takes part of a wide
-						one. A narrow bar puts the seek bar and time on a row of their own, above the buttons. -->
-						<div class="@container/bar">
-							<div class="flex flex-wrap items-center gap-x-1 px-1 py-1 @xl/bar:gap-x-2 @xl/bar:px-2">
-								<button
-									onclick={togglePlay}
-									disabled={!online || !toggleable}
-									aria-label={playState?.playing ? strings.pause : strings.play}
-									title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
-									class="icon-btn"
-								>
-									<Icon name={playState?.playing ? 'pause' : 'play'} />
-								</button>
-								<div
-									class="flex min-w-0 flex-1 items-center gap-3 px-2 @max-xl/bar:order-first @max-xl/bar:basis-full"
-								>
-									<input
-										type="range"
-										aria-label={strings.position}
-										min="0"
-										max={durationMs}
-										step="1000"
-										value={dragMs ?? shownMs}
-										aria-valuetext={strings.positionOf(formatTime(dragMs ?? shownMs), formatTime(durationMs))}
-										disabled={!online || durationMs === 0 || stuck}
-										oninput={(e) => (dragMs = Number(e.currentTarget.value))}
-										onkeydown={(e) => {
-											// An arrow skips 10 s, as everywhere else. The slider's own 1 s step would seek the
-											// whole room once per press.
-											if (e.ctrlKey || e.metaKey || e.altKey) return;
-											const back = e.key === 'ArrowLeft' || e.key === 'ArrowDown';
-											if (!back && e.key !== 'ArrowRight' && e.key !== 'ArrowUp') return;
-											e.preventDefault();
-											if (!e.repeat && online && durationMs > 0) skip(back ? -skipMs : skipMs);
-										}}
-										onchange={(e) => {
-											dragMs = null;
-											intent({ type: 'seek', positionMs: Number(e.currentTarget.value) });
-										}}
-										class="h-11 min-w-0 flex-1"
-									/>
-									<span class="text-sm whitespace-nowrap tabular-nums">
-										{formatTime(dragMs ?? shownMs)} / {formatTime(durationMs)}
-									</span>
-								</div>
-								<button
-									onclick={() => (muted = !muted)}
-									aria-label={muted ? strings.unmute : strings.mute}
-									title={strings.withKey(muted ? strings.unmute : strings.mute, strings.keys.mute)}
-									class="icon-btn"
-								>
-									<Icon name={muted ? 'muted' : 'volume'} />
-								</button>
-								{#if volumeWorks}
-									<input
-										type="range"
-										aria-label={strings.volume}
-										min="0"
-										max="1"
-										step="0.05"
-										bind:this={volumeSlider}
-										bind:value={volume}
-										aria-valuetext={strings.percent(volume)}
-										class="hidden h-11 w-20 accent-moonlight @xl/bar:block"
-									/>
-								{/if}
-								<button
-									onclick={() => (subtitlesOpen = !subtitlesOpen)}
-									aria-label={strings.subtitle}
-									aria-pressed={subtitlesOpen}
-									title={strings.withKey(strings.subtitle, strings.keys.subtitles)}
-									class="icon-btn ml-auto {playState?.subtitle ? '' : 'text-haze'}"
-								>
-									<Icon name="captions" />
-								</button>
-								<button
-									onclick={() => (chatOpen = !chatOpen)}
-									aria-label={strings.chat}
-									aria-pressed={chatOpen}
-									title={strings.withKey(strings.chat, strings.keys.chat)}
-									class="icon-btn portrait:hidden"
-								>
-									<Icon name="chat" />
-								</button>
-								<button
-									onclick={toggleFullscreen}
-									aria-label={full ? strings.exitFullscreen : strings.fullscreen}
-									title={strings.withKey(full ? strings.exitFullscreen : strings.fullscreen, strings.keys.fullscreen)}
-									class="icon-btn"
-								>
-									<Icon name={full ? 'shrink' : 'expand'} />
-								</button>
-							</div>
+							{#if volumeWorks}
+								<input
+									type="range"
+									aria-label={strings.volume}
+									min="0"
+									max="1"
+									step="0.05"
+									bind:this={volumeSlider}
+									bind:value={volume}
+									aria-valuetext={strings.percent(volume)}
+									class="hidden h-11 w-20 accent-moonlight @xl/bar:block"
+								/>
+							{/if}
+							<button
+								onclick={() => (subtitlesOpen = !subtitlesOpen)}
+								aria-label={strings.subtitle}
+								aria-pressed={subtitlesOpen}
+								title={strings.withKey(strings.subtitle, strings.keys.subtitles)}
+								class="icon-btn ml-auto {playState?.subtitle ? '' : 'text-haze'}"
+							>
+								<Icon name="captions" />
+							</button>
+							<button
+								onclick={() => (chatOpen = !chatOpen)}
+								aria-label={strings.chat}
+								aria-pressed={chatOpen}
+								title={strings.withKey(strings.chat, strings.keys.chat)}
+								class="icon-btn portrait:hidden"
+							>
+								<Icon name="chat" />
+							</button>
+							<button
+								onclick={toggleFullscreen}
+								aria-label={full ? strings.exitFullscreen : strings.fullscreen}
+								title={strings.withKey(full ? strings.exitFullscreen : strings.fullscreen, strings.keys.fullscreen)}
+								class="icon-btn"
+							>
+								<Icon name={full ? 'shrink' : 'expand'} />
+							</button>
 						</div>
 					</div>
 				</div>

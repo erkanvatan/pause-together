@@ -21,11 +21,12 @@
 		lift?: number; // px of controls over the video's bottom edge; the text sits above them
 	} = $props();
 
-	// Relative to the player's width, so fullscreen makes the text bigger; never below a readable size.
+	// Relative to the picture's width (the player's --picture), so fullscreen makes the text bigger;
+	// never below a readable size.
 	const sizes: Record<SubtitleSize, string> = {
-		small: 'text-[length:max(0.8rem,2.4cqi)]',
-		medium: 'text-[length:max(0.9rem,3.2cqi)]',
-		large: 'text-[length:max(1rem,4.2cqi)]'
+		small: 'text-[length:max(0.8rem,var(--picture)*0.024)]',
+		medium: 'text-[length:max(0.9rem,var(--picture)*0.032)]',
+		large: 'text-[length:max(1rem,var(--picture)*0.042)]'
 	};
 
 	let shown = $state.raw<Cue[]>([]);
@@ -79,9 +80,11 @@
 	</p>
 {/if}
 
+<!-- Wraps to the picture, but never narrower than about 30 characters: a phone clip filmed upright is a
+strip. -->
 <div
 	style:bottom={lift ? `calc(${lift}px + 2%)` : undefined}
-	class="pointer-events-none absolute inset-x-0 bottom-[6%] flex transition-[bottom] duration-300 flex-col items-center gap-0.5 px-[5%] text-center leading-snug {sizes[
+	class="pointer-events-none absolute inset-x-0 bottom-[6%] mx-auto flex max-w-[max(var(--picture),20em)] transition-[bottom] duration-300 flex-col items-center gap-0.5 px-[calc(var(--picture)*0.05)] text-center leading-snug {sizes[
 		size
 	]}"
 >
