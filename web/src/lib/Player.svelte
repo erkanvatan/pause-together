@@ -44,6 +44,7 @@
 		nexting,
 		onnext,
 		chatOpen = $bindable(),
+		chatShown,
 		side,
 		overlay
 	}: {
@@ -61,7 +62,8 @@
 		next: VideoSummary | null | undefined; // the next episode, offered at the end; undefined while looked up
 		nexting: boolean; // a "Next episode" switch is under way
 		onnext: () => Promise<boolean>; // false: it failed, and the page says why
-		chatOpen: boolean;
+		chatOpen: boolean; // the viewer's choice, followed in landscape
+		chatShown: boolean; // what shows: upright, the chat always does
 		// The chat panel: beside the video in landscape, under it in portrait.
 		side: Snippet;
 		overlay: Snippet; // new chat messages over the video, while the chat is closed
@@ -412,7 +414,7 @@
 			if (ready && durationMs > 0) skip(key === 'j' ? -2 * skipMs : 2 * skipMs);
 		} else if (key === 'f') toggleFullscreen();
 		else if (key === 'c') subtitlesOpen = !subtitlesOpen;
-		else if (key === 'h') chatOpen = !chatOpen;
+		else if (key === 'h' && !portrait.current) chatOpen = !chatOpen; // upright, the chat can't close
 		else if (key === 'm') muted = !muted;
 		else return;
 		e.preventDefault();
@@ -664,10 +666,10 @@ can't scroll at all. -->
 	style:padding-bottom={keyboard.bottom ? `${keyboard.bottom}px` : undefined}
 	class="flex overflow-clip bg-black portrait:flex-col {full
 		? 'fixed inset-0 z-30 h-dvh'
-		: `max-sm:-mx-4 min-h-0 fit:flex-1 sm:rounded-panel ${chatOpen ? 'portrait:flex-1' : ''}`}"
+		: `max-sm:-mx-4 min-h-0 fit:flex-1 sm:rounded-panel portrait:flex-1`}"
 >
 	<!-- In portrait, the video keeps its own height and the chat takes the rest; in fullscreen the
-	video takes the rest, or with the chat open, the upper half plus the subtitle panel: the panel
+	video takes the upper half plus the subtitle panel: the panel
 	pushes the chat down, and the video stays put to show the subtitles it times. The pointer handlers only show and hide the controls; the buttons inside do the rest. No text selection or iOS
 	callout: a long press on the video would select a subtitle or button label. Chat stays selectable. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -675,7 +677,7 @@ can't scroll at all. -->
 		onpointerdown={pointerDown}
 		onpointermove={(e) => e.pointerType === 'mouse' && wake()}
 		onpointerleave={(e) => e.pointerType === 'mouse' && rest()}
-		style:flex={full && portrait.current && chatOpen
+		style:flex={full && portrait.current
 			? `0 1 calc(50% + ${subtitlesOpen ? panelHeight : 0}px)`
 			: undefined}
 		class="relative flex min-w-0 flex-1 flex-col select-none [-webkit-touch-callout:none] {full ? 'portrait:min-h-0' : 'portrait:flex-none'}"
@@ -882,7 +884,7 @@ can't scroll at all. -->
 					{#each behind as b (b.userId)}
 						<p class="pill break-words">{strings.behind(b.name, b.ms)}</p>
 					{/each}
-					{#if !chatOpen}
+					{#if !chatShown}
 						{@render overlay()}
 					{/if}
 				</div>
@@ -987,7 +989,7 @@ can't scroll at all. -->
 							aria-label={strings.chat}
 							aria-pressed={chatOpen}
 							title={strings.withKey(strings.chat, strings.keys.chat)}
-							class="icon-btn"
+							class="icon-btn portrait:hidden"
 						>
 							<Icon name="chat" />
 						</button>
@@ -1008,7 +1010,7 @@ can't scroll at all. -->
 		</div>
 	</div>
 
-	{#if chatOpen}
+	{#if chatShown}
 		<!-- Landscape: the panel takes the row's height. Portrait: the screen's rest under the video, in
 		fullscreen of what's in view (above the keyboard, while it's up); it gives up more while the
 		subtitle panel is open. Absolute inside, so its messages never make the player taller. -->

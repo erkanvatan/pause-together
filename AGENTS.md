@@ -614,10 +614,14 @@ So each room's video is **prepared once**, then served as a plain file.
   (wall clock) shows on tap or hover.
 - No typing indicator, no sounds, no system messages: play, pause, seek, switch, join and leave never
   appear in chat.
-- UI: open on entering the room. A side panel on wide screens. On portrait screens it sits under the
-  video and fills the rest of the screen (the lower half in fullscreen), not a floating sheet. While
-  it's closed, new messages pop up as small toasts over the video and fade out; tapping one opens a
-  reply to it. Must work in fullscreen.
+- UI: open on entering the room, except on a phone (a touch screen, short side under 30rem), where it starts
+  closed in landscape: held sideways, the video needs the whole width. A side panel on wide screens.
+  On portrait screens it sits under the video and fills the rest of the screen (the lower half in
+  fullscreen), not a floating sheet. There it can't be closed (no chat button, no close, no H key):
+  the space under the video would sit empty. Closing it counts in landscape only, so a closed chat
+  comes back when the phone turns upright and goes again when it turns sideways. While it's closed,
+  new messages pop up as small toasts over the video and fade out; tapping one opens a reply to it.
+  Must work in fullscreen.
 - The "watching now" list sits at the top of the chat panel, under its header, like a chat app's
   online list. At most two lines, then it scrolls, so it never pushes the messages off a phone. Not
   shown while the chat is closed.

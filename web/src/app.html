@@ -2,7 +2,9 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- The keyboard covers the page, never shrinks it: a phone's page shrunk by it would turn
+		"landscape", and the room's layout and its chat would follow. Player.svelte pads fullscreen above it. -->
+		<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-visual" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
 		%sveltekit.head%
 	</head>

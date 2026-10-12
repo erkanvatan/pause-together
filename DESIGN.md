@@ -238,7 +238,8 @@ labels.
   right, 3:2), and one column below. Notes and hints stop at 48ch: Atkinson's wide "0" makes 70ch
   hold about 100 characters.
 - The room page goes full width. Wide landscape screens put the chat beside the video (18rem, 20rem
-  from `lg`). Portrait screens put the chat under the video, filling the rest of the screen.
+  from `lg`). Portrait screens put the chat under the video, filling the rest of the screen, and
+  always show it.
 - On phones the video runs edge to edge (it cancels the gutter). A landscape window at least 30rem
   tall (the `fit` variant in `app.css`) never scrolls: the player fills what's left of the screen,
   and the video box is the largest 16:9 that fits above the control bar, between black bars. A phone

@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { fade } from 'svelte/transition';
+	import { MediaQuery } from 'svelte/reactivity';
 	import Chat from '$lib/Chat.svelte';
 	import Dialog from '$lib/Dialog.svelte';
 	import Icon from '$lib/Icon.svelte';
@@ -90,9 +91,20 @@
 	let more = $state(false); // older messages may be on the server
 	let replyTo = $state<ChatMessage | null>(null);
 	let draft = $state('');
-	// The chat starts open: beside the video in landscape, under it in portrait.
-	let chatOpen = $state(true);
+	// Beside the video in landscape, under it in portrait. Closing it holds only in landscape: upright, it
+	// always shows, as the screen under the video has nothing else to hold. It starts open, except on a
+	// phone: a touch screen whose short side is under 30rem (app.css's `fit` height). Held sideways, its
+	// video needs all of its width. A short desktop window isn't one.
+	let chatOpen = $state(
+		!matchMedia('(pointer: coarse) and (width < 30rem), (pointer: coarse) and (height < 30rem)').matches
+	);
+	const portrait = new MediaQuery('(orientation: portrait)');
+	const chatShown = $derived(chatOpen || portrait.current);
 	let toasts = $state<ChatMessage[]>([]);
+	// A shown chat holds every message, so its toasts go, and don't come back when it hides again.
+	$effect(() => {
+		if (chatShown) toasts = [];
+	});
 	let heard = $state(''); // the newest message from someone else, for screen readers
 	// Each person's name color. meet adds the new people, so older messages loading in never recolor
 	// anyone; the room change below starts it over.
@@ -255,7 +267,7 @@
 				meet();
 				if (m.message.from.userId !== userId) {
 					heard = strings.said(m.message.from.name, m.message.text);
-					if (!chatOpen) toast(m.message);
+					if (!chatShown) toast(m.message);
 				}
 				break;
 			case 'chatDeleted':
@@ -400,7 +412,7 @@
 		onsend={sendChat}
 		ondelete={(chatId) => socket?.send({ type: 'deleteChat', id: chatId })}
 		onolder={olderChat}
-		onclose={readOnly ? undefined : () => (chatOpen = false)}
+		onclose={readOnly || portrait.current ? undefined : () => (chatOpen = false)}
 	/>
 {/snippet}
 
@@ -425,7 +437,7 @@
 
 <!-- In portrait, the player with its chat fills the screen down to the bottom edge. -->
 <main
-	class="flex w-full flex-1 flex-col gap-4 px-4 pt-2 pb-6 {chatOpen && room && !room.archived
+	class="flex w-full flex-1 flex-col gap-4 px-4 pt-2 pb-6 {room && !room.archived
 		? 'portrait:pb-0'
 		: ''}"
 >
@@ -533,6 +545,7 @@
 				{nexting}
 				onnext={playNext}
 				bind:chatOpen
+				{chatShown}
 			>
 				{#snippet side()}
 					{@render chatPanel(false)}
