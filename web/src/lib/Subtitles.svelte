@@ -24,7 +24,7 @@
 	// Relative to the picture's width (the player's --picture), so fullscreen makes the text bigger;
 	// never below a readable size.
 	const sizes: Record<SubtitleSize, string> = {
-		small: 'text-[length:max(0.8rem,var(--picture)*0.024)]',
+		small: 'text-[length:max(var(--text-sm),var(--picture)*0.024)]',
 		medium: 'text-[length:max(0.9rem,var(--picture)*0.032)]',
 		large: 'text-[length:max(1rem,var(--picture)*0.042)]'
 	};

@@ -292,7 +292,7 @@
 									<button
 										onclick={() => (confirming = m.id)}
 										disabled={!online}
-										class="btn btn-quiet btn-small text-ember"
+										class="btn btn-quiet btn-small"
 									>
 										{strings.deleteMessage}
 									</button>

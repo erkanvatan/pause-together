@@ -14,7 +14,8 @@
 
 <span class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
 	{#if r.gone}
-		<span class="text-ember">{strings.videoMissing}</span>
+		<!-- An archived room can't play anyway: no alarm there. -->
+		<span class={r.archived ? 'text-haze' : 'text-ember'}>{strings.videoMissing}</span>
 	{:else}
 		<span class="text-haze tabular-nums">{roomProgress(r)}</span>
 	{/if}

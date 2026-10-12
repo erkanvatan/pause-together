@@ -127,6 +127,9 @@
 	);
 	const subUrl = $derived(subtitleUrl(playState?.subtitle ?? null, prepare, detail?.sidecars ?? []));
 	const offsetMs = $derived(playState?.subtitleOffsetMs ?? 0);
+	// Timing moves subtitles that show: with none, there's nothing to move. Reset still clears an
+	// offset left from before.
+	const timing = $derived(online && !!subUrl);
 
 	// Fullscreen is the wrapper's, so subtitles and controls stay on top. Where the browser can't
 	// (iPhone), the wrapper fills the window instead.
@@ -669,7 +672,7 @@
 					<span class="mr-1 text-haze">{strings.subtitleTiming}</span>
 					<button
 						onclick={() => setOffset(offsetMs - offsetStepMs)}
-						disabled={!online || !playState}
+						disabled={!timing}
 						aria-label={strings.subtitleSooner}
 						class="btn btn-quiet btn-small w-11 px-0"
 					>
@@ -678,7 +681,7 @@
 					<span class="w-16 text-center tabular-nums">{strings.subtitleOffset(offsetMs)}</span>
 					<button
 						onclick={() => setOffset(offsetMs + offsetStepMs)}
-						disabled={!online || !playState}
+						disabled={!timing}
 						aria-label={strings.subtitleLater}
 						class="btn btn-quiet btn-small w-11 px-0"
 					>
@@ -1071,8 +1074,14 @@ can't scroll at all. -->
 									max="1"
 									step="0.05"
 									bind:this={volumeSlider}
-									bind:value={volume}
-									aria-valuetext={strings.percent(volume)}
+									value={muted ? 0 : volume}
+									oninput={(e) => {
+										// Down to 0 is mute: the volume before it stays, for unmuting.
+										const v = Number(e.currentTarget.value);
+										if (v > 0) volume = v;
+										muted = v === 0;
+									}}
+									aria-valuetext={strings.percent(muted ? 0 : volume)}
 									class="hidden h-11 w-20 accent-moonlight @xl/bar:block"
 								/>
 							{/if}

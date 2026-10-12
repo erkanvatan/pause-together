@@ -69,6 +69,8 @@
 	let next = $state<VideoSummary | null | undefined>(null); // its next episode; undefined while looked up
 	let renaming = $state(false);
 	let name = $state('');
+	let renameError = $state(''); // the rename dialog's own, so the page's stays as it was
+	let savingName = $state(false);
 	let watching = $state<Who[]>([]);
 	let prepare = $state<Prepare | null>(null);
 	let socket = $state<RoomSocket | null>(null);
@@ -385,12 +387,22 @@
 
 	function startRename() {
 		name = room?.name ?? '';
+		renameError = '';
 		renaming = true;
 	}
 
 	async function saveName(e: SubmitEvent) {
 		e.preventDefault();
-		if (apply(await renameRoom(id, name))) renaming = false;
+		savingName = true;
+		const r = await renameRoom(id, name);
+		savingName = false;
+		if (r.ok) room = r.value;
+		else if (r.error === 'not-found') notFound = true;
+		else {
+			renameError = strings.roomErrors[r.error] ?? strings.actionFailed;
+			return;
+		}
+		renaming = false;
 	}
 
 	// unarchive opens the room again afterwards: this page is open, so its video is needed.
@@ -455,73 +467,51 @@
 			<a href="/" class="btn btn-quiet">{strings.backHome}</a>
 		</div>
 	{:else if room}
-		{#if renaming}
-			<form onsubmit={saveName} class="flex max-w-md flex-col gap-2">
-				<label for="room-name" class="text-sm text-haze">{strings.roomName}</label>
-				<!-- No maxlength: it counts UTF-16 units, not runes. The server decides. -->
-				<!-- svelte-ignore a11y_autofocus -->
-				<input
-					id="room-name"
-					bind:value={name}
-					placeholder={videoName(room.video)}
-					autofocus
-					class="field"
-				/>
-				<p class="text-sm text-haze">{strings.roomNameHint}</p>
-				<div class="flex gap-2">
-					<button type="submit" class="btn btn-primary">{strings.save}</button>
-					<button type="button" onclick={() => (renaming = false)} class="btn btn-quiet">
-						{strings.cancel}
+		<!-- The title with its video name under it, and the room's few actions beside it, so the video
+		starts high on a phone. -->
+		<div class="flex items-start gap-3">
+			<div class="min-w-0 flex-1">
+				<h1 class="font-display text-xl font-bold break-words sm:text-2xl">{roomTitle(room)}</h1>
+				{#if roomSubtitle(room)}
+					<p class="break-words text-haze">{roomSubtitle(room)}</p>
+				{/if}
+			</div>
+			<div class="flex shrink-0 items-center gap-2 pt-1">
+				<!-- A missing video's pick sits in the player, in its place. -->
+				{#if !room.archived && !missing}
+					<button onclick={() => (picking = true)} class="btn btn-quiet btn-small">
+						{strings.switchVideo}
 					</button>
-				</div>
-			</form>
-		{:else}
-			<!-- The title with its video name under it, and the room's few actions beside it, so the video
-			starts high on a phone. -->
-			<div class="flex items-start gap-3">
-				<div class="min-w-0 flex-1">
-					<h1 class="font-display text-xl font-bold break-words sm:text-2xl">{roomTitle(room)}</h1>
-					{#if roomSubtitle(room)}
-						<p class="break-words text-haze">{roomSubtitle(room)}</p>
-					{/if}
-				</div>
-				<div class="flex shrink-0 items-center gap-2 pt-1">
-					<!-- A missing video's pick sits in the player, in its place. -->
-					{#if !room.archived && !missing}
-						<button onclick={() => (picking = true)} class="btn btn-quiet btn-small">
-							{strings.switchVideo}
-						</button>
-					{/if}
-					<Menu label={strings.roomActions} buttonClass="btn btn-quiet btn-small px-2 pointer-coarse:min-w-11">
-						{#snippet button()}
-							<Icon name="more" class="size-5" />
-						{/snippet}
-						{#snippet items(close)}
-							{#if next && !room?.archived && !missing}
-								<button
-									onclick={() => {
-										close();
-										playNext();
-									}}
-									class="row"
-								>
-									{strings.nextEpisode}
-								</button>
-							{/if}
+				{/if}
+				<Menu label={strings.roomActions} buttonClass="btn btn-quiet btn-small px-2 pointer-coarse:min-w-11">
+					{#snippet button()}
+						<Icon name="more" class="size-5" />
+					{/snippet}
+					{#snippet items(close)}
+						{#if next && !room?.archived && !missing}
 							<button
 								onclick={() => {
 									close();
-									startRename();
+									playNext();
 								}}
 								class="row"
 							>
-								{strings.renameRoom}
+								{strings.nextEpisode}
 							</button>
-						{/snippet}
-					</Menu>
-				</div>
+						{/if}
+						<button
+							onclick={() => {
+								close();
+								startRename();
+							}}
+							class="row"
+						>
+							{strings.renameRoom}
+						</button>
+					{/snippet}
+				</Menu>
 			</div>
-		{/if}
+		</div>
 		<!-- Only the admin port sends a guest link: guests never see this. -->
 		{#if me.guestUrl && !room.archived}
 			<div class="-mt-2"><GuestLink path="/rooms/{room.id}" /></div>
@@ -576,6 +566,39 @@
 
 {#if picking}
 	<Picker onpick={switchTo} onclose={() => (picking = false)} />
+{/if}
+
+{#if renaming && room}
+	{@const current = room.name}
+	<Dialog label={strings.renameRoom} onclose={() => (renaming = false)} class="items-center justify-center p-4">
+		<form
+			onsubmit={saveName}
+			class="flex w-full max-w-sm flex-col gap-4 rounded-panel border border-line bg-dusk p-5"
+		>
+			<label for="room-name" class="font-display text-2xl font-bold">{strings.roomName}</label>
+			<!-- No maxlength: it counts UTF-16 units, not runes. The server decides. -->
+			<!-- svelte-ignore a11y_autofocus -->
+			<input id="room-name" bind:value={name} placeholder={videoName(room.video)} autofocus class="field" />
+			{#if renameError}
+				<p class="-mt-2 text-sm text-ember" role="alert">{renameError}</p>
+			{:else}
+				<p class="-mt-2 text-sm text-haze">{strings.roomNameHint}</p>
+			{/if}
+			<div class="flex gap-2">
+				<!-- Off until the name changes: a form at rest shows no lit lamp. -->
+				<button
+					type="submit"
+					disabled={savingName || name.trim() === current}
+					class="btn btn-primary flex-1"
+				>
+					{strings.save}
+				</button>
+				<button type="button" onclick={() => (renaming = false)} class="btn btn-quiet flex-1">
+					{strings.cancel}
+				</button>
+			</div>
+		</form>
+	</Dialog>
 {/if}
 
 {#if confirming}

@@ -310,7 +310,8 @@ Not boxed. A room is a list row with a title-size condensed name that underlines
 then a haze line: the video name below a custom name, or the version label ("1080p.BrRip.x264") below
 a video title. Release tags never sit in the condensed face. Then one label-size line: where the
 room is in haze ("1:02:13 of 2:34:27", "Not started", "Finished"), or "Video missing" in ember when it
-can't play, followed by "watching" with a lamp dot.
+can't play (in haze on an archived room: nobody can play it anyway), followed by "watching" with a
+lamp dot.
 When someone is in the room, a thin lamp bar lights its left edge: the lamp is on. Rooms with people
 in them come first, and the first one gets the screen's lamp: a primary "Join" ("Watch something"
 turns quiet). A room with nobody in it has no Join button, so a haze chevron at the row's end says the
