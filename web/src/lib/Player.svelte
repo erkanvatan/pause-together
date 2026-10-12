@@ -451,9 +451,9 @@
 	}
 
 	// Keys for the player, like other video players: Space or K plays and pauses, ← and → skip, J and L
-	// skip twice as far, F for fullscreen, C for the subtitle panel, H for chat, M to mute. Never while typing, in a dialog, or for a key
-	// something on the page already used. Space stays with a focused button or link, and the arrows with
-	// a focused slider.
+	// skip twice as far, F for fullscreen, C for the subtitle panel, H for chat, M to mute. Never while
+	// typing, in a dialog, or for a key something on the page already used. Space stays with a focused
+	// button or link, and the arrows with a focused slider.
 	function shortcut(e: KeyboardEvent) {
 		// A held key repeats: each repeat would be another intent for everyone, or another toggle.
 		if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -739,10 +739,9 @@ can't scroll at all. -->
 >
 	<!-- In portrait, the video keeps its own height and the chat takes the rest; in fullscreen the video
 	takes the upper 40% plus the subtitle panel. The panel pushes the chat down, and the video stays put
-	to show the subtitles it times. The
-	pointer handlers only show and hide the controls; the buttons inside do the rest. No text selection
-	or iOS callout: a long press on the video would select a subtitle or button label. Chat stays
-	selectable. -->
+	to show the subtitles it times. The pointer handlers only show and hide the controls; the buttons
+	inside do the rest. No text selection or iOS callout: a long press on the video would select a
+	subtitle or button label. Chat stays selectable. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		onpointerdown={pointerDown}
@@ -1113,7 +1112,8 @@ can't scroll at all. -->
 	{#if chatShown}
 		<!-- Landscape: the panel takes the row's height. Portrait: the screen's rest under the video, in
 		fullscreen of what's in view (above the keyboard, while it's up); it gives up more while the
-		subtitle panel is open, never all: in fullscreen the video shrinks first. Absolute inside, so its messages never make the player taller. -->
+		subtitle panel is open, never all: in fullscreen the video shrinks first. Absolute inside, so its
+		messages never make the player taller. -->
 		<aside
 			class="relative z-10 border-line landscape:w-72 landscape:shrink-0 landscape:border-l lg:landscape:w-80 portrait:border-t portrait:flex-1 {subtitlesOpen
 				? 'portrait:min-h-56'

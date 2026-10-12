@@ -46,8 +46,8 @@ type Room struct {
 	// SubtitleOffsetMs shifts the subtitle: positive shows it later.
 	SubtitleOffsetMs int64 `json:"subtitleOffsetMs"`
 	Archived         bool  `json:"archived"`
-	// UsedAt is when the room was made, switched or last saved its state: wall clock, Unix ms. Only the
-	// homepage needs it, so it isn't part of the room on the socket.
+	// UsedAt is when the room was last made, switched, unarchived, or moved to a new position: wall
+	// clock, Unix ms. Only the homepage needs it, so it isn't part of the room on the socket.
 	UsedAt int64 `json:"-"`
 }
 

@@ -73,8 +73,8 @@ type fileStat struct {
 //
 // If the media folder or the library folder is gone, the library folder can't be read, leads outside
 // the media folder, or is empty while the library has videos, it returns an error and marks nothing
-// missing. A sub-folder that can't be read is logged, and nothing under it
-// is marked missing. If the library is removed meanwhile, it stops with ErrRemoved.
+// missing. A sub-folder that can't be read is logged, and nothing under it is marked missing. If the
+// library is removed meanwhile, it stops with ErrRemoved.
 func (s *Scanner) ScanLibrary(ctx context.Context, lib Library, progress func(done, total int)) error {
 	known, err := s.knownVideos(ctx, lib.ID)
 	if err != nil {

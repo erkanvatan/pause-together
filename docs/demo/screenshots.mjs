@@ -1,7 +1,7 @@
 // Takes the README's screenshots of the pages around the player: the welcome, the homepage, the
 // picker and the admin page. Run through `task screenshots`, in Playwright's image, sharing the
 // network of a throwaway app container (library.sh's library). Writes PNGs into OUT, for the task to
-// turn into docs/screenshots/*.webp.
+// copy into docs/screenshots.
 import { chromium } from 'playwright';
 import { ADMIN, GUEST, api, prepared, until } from './app.mjs';
 

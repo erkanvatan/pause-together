@@ -141,7 +141,7 @@ type ChatDeletedMsg struct {
 	ID   int64  `json:"id"`
 }
 
-// TypeMsg is a message with nothing but its type: deleted.
+// TypeMsg is a message with nothing but its type: deleted or loggedOut.
 type TypeMsg struct {
 	Type string `json:"type"`
 }
