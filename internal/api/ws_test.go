@@ -183,9 +183,54 @@ func TestSocketPlayReachesOthers(t *testing.T) {
 	until(t, b, room.MsgState, func(m msg) bool { return m["state"].(map[string]any)["playing"] == true })
 
 	send(t, b, `{"type":"pause"}`)
-	paused := until(t, a, room.MsgPaused, nil)
-	if by := paused["by"].(map[string]any); by["name"] != "Bob" {
-		t.Errorf("paused by %v, want Bob", by)
+	paused := until(t, a, room.MsgDid, nil)
+	if by := paused["by"].(map[string]any); by["name"] != "Bob" || paused["action"] != room.DidPause {
+		t.Errorf("did = %v, want Bob's pause", paused)
+	}
+
+	send(t, a, `{"type":"seek","positionMs":60000}`)
+	seeked := until(t, b, room.MsgDid, func(m msg) bool { return m["action"] == room.DidSeek })
+	if by := seeked["by"].(map[string]any); by["name"] != "Alice" {
+		t.Errorf("seek by %v, want Alice", by)
+	}
+
+	// Subtitles that are off already change nothing, so nobody is told.
+	send(t, a, `{"type":"subtitle"}`)
+	send(t, a, `{"type":"offset","ms":500}`)
+	if did := until(t, b, room.MsgDid, nil); did["action"] != room.DidOffset {
+		t.Errorf("did = %v, want the offset, not the subtitle that didn't change", did)
+	}
+}
+
+// A switch by the API names who switched, for the others' note.
+func TestSocketSwitchNamesWho(t *testing.T) {
+	w := newWSTest(t)
+	if _, err := w.d.Libraries.DB.Exec(`
+		INSERT INTO videos (id, library_id, path, title, year, edition, version, season, episode, episode_end,
+			episode_title, group_name, size, mtime, codec_string)
+		VALUES (9, 1, 'Ronin (1998).mkv', 'Ronin', 1998, '', '', 0, 0, 0, '', '', 1, 1, 'avc1.640028');`); err != nil {
+		t.Fatal(err)
+	}
+	a := w.join(t, w.alice)
+	until(t, a, room.MsgPresence, nil)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, w.srv.URL+"/api/rooms/1/video",
+		strings.NewReader(`{"videoId":9,"audio":null}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Cookie", testCookie+"="+w.bob)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("switch: %s", resp.Status)
+	}
+	did := until(t, a, room.MsgDid, nil)
+	if by := did["by"].(map[string]any); by["name"] != "Bob" || did["action"] != room.DidSwitch {
+		t.Errorf("did = %v, want Bob's switch", did)
 	}
 }
 

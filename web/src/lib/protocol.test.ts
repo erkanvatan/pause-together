@@ -94,7 +94,7 @@ const server: ServerMessage[] = [
 			subtitles: [3, 5]
 		}
 	},
-	{ type: 'paused', by: bob },
+	{ type: 'did', by: bob, action: 'pause' },
 	{ type: 'pong', t: 1234.5, serverMs: 98765 },
 	{ type: 'deleted' },
 	{ type: 'renamed', who: alice },

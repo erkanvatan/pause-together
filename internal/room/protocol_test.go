@@ -79,7 +79,7 @@ func TestProtocol(t *testing.T) {
 		PresenceMsg{Type: MsgPresence, Watching: []Who{alice}},
 		PrepareMsg{Type: MsgPrepare, Prepare: Prepare{State: "queued", Place: 2, Subtitles: []int{}}},
 		PrepareMsg{Type: MsgPrepare, Prepare: Prepare{State: "ready", Key: "0123456789abcdef0123456789abcdef", Subtitles: []int{3, 5}}},
-		PausedMsg{Type: MsgPaused, By: bob},
+		DidMsg{Type: MsgDid, By: bob, Action: DidPause},
 		PongMsg{Type: MsgPong, T: 1234.5, ServerMs: 98_765},
 		TypeMsg{Type: MsgDeleted},
 		RenamedMsg{Type: MsgRenamed, Who: alice},

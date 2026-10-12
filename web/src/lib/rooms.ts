@@ -1,7 +1,8 @@
 // Room helpers for the homepage and the room page. Pure: no fetch, no DOM.
-import type { Room, RoomCard } from '$lib/api';
-import { videoName, videoTitle } from '$lib/picker';
-import type { Wait } from '$lib/protocol';
+import type { Room, RoomCard, VideoDetail } from '$lib/api';
+import { subtitleLabel, subtitleOptions, videoName, videoTitle } from '$lib/picker';
+import type { Did, RoomState, Wait } from '$lib/protocol';
+import { sameSubtitle } from '$lib/subtitles';
 import { strings } from '$lib/strings';
 import { formatTime } from '$lib/time';
 
@@ -27,6 +28,34 @@ export function roomProgress(r: Room): string {
 	return durationMs > 0
 		? strings.positionOf(formatTime(positionMs), formatTime(durationMs))
 		: formatTime(positionMs);
+}
+
+// didNote is the note the others see when name did something to the room: "Alice paused", "Alice
+// jumped to 1:02:13". The state and the room have the change already: the server sends them first.
+// detail is the room's video with its tracks, for the subtitle's name; null while it loads.
+export function didNote(
+	did: Did,
+	name: string,
+	state: RoomState | null,
+	room: Room,
+	detail: VideoDetail | null
+): string {
+	switch (did) {
+		case 'pause':
+			return strings.pausedBy(name);
+		case 'seek':
+			return state ? strings.jumpedBy(name, formatTime(state.positionMs)) : '';
+		case 'switch':
+			return strings.switchedBy(name, videoName(room.video)); // the version too: it may be all that changed
+		case 'subtitle': {
+			if (!state?.subtitle) return strings.subtitlesOffBy(name);
+			const options = detail?.id === state.videoId ? subtitleOptions(detail) : [];
+			const o = options.find((o) => sameSubtitle(o.choice, state.subtitle));
+			return o ? strings.subtitlesSetBy(name, subtitleLabel(o, options)) : strings.subtitlesChangedBy(name);
+		}
+		case 'offset':
+			return state ? strings.timingBy(name, strings.subtitleOffset(state.subtitleOffsetMs)) : '';
+	}
 }
 
 // roomFinished says whether a room sits at the end of its video.

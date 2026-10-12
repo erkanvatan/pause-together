@@ -32,7 +32,7 @@ const (
 	MsgRoom     = "room"
 	MsgPresence = "presence"
 	MsgPrepare  = "prepare"
-	MsgPaused   = "paused" // for the "Alice paused" note
+	MsgDid      = "did" // for the "Alice paused" note: someone else's pause, seek, switch or subtitle
 	MsgPong     = "pong"
 	MsgDeleted  = "deleted"
 	// MsgRenamed says a person has a new name, so pages fix it in chat. Sent to every room, even one
@@ -115,9 +115,20 @@ type RenamedMsg struct {
 	Who  Who    `json:"who"`
 }
 
-type PausedMsg struct {
-	Type string `json:"type"`
-	By   Who    `json:"by"`
+// What a DidMsg says someone did. The page reads the rest (where to, which subtitle) from the room's
+// state or video, which reach it first.
+const (
+	DidPause    = "pause"
+	DidSeek     = "seek"
+	DidSwitch   = "switch"
+	DidSubtitle = "subtitle"
+	DidOffset   = "offset"
+)
+
+type DidMsg struct {
+	Type   string `json:"type"`
+	By     Who    `json:"by"`
+	Action string `json:"action"` // a Did constant
 }
 
 type PongMsg struct {

@@ -48,6 +48,9 @@ export type Prepare = {
 	subtitles: number[]; // ready: the embedded subtitle streams the copy has as WebVTT
 };
 
+// What someone did, for the note the others see (protocol.go's Did constants).
+export type Did = 'pause' | 'seek' | 'switch' | 'subtitle' | 'offset';
+
 // What the server sends. hello comes first; buildId is the server's web build.
 export type ServerMessage =
 	| { type: 'hello'; buildId: string; userId: number }
@@ -55,7 +58,7 @@ export type ServerMessage =
 	| { type: 'room'; room: Room }
 	| { type: 'presence'; watching: Who[] }
 	| { type: 'prepare'; prepare: Prepare }
-	| { type: 'paused'; by: Who }
+	| { type: 'did'; by: Who; action: Did } // for the "Alice paused" note; the rest is in state or room
 	| { type: 'pong'; t: number; serverMs: number }
 	| { type: 'deleted' }
 	| { type: 'renamed'; who: Who } // a person's new name, for the chat

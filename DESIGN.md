@@ -384,9 +384,11 @@ typing or with a dialog open. The cost: single-letter keys with no modifier and 
 WCAG 2.1.4, and voice control can fire them. Not: letters only with focus in the player.
 
 ### Pills
-A short line over the video: "Host is offline, reconnecting…" (with a small ember signal icon), "Alice
-paused" (with a small lamp pause icon), "Alice is 3 s behind", chat toasts. Midnight at 88% (so person colors stay readable over a white frame), gentle corners, sized with the video width (at least 1rem), so they stay
-readable in fullscreen.
+A short line over the video: "Host is offline, reconnecting…" (with a small ember signal icon), what
+someone else did ("Alice paused" with a small lamp pause icon, a subtitle change with the lamp
+captions icon, "Alice jumped to 1:02:13" and a switch with none), "Alice is 3 s behind", chat toasts.
+Midnight at 88% (so person colors stay readable over a white frame), gentle corners, sized with the
+video width (at least 1rem), so they stay readable in fullscreen.
 
 ### Chat
 A panel with a title-small header, then the "watching now" list in label size (at most two lines),

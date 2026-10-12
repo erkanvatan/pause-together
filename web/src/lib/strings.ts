@@ -211,7 +211,14 @@ export const strings = {
 	waitLineNamed: (name: string, reason: string, time: string) =>
 		time ? `${name}: ${reason} · ${time}` : `${name}: ${reason}`,
 	behind: (name: string, ms: number) => `${name} is ${Math.round(ms / 1000)} s behind`,
+	// What someone else did to the room, as a note over the video.
 	pausedBy: (name: string) => `${name} paused`,
+	jumpedBy: (name: string, time: string) => `${name} jumped to ${time}`,
+	switchedBy: (name: string, video: string) => `${name} switched to ${video}`,
+	subtitlesSetBy: (name: string, subtitle: string) => `${name} set subtitles to ${subtitle}`,
+	subtitlesOffBy: (name: string) => `${name} turned off subtitles`,
+	subtitlesChangedBy: (name: string) => `${name} changed the subtitles`,
+	timingBy: (name: string, offset: string) => `${name} set the subtitle timing to ${offset}`,
 	hostOffline: 'Host is offline, reconnecting…',
 	hostOfflineWhy: 'Play, pause and chat come back with it.',
 	gettingReady: 'Getting the room ready…',

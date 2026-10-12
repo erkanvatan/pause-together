@@ -17,7 +17,7 @@
 		whyUnplayable
 	} from '$lib/picker';
 	import { loadPlayerPrefs, savePlayerPrefs, SUBTITLE_SIZES } from '$lib/prefs';
-	import type { Prepare, RoomState } from '$lib/protocol';
+	import type { Did, Prepare, RoomState } from '$lib/protocol';
 	import { waitText } from '$lib/rooms';
 	import type { RoomSocket } from '$lib/socket';
 	import { strings } from '$lib/strings';
@@ -57,7 +57,7 @@
 		userId: number; // this user's, from hello
 		online: boolean; // the socket said hello and hasn't dropped since
 		offline: boolean; // the socket has been down a while: "Host is offline"; not before the first connect
-		note: string; // "Alice paused"
+		note: { did: Did; text: string } | null; // what someone else did: "Alice paused"
 		missing: boolean; // the video is gone, with no prepared copy: offer another pick
 		onpick: () => void;
 		next: VideoSummary | null | undefined; // the next episode, offered at the end; undefined while looked up
@@ -218,7 +218,7 @@
 	// What a screen reader hears: the room's state changes that show only over the video.
 	// Who's behind is the server's word: stale while it's offline.
 	const behind = $derived(offline ? [] : (playState?.behind ?? []));
-	const announce = $derived(offline ? strings.hostOffline : (waits?.headline ?? note));
+	const announce = $derived(offline ? strings.hostOffline : (waits?.headline ?? note?.text ?? ''));
 
 	// What holds the video's middle, one thing at a time, the first that applies. "Waiting for …" is the
 	// room's, not this screen's: it can sit under any of them. 'transport' is back, play or pause, forward.
@@ -969,7 +969,11 @@ can't scroll at all. -->
 				{/if}
 				{#if note}
 					<p class="pill flex items-center gap-1.5 break-words">
-						<Icon name="pause" class="size-[0.9em] shrink-0 text-lamp" />{note}
+						{#if note.did === 'pause'}
+							<Icon name="pause" class="size-[0.9em] shrink-0 text-lamp" />
+						{:else if note.did === 'subtitle' || note.did === 'offset'}
+							<Icon name="captions" class="size-[0.9em] shrink-0 text-lamp" />
+						{/if}{note.text}
 					</p>
 				{/if}
 				{#each behind as b (b.userId)}

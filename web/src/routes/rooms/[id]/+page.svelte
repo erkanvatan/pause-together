@@ -43,12 +43,12 @@
 		type Who
 	} from '$lib/api';
 	import { carryOver, nextEpisode, videoName, whyUnplayable } from '$lib/picker';
-	import type { Prepare, RoomState, ServerMessage } from '$lib/protocol';
-	import { needsConfirm, roomSubtitle, roomTitle } from '$lib/rooms';
+	import type { Did, Prepare, RoomState, ServerMessage } from '$lib/protocol';
+	import { didNote, needsConfirm, roomSubtitle, roomTitle } from '$lib/rooms';
 	import { RoomSocket } from '$lib/socket';
 	import { strings } from '$lib/strings';
 	import { target } from '$lib/sync/state';
-	import { OFFLINE_NOTE_MS, PAUSED_NOTE_MS } from '$lib/sync/timing';
+	import { DID_NOTE_MS, OFFLINE_NOTE_MS } from '$lib/sync/timing';
 	import { formatTime } from '$lib/time';
 
 	// How soon a failed load tries again.
@@ -85,7 +85,7 @@
 		clearTimeout(offlineTimer);
 		offlineTimer = undefined;
 	}
-	let note = $state(''); // "Alice paused"
+	let note = $state<{ did: Did; text: string } | null>(null); // what someone else did: "Alice paused"
 	let noteTimer: ReturnType<typeof setTimeout>;
 	let messages = $state<ChatMessage[]>([]); // the chat, oldest first
 	let more = $state(false); // older messages may be on the server
@@ -128,7 +128,7 @@
 		playState = null;
 		online = false;
 		backOnline();
-		note = '';
+		note = null;
 		messages = [];
 		more = false;
 		replyTo = null;
@@ -222,12 +222,15 @@
 			case 'state':
 				playState = m.state;
 				break;
-			case 'paused':
-				if (m.by.userId === userId) break;
-				note = strings.pausedBy(m.by.name);
+			case 'did': {
+				if (m.by.userId === userId || !room) break;
+				const text = didNote(m.action, m.by.name, playState, room, detail);
+				if (!text) break;
+				note = { did: m.action, text };
 				clearTimeout(noteTimer);
-				noteTimer = setTimeout(() => (note = ''), PAUSED_NOTE_MS);
+				noteTimer = setTimeout(() => (note = null), DID_NOTE_MS);
 				break;
+			}
 			case 'room':
 				room = m.room;
 				break;

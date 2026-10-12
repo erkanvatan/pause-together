@@ -78,9 +78,16 @@ func (s *server) switchVideo(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &p) {
 		return
 	}
+	// Who switches, for the others' note. Without a name there's nobody to name.
+	var by *room.Who
+	if u, _, ok, err := s.currentUser(r); err != nil {
+		slog.Error("switch video: read user", "err", err)
+	} else if ok {
+		by = &room.Who{UserID: u.ID, Name: u.Name}
+	}
 	rm, err := s.Rooms.Switch(r.Context(), id, p)
 	if err == nil {
-		s.Hub.Switched(rm)
+		s.Hub.Switched(rm, by)
 	}
 	writeRoom(w, "switch video", rm, err)
 }

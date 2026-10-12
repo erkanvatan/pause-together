@@ -241,13 +241,14 @@ func (l *loop) intent(s *socket, m ClientMsg) {
 		return
 	}
 	var e Effect
+	did := "" // for the note, after the state it's about; none when nothing changed
 	switch m.Type {
 	case MsgPlay:
 		e = l.sync.Play(now)
 	case MsgPause:
 		e = l.sync.Pause(s.id, now)
 	case MsgSeek:
-		e = l.sync.SeekTo(ms(m.PositionMs), now)
+		e, did = l.sync.SeekTo(ms(m.PositionMs), now), DidSeek
 	case MsgPlayAnyway:
 		e = l.sync.PlayAnyway(now)
 	case MsgSubtitle:
@@ -255,13 +256,22 @@ func (l *loop) intent(s *socket, m ClientMsg) {
 			snap()
 			return
 		}
+		if !reflect.DeepEqual(m.Subtitle, l.sync.State(now).Subtitle) {
+			did = DidSubtitle
+		}
 		e = l.sync.SetSubtitle(m.Subtitle, now)
 	case MsgOffset:
+		if ms(m.Ms) != l.sync.State(now).SubtitleOffsetMs {
+			did = DidOffset
+		}
 		e = l.sync.SetOffset(ms(m.Ms), now)
 	default:
 		return
 	}
 	l.apply(e, now)
+	if did != "" {
+		l.broadcast(DidMsg{Type: MsgDid, By: s.who, Action: did})
+	}
 }
 
 // chat stores a message with what the room plays, and where, and sends it to everyone. The page never
@@ -277,12 +287,15 @@ func (l *loop) chat(s *socket, m ClientMsg, now int64) {
 	l.broadcast(ChatMsg{Type: MsgChat, Message: msg})
 }
 
-// switched puts on the room's new video.
-func (l *loop) switched(rm Room) {
+// switched puts on the room's new video, which by picked (nil: nobody to name).
+func (l *loop) switched(rm Room, by *Who) {
 	now := l.hub.now()
 	l.room = rm
 	l.broadcast(RoomMsg{Type: MsgRoom, Room: rm})
 	l.apply(l.sync.Switch(rm, now), now)
+	if by != nil {
+		l.broadcast(DidMsg{Type: MsgDid, By: *by, Action: DidSwitch})
+	}
 	l.findKey()
 	l.checkPrepare()
 }
@@ -319,7 +332,7 @@ func (l *loop) apply(e Effect, now int64) {
 		l.broadcast(StateMsg{Type: MsgState, State: st})
 	}
 	if e.PausedBy != nil {
-		l.broadcast(PausedMsg{Type: MsgPaused, By: *e.PausedBy})
+		l.broadcast(DidMsg{Type: MsgDid, By: *e.PausedBy, Action: DidPause})
 	}
 	if e.Save {
 		l.save(l.hub.ctx, now)

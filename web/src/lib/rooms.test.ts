@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { Room, RoomCard } from './api';
-import type { Wait } from './protocol';
+import type { Room, RoomCard, VideoDetail } from './api';
+import type { RoomState, Wait } from './protocol';
 import {
+	didNote,
 	needsConfirm,
 	roomProgress,
 	roomSubtitle,
@@ -239,5 +240,41 @@ describe('waitText', () => {
 
 	it('leaves out times before the server clock is known', () => {
 		expect(waitText([alice], 9, null, false).lines).toEqual(['stepped away']);
+	});
+});
+
+describe('didNote', () => {
+	const state: RoomState = {
+		videoId: 7,
+		audio: 1,
+		subtitle: null,
+		subtitleOffsetMs: 0,
+		durationMs: 7_000_000,
+		playing: false,
+		positionMs: 3_733_000,
+		atMs: 0,
+		waiting: [],
+		behind: []
+	};
+	const track = { lang: 'tr', title: '', default: false, forced: false, sdh: false, unavailable: '' };
+	const detail = {
+		...room(1).video,
+		audio: [],
+		subtitles: [{ stream: 3, ...track }],
+		sidecars: []
+	} as VideoDetail;
+	const on = { ...state, subtitle: { stream: 3 } };
+
+	it.each([
+		['pause', state, detail, 'Bob paused'],
+		['seek', state, detail, 'Bob jumped to 1:02:13'],
+		['switch', state, detail, 'Bob switched to Heat (1995)'],
+		['subtitle', state, detail, 'Bob turned off subtitles'],
+		['subtitle', on, detail, 'Bob set subtitles to Turkish'],
+		['subtitle', on, null, 'Bob changed the subtitles'], // the tracks are still loading
+		['subtitle', on, { ...detail, id: 8 }, 'Bob changed the subtitles'], // another video's tracks
+		['offset', { ...state, subtitleOffsetMs: -500 }, detail, 'Bob set the subtitle timing to −0.5 s']
+	] as const)('%s', (did, st, d, want) => {
+		expect(didNote(did, 'Bob', st, room(1), d)).toBe(want);
 	});
 });

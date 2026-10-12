@@ -162,10 +162,11 @@ func (h *Hub) loop(id int64) *loop {
 	return nil
 }
 
-// Switched tells a room's loop that the room switched to another video.
-func (h *Hub) Switched(rm Room) {
+// Switched tells a room's loop that by switched the room to another video. by is nil when
+// nobody can be named.
+func (h *Hub) Switched(rm Room, by *Who) {
 	if l := h.loop(rm.ID); l != nil {
-		l.do(func() { l.switched(rm) })
+		l.do(func() { l.switched(rm, by) })
 	}
 }
 

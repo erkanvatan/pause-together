@@ -538,7 +538,10 @@ So each room's video is **prepared once**, then served as a plain file.
   - a device marked "can't play" (it can't decode the video),
   - someone who hasn't pressed "Tap to join" yet,
   - a new joiner, until it has been ready once.
-- When someone pauses, the player shows a small note for 2 s ("Alice paused"). Not in chat, not stored.
+- When someone pauses, skips, switches the video or changes the subtitle or its timing, the others'
+  players show a small note for 2 s: "Alice paused", "Alice jumped to 1:02:13", "Alice switched to
+  Dune (2021)", "Alice set subtitles to Turkish", "Alice set the subtitle timing to +0.5 s". So a jump
+  never comes from nowhere. Play needs none: everyone sees it start. Not in chat, not stored.
 - The room pauses when the last person leaves, and forgets who left before. On server start, every
   room loads paused.
 - Timing numbers in this spec are named constants, kept in one place per side.
