@@ -170,20 +170,29 @@
 		onpick({ videoId: d.id, audio: stream, subtitle }, videoName(d));
 	}
 
-	// A step that replaces the focused row (a video, show or folder opened, or Back) would drop focus
-	// out of the dialog. Put it on the new step's first row or menu instead: not the search box, which
-	// would open a phone's keyboard.
+	// A step that replaces the focused control (a video, show or folder opened, Back, or a cleared
+	// search taking the tabs and sort away) would drop focus out of the dialog. Put it on the new step's
+	// first row instead, else its sort, else Back or Close: not the search box, which would open a
+	// phone's keyboard.
 	let panel: HTMLDivElement;
 	$effect(() => {
-		void [picked, offered, showKey, folderName];
+		void [picked, offered, showKey, folderName, query];
 		tick().then(() => {
 			if (panel && !panel.contains(document.activeElement)) {
-				(panel.querySelector<HTMLElement>('.row:not(:disabled)') ?? panel.querySelector('select'))?.focus();
+				(
+					panel.querySelector<HTMLElement>('.row:not(:disabled)') ??
+					panel.querySelector('select') ??
+					panel.querySelector('button')
+				)?.focus();
 			}
 		});
 	});
 
-	const canGoBack = $derived(picked !== null || offered !== null || (!results && (show || folder)));
+	// The show or folder on screen: none while a search lists results. Inside one, the library tabs
+	// go. So does the sort inside a show, whose episodes are always in order; a folder keeps it.
+	const openShow = $derived(results ? undefined : show);
+	const openFolder = $derived(results ? undefined : folder);
+	const canGoBack = $derived(picked !== null || offered !== null || !!openShow || !!openFolder);
 
 	// Escape steps back one level: out of a video, a search, a show or folder, then the picker. Handled
 	// here, so the dialog doesn't close at once.
@@ -206,7 +215,8 @@
 		<button disabled={why !== ''} onclick={() => choose(v)} class="row">
 			<span class="min-w-0 flex-1">
 				<span class="block break-words">
-					{#if code}<span class="mr-2 text-haze tabular-nums">{code}</span>{/if}{label}
+					<!-- An episode with no title has only its code: then it's the name, not a quiet aside. -->
+					{#if code}<span class={['tabular-nums', label && 'mr-2 text-haze']}>{code}</span>{/if}{label}
 				</span>
 				<!-- Release tags ("1080p.BrRip.x264") are noise in a title: a quiet line of their own. -->
 				{#if v.version}
@@ -273,10 +283,10 @@ doesn't open as a strip and grow when the videos arrive. -->
 					{videoTitle(picked)}
 				{:else if offered}
 					{videoTitle(offered)}
-				{:else if show && !results}
-					{withYear(show.title, show.year)}
-				{:else if folder && !results}
-					{folder.name}
+				{:else if openShow}
+					{withYear(openShow.title, openShow.year)}
+				{:else if openFolder}
+					{openFolder.name}
 				{:else}
 					{strings.pickVideo}
 				{/if}
@@ -348,13 +358,15 @@ doesn't open as a strip and grow when the videos arrive. -->
 					aria-label={strings.search}
 					class="field min-w-0 flex-1 bg-midnight"
 				/>
-				<select bind:value={sort} aria-label={strings.sort} class="field">
-					<option value="title">{strings.sortTitle}</option>
-					<option value="recent">{strings.sortRecent}</option>
-				</select>
+				{#if !openShow}
+					<select bind:value={sort} aria-label={strings.sort} class="field">
+						<option value="title">{strings.sortTitle}</option>
+						<option value="recent">{strings.sortRecent}</option>
+					</select>
+				{/if}
 			</div>
 
-			{#if !results && all.length > 1}
+			{#if !results && !openShow && !openFolder && all.length > 1}
 				<nav class="flex gap-5 border-b border-line px-4">
 					{#each all as s (s.type)}
 						<button
