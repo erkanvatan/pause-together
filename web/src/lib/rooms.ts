@@ -1,5 +1,5 @@
 // Room helpers for the homepage and the room page. Pure: no fetch, no DOM.
-import type { Room, RoomCard, VideoDetail } from '$lib/api';
+import type { Room, RoomCard, VideoDetail, Who } from '$lib/api';
 import { subtitleLabel, subtitleOptions, videoName, videoTitle } from '$lib/picker';
 import type { Did, RoomState, Wait } from '$lib/protocol';
 import { sameSubtitle } from '$lib/subtitles';
@@ -137,6 +137,18 @@ export type WaitText = {
 	lines: string[]; // why, and for how long: one line, or one per person when it waits for several
 	action: string; // the "Play anyway" button
 };
+
+// youFirst is who's watching as userId sees it: themselves first, as "You".
+export function youFirst(watching: Who[], userId: number | null): Who[] {
+	const me = watching.find((w) => w.userId === userId);
+	const others = watching.filter((w) => w !== me);
+	return me ? [{ ...me, name: strings.you }, ...others] : others;
+}
+
+// watchingText is a room card's "Watching: You, Alice".
+export function watchingText(watching: Who[], userId: number | null): string {
+	return strings.watchingList(youFirst(watching, userId).map((w) => w.name).join(', '));
+}
 
 // waitText says who the room waits for, as userId sees it: the person it waits for hears it's them.
 // serverMs is the server's clock now, or null before the first pong: then no times. needsTap: this

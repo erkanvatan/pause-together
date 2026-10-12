@@ -11,6 +11,8 @@ import {
 	usedAgo,
 	roomsByVideo,
 	waitText,
+	watchingText,
+	youFirst,
 	type WaitText
 } from './rooms';
 
@@ -187,6 +189,30 @@ describe('needsConfirm', () => {
 		['the video is missing: the swap keeps the position', 5000, hour, true, false]
 	])('%s', (_, positionMs, durationMs, missing, want) => {
 		expect(needsConfirm(positionMs, durationMs, missing)).toBe(want);
+	});
+});
+
+describe('watchingText', () => {
+	const alice = { userId: 1, name: 'Alice' };
+	const bob = { userId: 2, name: 'Bob' };
+	it.each([
+		['others only', [alice, bob], 3, 'Watching: Alice, Bob'],
+		['you come first', [alice, bob], 2, 'Watching: You, Alice'],
+		['you alone', [bob], 2, 'Watching: You'],
+		['a new visitor', [alice], null, 'Watching: Alice']
+	])('%s', (_, watching, userId, want) => {
+		expect(watchingText(watching, userId)).toBe(want);
+	});
+});
+
+describe('youFirst', () => {
+	const alice = { userId: 1, name: 'Alice' };
+	const bob = { userId: 2, name: 'Bob' };
+	it('puts you first, as You', () => {
+		expect(youFirst([alice, bob], 2)).toEqual([{ userId: 2, name: 'You' }, alice]);
+	});
+	it('keeps the order without you', () => {
+		expect(youFirst([alice, bob], null)).toEqual([alice, bob]);
 	});
 });
 

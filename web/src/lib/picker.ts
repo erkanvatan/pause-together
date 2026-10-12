@@ -131,6 +131,31 @@ export function whyUnplayable(v: VideoSummary, canPlayType: (type: string) => st
 	return canPlay(v.codecString, canPlayType) ? '' : strings.cantPlayHere(codecName(v.codecString));
 }
 
+// roomsOf is the rooms the picker offers to join for v: none when this device can't play it.
+export function roomsOf<R>(
+	v: VideoSummary,
+	byVideo: Map<number, R[]>,
+	canPlayType: (type: string) => string
+): R[] {
+	const rooms = byVideo.get(v.id);
+	return rooms && !whyUnplayable(v, canPlayType) ? rooms : [];
+}
+
+// roomsLine is a show's or folder's line in the picker for the rooms of its videos, so joining still
+// comes before making one level up: "In a room · S01E04" (an episode code, or a title), "In 3 rooms",
+// '' for none.
+export function roomsLine(
+	vs: VideoSummary[],
+	byVideo: Map<number, unknown[]>,
+	canPlayType: (type: string) => string
+): string {
+	const counts = vs.map((v) => roomsOf(v, byVideo, canPlayType).length);
+	const total = counts.reduce((a, b) => a + b, 0);
+	if (total !== 1) return total === 0 ? '' : strings.inRooms(total);
+	const v = vs[counts.indexOf(1)];
+	return strings.inRoom(episodeCode(v) || v.title);
+}
+
 // codecName names a codec string's codec for people: 'hvc1.2.4.L120.90' is HEVC.
 export function codecName(codecString: string): string {
 	const names: Record<string, string> = {

@@ -183,6 +183,7 @@ export const strings = {
 	roomDeleted: 'That room was deleted.',
 	watchingNow: 'Watching now',
 	watchingList: (names: string) => `Watching: ${names}`,
+	you: 'You', // in a list of who's watching, for yourself
 	tapToJoin: 'Tap to join',
 	clickToJoin: 'Click to join',
 	play: 'Play',
@@ -227,8 +228,8 @@ export const strings = {
 	fullscreen: 'Fullscreen',
 	exitFullscreen: 'Exit fullscreen',
 	subtitleTiming: 'Timing',
-	subtitleSooner: 'Show subtitles sooner',
-	subtitleLater: 'Show subtitles later',
+	subtitleSooner: (s: number) => `Show subtitles ${s} s sooner`,
+	subtitleLater: (s: number) => `Show subtitles ${s} s later`,
 	// A subtitle offset: "+0.25 s", "−1.5 s", "0 s".
 	subtitleOffset: (ms: number) => `${ms > 0 ? '+' : ms < 0 ? '−' : ''}${Math.abs(ms) / 1000} s`,
 	reset: 'Reset',
@@ -312,8 +313,10 @@ export const strings = {
 	videoHasRooms: (n: number) =>
 		n === 1 ? 'This already has a room. Join it to watch together.' : 'This already has rooms. Join one to watch together.',
 	startNewRoom: 'Start a new room',
-	// Under a video in the homepage's picker: where its one room is, or how many it has.
-	inRoom: (progress: string) => `In a room · ${progress}`,
+	// In the homepage's picker, a video's one room or how many it has. Under a video, where says where
+	// the room is ("19:19 of 2:34:27"); under a show or folder, which of its videos it plays ("S01E04",
+	// or a title). inRooms counts a show's or folder's rooms across all its videos.
+	inRoom: (where: string) => `In a room · ${where}`,
 	inRooms: (n: number) => `In ${n} rooms`,
 	unknownLanguage: 'Unknown language',
 	forced: 'Forced',

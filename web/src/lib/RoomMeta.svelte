@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { RoomCard } from '$lib/api';
-	import { roomJoinable, roomProgress, usedAgo } from '$lib/rooms';
+	import { me } from '$lib/me.svelte';
+	import { roomJoinable, roomProgress, usedAgo, watchingText } from '$lib/rooms';
 	import { strings } from '$lib/strings';
 
 	// A room's meta line, on the homepage's cards and in the picker's rooms to join: where the room is,
@@ -26,7 +27,7 @@
 		<span class="flex min-w-0 items-center gap-2">
 			<span class="size-2 shrink-0 rounded-full bg-lamp" aria-hidden="true"></span>
 			<span class="min-w-0 break-words">
-				{strings.watchingList(r.watching.map((w) => w.name).join(', '))}
+				{watchingText(r.watching, me.id)}
 			</span>
 		</span>
 	{/if}

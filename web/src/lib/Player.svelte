@@ -673,7 +673,8 @@
 					<button
 						onclick={() => setOffset(offsetMs - offsetStepMs)}
 						disabled={!timing}
-						aria-label={strings.subtitleSooner}
+						aria-label={strings.subtitleSooner(offsetStepMs / 1000)}
+						title={strings.subtitleSooner(offsetStepMs / 1000)}
 						class="btn btn-quiet btn-small w-11 px-0"
 					>
 						−
@@ -682,7 +683,8 @@
 					<button
 						onclick={() => setOffset(offsetMs + offsetStepMs)}
 						disabled={!timing}
-						aria-label={strings.subtitleLater}
+						aria-label={strings.subtitleLater(offsetStepMs / 1000)}
+						title={strings.subtitleLater(offsetStepMs / 1000)}
 						class="btn btn-quiet btn-small w-11 px-0"
 					>
 						+

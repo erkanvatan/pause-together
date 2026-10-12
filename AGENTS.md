@@ -450,10 +450,12 @@ So each room's video is **prepared once**, then served as a plain file.
 - Joining comes before making: a family split across two rooms of one film isn't watching together.
   In the homepage's picker, a video that already has a room says so under its name ("In a room ·
   19:19 of 2:34:27", "In 3 rooms"), and a tap on it lists those rooms (where each is, who's watching)
-  above a quiet "Start a new room". A room's audio track never changes, so when the video has a
-  choice of them, each room says which it plays. Only rooms that can play count (not archived, video
-  not gone) and that aren't at the end, and only the same video: another episode of the show is
-  another video. "Switch video" in a room never offers this.
+  above a quiet "Start a new room". A show or folder says it too, for all its videos ("In a room ·
+  S01E04" or a title, "In 3 rooms"), so the way to the room shows before it's opened. A room's audio
+  track never changes, so when the video has a choice of them, each room says which it plays. Only
+  rooms that can play count (not archived, video not gone) and that aren't at the end, and only the
+  same video: another episode of the show is another video. "Switch video" in a room never offers
+  this.
 - Defaults come from an admin setting: preferred audio language (or "original") and subtitle languages
   in order (e.g. `tr`, then `en`). Fall back to the file's default-track flag. Forced subtitles are
   turned on when their language matches the audio.
@@ -467,13 +469,14 @@ So each room's video is **prepared once**, then served as a plain file.
 - A deleted room's id is never reused (`AUTOINCREMENT`), so an old link or open tab can't lead to
   another room.
 - The homepage lists every room with its current video, where it is in it ("Video missing" when it
-  can't play: the file is gone and no prepared copy is left), when it was last used ("3 days ago"), and
-  who's watching. Rooms with people in them come first, then the most recently used: made, switched,
-  unarchived, or moved to a new position (`used_at`, wall clock). Rooms that can't play, with nobody in
-  them, fold into a closed "Video missing (3)" group. Manage freezes the order as it was, so rows don't
-  move under the finger. While someone watches, "Join" on the first such room is the main action and "Watch something"
-  steps back. Archive and Delete wait behind "Manage". It polls `GET /api/rooms` every 5 s while the
-  tab is visible, and right away when it becomes visible again.
+  can't play: the file is gone and no prepared copy is left), when it was last used ("3 days ago"),
+  and who's watching ("Watching: You, Alice": yourself first, as "You"). Rooms with people in them
+  come first, then the most recently used: made, switched, unarchived, or moved to a new position
+  (`used_at`, wall clock). Rooms that can't play, with nobody in them, fold into a closed "Video
+  missing (3)" group. Manage freezes the order as it was, so rows don't move under the finger. While
+  someone watches, "Join" on the first such room is the main action and "Watch something" steps back.
+  Archive and Delete wait behind "Manage". It polls `GET /api/rooms` every 5 s while the tab is
+  visible, and right away when it becomes visible again.
 - Rooms live until the host deletes them. Then the server sends "room deleted" to everyone in it, and
   their page goes home with a short note.
 - Archive is allowed only when nobody is watching. An archived room can't play, and its chat is
@@ -644,8 +647,8 @@ So each room's video is **prepared once**, then served as a plain file.
   new messages pop up as small toasts over the video and fade out; tapping one opens a reply to it.
   Must work in fullscreen.
 - The "watching now" list sits at the top of the chat panel, under its header, like a chat app's
-  online list. At most two lines, then it scrolls, so it never pushes the messages off a phone. Not
-  shown while the chat is closed.
+  online list. Yourself first, as "You", like the homepage's cards. At most two lines, then it
+  scrolls, so it never pushes the messages off a phone. Not shown while the chat is closed.
 
 ## Operations
 

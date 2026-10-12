@@ -10,6 +10,7 @@ import {
 	episodeCode,
 	langName,
 	nextEpisode,
+	roomsLine,
 	search,
 	searchIndex,
 	searchKey,
@@ -233,6 +234,27 @@ describe('whyUnplayable', () => {
 		['this device', summary({ codecString: 'hvc1.2.4.L120.90' }), "This device can't play HEVC."]
 	])('%s', (_, v, want) => {
 		expect(whyUnplayable(v, browser)).toBe(want);
+	});
+});
+
+describe('roomsLine', () => {
+	const browser = (type: string) => (type.includes('avc1') ? 'probably' : '');
+	const vs = [
+		summary({ id: 1, title: 'One' }),
+		summary({ id: 2, title: 'Two' }),
+		summary({ id: 3, title: 'HEVC', codecString: 'hvc1.2.4.L120.90' }),
+		summary({ id: 4, type: 'tv', title: 'Show', season: 1, episode: 2 })
+	];
+	it.each([
+		['no rooms', new Map(), ''],
+		['one room names its video', new Map([[2, ['a']]]), 'In a room · Two'],
+		['two rooms of one video', new Map([[1, ['a', 'b']]]), 'In 2 rooms'],
+		['rooms across videos', new Map([[1, ['a']], [2, ['b']]]), 'In 2 rooms'],
+		['a video this device cannot play', new Map([[3, ['a']]]), ''],
+		['another show or folder', new Map([[9, ['a']]]), ''],
+		['an episode by its code', new Map([[4, ['a']]]), 'In a room · S01E02']
+	])('%s', (_, byVideo, want) => {
+		expect(roomsLine(vs, byVideo, browser)).toBe(want);
 	});
 });
 

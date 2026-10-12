@@ -6,6 +6,7 @@
 	import Confirm from '$lib/Confirm.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import { videoName } from '$lib/picker';
+	import { youFirst } from '$lib/rooms';
 	import { strings } from '$lib/strings';
 	import { formatTime } from '$lib/time';
 
@@ -206,7 +207,7 @@
 					{strings.watchingNow}
 				</li>
 				<!-- Each name on its own chip: names can hold spaces, so a plain gap can't tell two apart. -->
-				{#each watching as w (w.userId)}
+				{#each youFirst(watching, userId) as w (w.userId)}
 					<li title={w.name} class="max-w-full truncate rounded-control bg-midnight px-2 {nameColor(w.userId, userId, colors)}">
 						{w.name}
 					</li>

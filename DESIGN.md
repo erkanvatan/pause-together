@@ -392,12 +392,13 @@ Midnight at 88% (so person colors stay readable over a white frame), gentle corn
 video width (at least 1rem), so they stay readable in fullscreen.
 
 ### Chat
-A panel with a title-small header, then the "watching now" list in label size (at most two lines),
-then messages. Messages are not bubbles: each is a row with the name in bold (yours in lamp, everyone else's in their person color), the
-video time in haze, then the text. Replies quote with a 2px line border on the left. The reply being
-written shows a lamp left border instead. A small haze reply arrow on hover and focus (and on
-every message on a touch screen) hints that a message opens Reply. Delete your own message asks
-"Delete for everyone?" inline, with the danger button.
+A panel with a title-small header, then the "watching now" list in label size (at most two lines;
+yourself first, as "You", in lamp), then messages. Messages are not bubbles: each is a row with the
+name in bold (yours in lamp, everyone else's in their person color), the video time in haze, then
+the text. Replies quote with a 2px line border on the left. The reply being written shows a lamp
+left border instead. A small haze reply arrow on hover and focus (and on every message on a touch
+screen) hints that a message opens Reply. Delete your own message asks "Delete for everyone?"
+inline, with the danger button.
 
 ### Subtitles
 White text on a black 65% backing with small corners, sized from the video width. Only `<i>` and

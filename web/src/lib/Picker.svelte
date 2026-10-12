@@ -21,6 +21,8 @@
 		defaultAudio,
 		defaultSubtitle,
 		episodeCode,
+		roomsLine,
+		roomsOf,
 		search,
 		searchIndex,
 		shelves,
@@ -210,7 +212,7 @@
 
 {#snippet videoRow(v: VideoSummary, label: string, code = '')}
 	{@const why = whyUnplayable(v, canPlayType)}
-	{@const vRooms = (!why && byVideo.get(v.id)) || []}
+	{@const vRooms = roomsOf(v, byVideo, canPlayType)}
 	<li>
 		<button disabled={why !== ''} onclick={() => choose(v)} class="row">
 			<span class="min-w-0 flex-1">
@@ -242,13 +244,16 @@
 	</li>
 {/snippet}
 
-{#snippet folderRow(label: string, detail: string, open: () => void)}
+{#snippet folderRow(label: string, detail: string, roomsText: string, open: () => void)}
 	<li>
 		<button onclick={open} class="row">
 			<span class="min-w-0 flex-1">
 				<span class="block break-words">{label}</span>
 				{#if detail}
 					<span class="block text-sm text-haze">{detail}</span>
+				{/if}
+				{#if roomsText}
+					<span class="block text-sm break-words text-haze tabular-nums">{roomsText}</span>
 				{/if}
 			</span>
 			<Icon name="chevron" class="size-5 shrink-0 text-haze" />
@@ -426,7 +431,12 @@ doesn't open as a strip and grow when the videos arrive. -->
 					{:else}
 						<ul>
 							{#each shelf.shows as s (s.key)}
-								{@render folderRow(withYear(s.title, s.year), strings.seasonCount(s.seasons.length), () => (showKey = s.key))}
+								{@render folderRow(
+									withYear(s.title, s.year),
+									strings.seasonCount(s.seasons.length),
+									roomsLine(s.seasons.flatMap((se) => se.episodes), byVideo, canPlayType),
+									() => (showKey = s.key)
+								)}
 							{/each}
 						</ul>
 					{/if}
@@ -444,7 +454,12 @@ doesn't open as a strip and grow when the videos arrive. -->
 									{@render videoRow(v, v.title)}
 								{/each}
 							{:else}
-								{@render folderRow(f.name, strings.videoCount(f.videos.length), () => (folderName = f.name))}
+								{@render folderRow(
+									f.name,
+									strings.videoCount(f.videos.length),
+									roomsLine(f.videos, byVideo, canPlayType),
+									() => (folderName = f.name)
+								)}
 							{/if}
 						{/each}
 					</ul>
