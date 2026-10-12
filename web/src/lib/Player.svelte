@@ -118,9 +118,7 @@
 	const durationMs = $derived(playState?.durationMs ?? 0);
 
 	let subtitlesOpen = $state(false); // the subtitle panel
-	let panelHeight = $state(0); // its height, so the subtitles sit above it where it lies over the video
-	// The page fits the screen: app.css's `fit` variant, which the layout below follows. Change both.
-	const fits = new MediaQuery('(orientation: landscape) and (min-height: 30rem)');
+	let panelHeight = $state(0); // its height: in fullscreen held upright it pushes the chat down
 	const options = $derived(detail ? subtitleOptions(detail) : []);
 	const subtitleKey = $derived(
 		options.find((o) => sameSubtitle(o.choice, playState?.subtitle ?? null))?.key ?? ''
@@ -136,29 +134,55 @@
 	// Fullscreen held upright: the video is as wide as the screen, with black above and below it, and the
 	// chat under it.
 	const portrait = new MediaQuery('(orientation: portrait)');
-	// The bar lies over the video's foot in fullscreen, so hiding it never resizes the video. Held
-	// upright, there's black to spare: the bar and the subtitle panel go under the video, and cover none
-	// of it.
-	const barOver = $derived(full && !portrait.current);
-	// The subtitle panel lies over the video's foot only where the page fits the screen: there, taking
-	// room would shrink the video. Elsewhere the video is short (a phone), and the panel would hide the
-	// subtitles its timing is set by, so it goes under the bar and the page grows.
-	const panelOver = $derived(!full && fits.current);
+	// The page fits the screen: app.css's `fit` variant, which the layout below follows. Change both.
+	const fits = new MediaQuery('(orientation: landscape) and (min-height: 30rem)');
+	// The control bar lies over the video's foot where the video is big: the page fits a landscape
+	// screen, or fullscreen held sideways. Elsewhere the video is short (a phone's is about 220 px tall
+	// upright, 290 px sideways), and the bar would cover its foot, the subtitles and what holds the
+	// middle: there it sits in the black under the picture, with the same look, and keeps its space
+	// while it fades.
+	const barOver = $derived(full ? !portrait.current : fits.current);
+	// The subtitle panel lies over the video's foot, above the bar, only on a big landscape screen, in or
+	// out of fullscreen. Elsewhere the video is small (a phone, a small window), and the panel with the
+	// bar would cover the subtitles its timing is set by, so it goes under the video.
+	const wide = new MediaQuery('(min-width: 64rem)');
+	const panelOver = $derived(fits.current && wide.current);
 	// A phone's keyboard covers the foot of a fullscreen page without making it shorter. The wrapper is
 	// padded to the part still in view, so the chat's box sits on top of the keyboard.
 	let keyboard = $state({ top: 0, bottom: 0 });
 
-	// The controls step aside while the video plays and nobody touches them: the buttons over the video
-	// always, the bar in fullscreen only. Never while paused, the subtitle panel is open, or the seek
-	// bar is held.
-	let stage: HTMLDivElement; // the layer over the video; a tap on it, not on a button, hides the controls
+	// The controls step aside while the video plays and nobody touches them: the buttons in the middle
+	// and the bar. Never while paused, the subtitle panel is open, the seek bar is held, the mouse is on
+	// the bar, or a key has put the focus on one of them.
+	let box: HTMLDivElement; // the video box; a tap on it, not on a control, hides the controls
+	let bar: HTMLDivElement; // the control bar, with the subtitle panel when that lies over the video
 	let idle = $state(false);
 	let idleTimer: ReturnType<typeof setTimeout> | undefined;
 	let overBar = $state(false);
 	let barHeight = $state(0);
+	// The control a key put the focus on (Tab), which shows a ring. A click or a tap focuses a button too:
+	// the controls fade after one as usual, even once a later key press gives it a ring.
+	let byKey = false; // the last input was Tab, not a pointer or another key
+	let keyFocused: Element | null = null;
 	const canFade = $derived(joined && !!playState?.playing && !subtitlesOpen && dragMs === null);
 	const faded = $derived(idle && canFade && !overBar);
-	const fade = $derived(faded ? 'invisible opacity-0' : '');
+	// Hiding waits for the fade to end; showing doesn't, or Tab would find them still hidden and skip them.
+	const fade = $derived(
+		faded
+			? 'invisible opacity-0 transition-[opacity,visibility] duration-300'
+			: 'transition-opacity duration-300'
+	);
+
+	// A control a click focused stays focused as it fades: Space would press a button unseen, or do
+	// nothing on the seek bar. Let go of it, so Space plays and pauses. Not the volume slider: its arrows
+	// change this screen's volume, and would skip the room for everyone without it. A key's focus never
+	// fades: it holds the controls up.
+	let volumeSlider = $state<HTMLInputElement>(); // only where volume works
+	$effect(() => {
+		if (!faded) return;
+		const a = document.activeElement;
+		if (a instanceof HTMLElement && box.contains(a) && a !== volumeSlider) a.blur();
+	});
 
 	// Where the room's prepared copy stands, shown in the video box; '' when there's nothing to say, or
 	// it's ready.
@@ -394,6 +418,11 @@
 		socket.send({ type: 'offset', ms });
 	}
 
+	// Typing in chat or a search box. A slider isn't: it's one of the controls.
+	function typing(t: Element) {
+		return t.closest('input:not([type=range]), textarea, select, [contenteditable]') !== null;
+	}
+
 	// Keys for the player, like other video players: Space or K plays and pauses, ← and → skip, J and L
 	// skip twice as far, F for fullscreen, C for the subtitle panel, H for chat, M to mute. Never while typing, in a dialog, or for a key
 	// something on the page already used. Space stays with a focused button or link, and the arrows with
@@ -402,8 +431,7 @@
 		// A held key repeats: each repeat would be another intent for everyone, or another toggle.
 		if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
 		const t = e.target as HTMLElement;
-		const typing = t.closest('input:not([type=range]), textarea, select, [contenteditable]');
-		if (typing || document.querySelector('dialog[open]')) return;
+		if (typing(t) || document.querySelector('dialog[open]')) return;
 		const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
 		const ready = online && !!playState && !stuck;
 		if ((key === ' ' && !t.closest('button, a, input')) || key === 'k') {
@@ -423,10 +451,17 @@
 	function wake() {
 		idle = false;
 		clearTimeout(idleTimer);
-		idleTimer = setTimeout(() => (idle = true), controlsHideMs);
+		idleTimer = setTimeout(rest, controlsHideMs);
+	}
+
+	// Looked at each time, not kept: a focused button that goes away ("Tap to join") takes the focus with
+	// it, and Firefox sends no focusout then.
+	function held() {
+		return keyFocused !== null && keyFocused === document.activeElement;
 	}
 
 	function rest() {
+		if (held()) return wake();
 		clearTimeout(idleTimer);
 		idle = true;
 	}
@@ -434,7 +469,7 @@
 	// A finger on the bare video toggles the controls, like a phone's own player; anything else shows them.
 	function pointerDown(e: PointerEvent) {
 		const t = e.target as Element;
-		const bare = stage.contains(t) && !t.closest('button, a, input, select');
+		const bare = box.contains(t) && !bar.contains(t) && !t.closest('button, a, input, select');
 		if (e.pointerType !== 'mouse' && bare && !faded) rest();
 		else wake();
 	}
@@ -544,23 +579,29 @@
 </script>
 
 <svelte:window
+	onpointerdowncapture={() => {
+		// Capture: before the player's own handler, which may ask held().
+		byKey = false;
+		keyFocused = null;
+	}}
 	onkeydown={(e) => {
-		// Typing in chat or a search box isn't asking for the controls. A slider is: it's one of them.
-		const t = e.target as HTMLElement;
-		if (!t.closest('input:not([type=range]), textarea, select, [contenteditable]')) wake();
+		// Tab moves the focus. Not Alt or Cmd: Alt+Tab to another window and back focuses the clicked button
+		// again.
+		byKey = e.key === 'Tab' && !e.altKey && !e.ctrlKey && !e.metaKey;
+		// Typing isn't asking for the controls. Tab is, even from the chat's box: it may lead into them, and
+		// faded controls can't take the focus.
+		if (!typing(e.target as Element) || e.key === 'Tab') wake();
 		if (e.key === 'Escape') filled = false;
 		shortcut(e);
 	}}
 />
 
-<!-- The subtitle panel: a strip by the bar. -->
+<!-- The subtitle panel: a strip above the bar, or under the video. -->
 {#snippet subtitlePanel()}
 	{#if subtitlesOpen}
 		<div
 			bind:clientHeight={panelHeight}
-			class="flex flex-wrap items-center gap-x-8 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm {panelOver
-				? 'absolute inset-x-0 bottom-full'
-				: ''}"
+			class="flex flex-wrap items-center gap-x-8 gap-y-2 border-t border-line bg-dusk px-3 py-2 text-sm"
 		>
 			<!-- Subtitle and timing change the room for everyone; size, only this screen. Said, so a guest
 			fixing their own view doesn't move everyone's. -->
@@ -677,14 +718,23 @@ can't scroll at all. -->
 		onpointerdown={pointerDown}
 		onpointermove={(e) => e.pointerType === 'mouse' && wake()}
 		onpointerleave={(e) => e.pointerType === 'mouse' && rest()}
+		onfocusin={(e) => {
+			const t = e.target as Element;
+			// Coming back from another window focuses the same control again: it keeps its hold.
+			if (byKey) keyFocused = t;
+			else if (keyFocused !== t) keyFocused = null;
+		}}
+		onfocusout={() => {
+			if (document.hasFocus()) keyFocused = null;
+		}}
 		style:flex={full && portrait.current
 			? `0 1 calc(50% + ${subtitlesOpen ? panelHeight : 0}px)`
 			: undefined}
 		class="relative flex min-w-0 flex-1 flex-col select-none [-webkit-touch-callout:none] {full ? 'portrait:min-h-0' : 'portrait:flex-none'}"
 	>
-		<!-- When the page fits the screen, this space is what's left above the control bar, and the video
-		box is the largest 16:9 that fits in it, between black bars. The box narrows with it, not just the
-		picture, so subtitles size and wrap to the picture. -->
+		<!-- When the page fits the screen, the video box is the largest 16:9 that fits in this space,
+		between black bars. The box narrows with it, not just the picture, so subtitles size and wrap to
+		the picture, and the bar lies over the picture's foot. -->
 		<div
 			class={full
 				? 'flex min-h-0 flex-1 flex-col'
@@ -692,6 +742,8 @@ can't scroll at all. -->
 		>
 			<!-- The container for the subtitles' and pills' cqi sizes. Not the wrapper: it holds the chat too. -->
 			<div
+				bind:this={box}
+				style:padding-bottom={barOver ? undefined : `${barHeight}px`}
 				class="@container relative {full
 					? 'min-h-0 flex-1'
 					: 'mx-auto w-full fit:w-[min(100cqw,100cqh*16/9)]'} {faded
@@ -726,7 +778,7 @@ can't scroll at all. -->
 						{offsetMs}
 						size={subtitleSize}
 						videoMs={() => video.currentTime * 1000}
-						lift={barOver ? (faded ? 0 : barHeight) : subtitlesOpen && panelOver ? panelHeight : 0}
+						lift={barOver && faded ? 0 : barHeight}
 					/>
 				{/if}
 
@@ -735,13 +787,14 @@ can't scroll at all. -->
 					<div class="fade-out-video absolute inset-0 bg-black"></div>
 				{/if}
 
+				<!-- What holds the middle centers above the bar, never under it. -->
 				<div
-					bind:this={stage}
+					style:bottom="{barHeight}px"
 					class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center @max-md:p-2"
 				>
 					{#if middle === 'transport'}
 						<div
-							class="flex items-center gap-6 transition-[opacity,visibility] duration-300 sm:gap-10 {fade}"
+							class="flex items-center gap-6 sm:gap-10 {fade}"
 						>
 							<button
 								onclick={() => skip(-skipMs)}
@@ -889,125 +942,130 @@ can't scroll at all. -->
 					{/if}
 				</div>
 				<p role="status" class="sr-only">{announce}</p>
-			</div>
-		</div>
 
-		<!-- In fullscreen the controls lie over the video's foot on a dark fade, so hiding them never
-		resizes the video. Held upright, they sit in the black under it and keep their space while hidden. -->
-		<div
-			class={full
-				? `transition-[opacity,visibility] duration-300 ${fade} ${barOver ? 'pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent pt-12' : ''}`
-				: ''}
-		>
-			<!-- svelte-ignore a11y_no_static_element_interactions (keeps the controls up under the mouse) -->
-			<div
-				bind:clientHeight={barHeight}
-				onpointerenter={() => (overBar = true)}
-				onpointerleave={() => (overBar = false)}
-				class="pointer-events-auto relative"
-			>
-				<!-- The subtitle panel sits where it shows, so Tab and screen readers meet it in that order: above
-				the bar where the bar lies over the video, or the panel does; under it everywhere else. -->
-				{#if barOver || panelOver}
-					{@render subtitlePanel()}
-				{/if}
-
-				<!-- Laid out by the bar's own width, not the screen's: the chat panel takes part of a wide one.
-				A narrow bar puts the seek bar and time on a row of their own, above the buttons. -->
-				<div class="@container/bar {full ? '' : 'bg-dusk'}">
-					<div class="flex flex-wrap items-center gap-x-1 px-1 py-1 @xl/bar:gap-x-2 @xl/bar:px-2">
-						<button
-							onclick={togglePlay}
-							disabled={!online || !toggleable}
-							aria-label={playState?.playing ? strings.pause : strings.play}
-							title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
-							class="icon-btn"
-						>
-							<Icon name={playState?.playing ? 'pause' : 'play'} />
-						</button>
-						<div class="flex min-w-0 flex-1 items-center gap-3 px-2 @max-xl/bar:order-first @max-xl/bar:basis-full">
-							<input
-								type="range"
-								aria-label={strings.position}
-								min="0"
-								max={durationMs}
-								step="1000"
-								value={dragMs ?? shownMs}
-								aria-valuetext={strings.positionOf(formatTime(dragMs ?? shownMs), formatTime(durationMs))}
-								disabled={!online || durationMs === 0 || stuck}
-								oninput={(e) => (dragMs = Number(e.currentTarget.value))}
-								onkeydown={(e) => {
-									// An arrow skips 10 s, as everywhere else. The slider's own 1 s step would seek the
-									// whole room once per press.
-									if (e.ctrlKey || e.metaKey || e.altKey) return;
-									const back = e.key === 'ArrowLeft' || e.key === 'ArrowDown';
-									if (!back && e.key !== 'ArrowRight' && e.key !== 'ArrowUp') return;
-									e.preventDefault();
-									if (!e.repeat && online && durationMs > 0) skip(back ? -skipMs : skipMs);
-								}}
-								onchange={(e) => {
-									dragMs = null;
-									intent({ type: 'seek', positionMs: Number(e.currentTarget.value) });
-								}}
-								class="h-11 min-w-0 flex-1"
-							/>
-							<span class="text-sm whitespace-nowrap text-haze tabular-nums">
-								{formatTime(dragMs ?? shownMs)} / {formatTime(durationMs)}
-							</span>
-						</div>
-						<button
-							onclick={() => (muted = !muted)}
-							aria-label={muted ? strings.unmute : strings.mute}
-							title={strings.withKey(muted ? strings.unmute : strings.mute, strings.keys.mute)}
-							class="icon-btn"
-						>
-							<Icon name={muted ? 'muted' : 'volume'} />
-						</button>
-						{#if volumeWorks}
-							<input
-								type="range"
-								aria-label={strings.volume}
-								min="0"
-								max="1"
-								step="0.05"
-								bind:value={volume}
-								aria-valuetext={strings.percent(volume)}
-								class="hidden h-11 w-20 accent-moonlight @xl/bar:block"
-							/>
+				<!-- The control bar, one element in every view, so turning the screen keeps a drag on the seek
+				bar, and the focus on a button. Landscape: over the video's foot on a dark fade. Upright: in the black under the picture,
+				where the box keeps room for it. -->
+				<div
+					class="pointer-events-none absolute inset-x-0 bottom-0 {barOver
+						? 'bg-linear-to-t from-black/80 via-black/60 via-60% to-transparent pt-12'
+						: ''} {fade}"
+				>
+					<!-- svelte-ignore a11y_no_static_element_interactions (keeps the controls up under the mouse) -->
+					<div
+						bind:this={bar}
+						bind:clientHeight={barHeight}
+						onpointerenter={() => (overBar = true)}
+						onpointerleave={() => (overBar = false)}
+						class="pointer-events-auto"
+					>
+						<!-- Above the bar, where it shows, so Tab and screen readers meet it in that order. -->
+						{#if panelOver}
+							{@render subtitlePanel()}
 						{/if}
-						<button
-							onclick={() => (subtitlesOpen = !subtitlesOpen)}
-							aria-label={strings.subtitle}
-							aria-pressed={subtitlesOpen}
-							title={strings.withKey(strings.subtitle, strings.keys.subtitles)}
-							class="icon-btn ml-auto {playState?.subtitle ? '' : 'text-haze'}"
-						>
-							<Icon name="captions" />
-						</button>
-						<button
-							onclick={() => (chatOpen = !chatOpen)}
-							aria-label={strings.chat}
-							aria-pressed={chatOpen}
-							title={strings.withKey(strings.chat, strings.keys.chat)}
-							class="icon-btn portrait:hidden"
-						>
-							<Icon name="chat" />
-						</button>
-						<button
-							onclick={toggleFullscreen}
-							aria-label={full ? strings.exitFullscreen : strings.fullscreen}
-							title={strings.withKey(full ? strings.exitFullscreen : strings.fullscreen, strings.keys.fullscreen)}
-							class="icon-btn"
-						>
-							<Icon name={full ? 'shrink' : 'expand'} />
-						</button>
+
+						<!-- Laid out by the bar's own width, not the screen's: the chat panel takes part of a wide
+						one. A narrow bar puts the seek bar and time on a row of their own, above the buttons. -->
+						<div class="@container/bar">
+							<div class="flex flex-wrap items-center gap-x-1 px-1 py-1 @xl/bar:gap-x-2 @xl/bar:px-2">
+								<button
+									onclick={togglePlay}
+									disabled={!online || !toggleable}
+									aria-label={playState?.playing ? strings.pause : strings.play}
+									title={strings.withKey(playState?.playing ? strings.pause : strings.play, strings.keys.play)}
+									class="icon-btn"
+								>
+									<Icon name={playState?.playing ? 'pause' : 'play'} />
+								</button>
+								<div
+									class="flex min-w-0 flex-1 items-center gap-3 px-2 @max-xl/bar:order-first @max-xl/bar:basis-full"
+								>
+									<input
+										type="range"
+										aria-label={strings.position}
+										min="0"
+										max={durationMs}
+										step="1000"
+										value={dragMs ?? shownMs}
+										aria-valuetext={strings.positionOf(formatTime(dragMs ?? shownMs), formatTime(durationMs))}
+										disabled={!online || durationMs === 0 || stuck}
+										oninput={(e) => (dragMs = Number(e.currentTarget.value))}
+										onkeydown={(e) => {
+											// An arrow skips 10 s, as everywhere else. The slider's own 1 s step would seek the
+											// whole room once per press.
+											if (e.ctrlKey || e.metaKey || e.altKey) return;
+											const back = e.key === 'ArrowLeft' || e.key === 'ArrowDown';
+											if (!back && e.key !== 'ArrowRight' && e.key !== 'ArrowUp') return;
+											e.preventDefault();
+											if (!e.repeat && online && durationMs > 0) skip(back ? -skipMs : skipMs);
+										}}
+										onchange={(e) => {
+											dragMs = null;
+											intent({ type: 'seek', positionMs: Number(e.currentTarget.value) });
+										}}
+										class="h-11 min-w-0 flex-1"
+									/>
+									<span class="text-sm whitespace-nowrap tabular-nums">
+										{formatTime(dragMs ?? shownMs)} / {formatTime(durationMs)}
+									</span>
+								</div>
+								<button
+									onclick={() => (muted = !muted)}
+									aria-label={muted ? strings.unmute : strings.mute}
+									title={strings.withKey(muted ? strings.unmute : strings.mute, strings.keys.mute)}
+									class="icon-btn"
+								>
+									<Icon name={muted ? 'muted' : 'volume'} />
+								</button>
+								{#if volumeWorks}
+									<input
+										type="range"
+										aria-label={strings.volume}
+										min="0"
+										max="1"
+										step="0.05"
+										bind:this={volumeSlider}
+										bind:value={volume}
+										aria-valuetext={strings.percent(volume)}
+										class="hidden h-11 w-20 accent-moonlight @xl/bar:block"
+									/>
+								{/if}
+								<button
+									onclick={() => (subtitlesOpen = !subtitlesOpen)}
+									aria-label={strings.subtitle}
+									aria-pressed={subtitlesOpen}
+									title={strings.withKey(strings.subtitle, strings.keys.subtitles)}
+									class="icon-btn ml-auto {playState?.subtitle ? '' : 'text-haze'}"
+								>
+									<Icon name="captions" />
+								</button>
+								<button
+									onclick={() => (chatOpen = !chatOpen)}
+									aria-label={strings.chat}
+									aria-pressed={chatOpen}
+									title={strings.withKey(strings.chat, strings.keys.chat)}
+									class="icon-btn portrait:hidden"
+								>
+									<Icon name="chat" />
+								</button>
+								<button
+									onclick={toggleFullscreen}
+									aria-label={full ? strings.exitFullscreen : strings.fullscreen}
+									title={strings.withKey(full ? strings.exitFullscreen : strings.fullscreen, strings.keys.fullscreen)}
+									class="icon-btn"
+								>
+									<Icon name={full ? 'shrink' : 'expand'} />
+								</button>
+							</div>
+						</div>
 					</div>
 				</div>
-				{#if !barOver && !panelOver}
-					{@render subtitlePanel()}
-				{/if}
 			</div>
 		</div>
+
+		{#if !panelOver}
+			{@render subtitlePanel()}
+		{/if}
 	</div>
 
 	{#if chatShown}

@@ -15,7 +15,7 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 @theme {
 	--color-*: initial;
 	--color-midnight: #16122b; /* the page */
-	--color-dusk: #231d40; /* raised surfaces: panels, fields, the control bar */
+	--color-dusk: #231d40; /* raised surfaces: panels, fields, the subtitle panel */
 	--color-haze: #a69dcb; /* quiet text */
 	--color-moonlight: #eee9ff; /* text */
 	--color-lamp: #ffc15e; /* the accent, and "someone is here" */

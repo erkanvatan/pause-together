@@ -573,11 +573,16 @@ So each room's video is **prepared once**, then served as a plain file.
   Held sideways, the chat sits beside the video, as on any landscape screen.
 - In fullscreen the wrapper is padded to the visual viewport, so a phone's keyboard pushes the chat's
   box up above it instead of covering it.
+- The control bar looks the same in and out of fullscreen. Where the video is big (the page fits a
+  landscape screen, or fullscreen held sideways) it lies over the foot of the video, so hiding it
+  never resizes the video; subtitles move up while it shows, and what holds the video's middle centers
+  above its place, shown or not, so it doesn't bob as the bar fades. Elsewhere the video is short (a
+  phone, out of fullscreen or held upright), so the bar sits in the black under the picture and keeps
+  its space while hidden.
 - Controls fade after 3 s with no mouse move, touch or key while the video plays: the round buttons
-  over the video always, the control bar in fullscreen only (in landscape it lies over the video, so
-  hiding it never resizes the video, and subtitles move up while it shows; held upright it keeps its
-  space under the video). Never while paused, the subtitle panel
-  is open or the seek bar is held. On touch screens, a tap on bare video hides them.
+  and the bar together. Never while paused, the subtitle panel is open, the seek bar is held, the
+  mouse is on the bar, or a key has put the focus on one of them (a click's focus doesn't count). On
+  touch screens, a tap on bare video hides them.
 - Over the video's middle: back 10 s, play or pause, forward 10 s. Hidden while "Tap to join", "Waiting
   for …", the end of the video ("Next episode", "The end"), or "Host is offline" hold the middle. Before the room's first
   word on the socket, the middle says "Getting the room ready…" (after a moment, so a quick connect

@@ -173,8 +173,8 @@ A cool violet night with one warm lamp and one red-orange warning.
 ### Neutral
 - **Midnight Violet** (midnight): the page. Also the base for translucent layers over video (55–90%
   mixed with transparent).
-- **Dusk Violet** (dusk): raised surfaces: panels, dialogs, fields, menus, the picker, the control
-  bar. Also the "off" state of a filled button.
+- **Dusk Violet** (dusk): raised surfaces: panels, dialogs, fields, menus, the picker, the subtitle
+  panel. Also the "off" state of a filled button.
 - **Haze Lavender** (haze): quiet text: hints, timestamps, section headings on the homepage,
   archived rooms, placeholders.
 - **Moonlight** (moonlight): all main text. Also tinted overlays for hover (7–12% mixed with
@@ -242,8 +242,9 @@ labels.
   always show it.
 - On phones the video runs edge to edge (it cancels the gutter). A landscape window at least 30rem
   tall (the `fit` variant in `app.css`) never scrolls: the player fills what's left of the screen,
-  and the video box is the largest 16:9 that fits above the control bar, between black bars. A phone
-  held sideways is shorter, so its page scrolls instead of shrinking the video to a strip.
+  and the video box is the largest 16:9 that fits, between black bars, with the control bar over its
+  foot. A phone held sideways is shorter, so its page scrolls instead of shrinking the video to a
+  strip.
 - Fullscreen fills the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   real fullscreen isn't available, the wrapper fills the window with CSS. In fullscreen every phone
   turns as its auto-rotate setting says, and the layout follows how it's held. Upright, the video sits on top with the bar
@@ -319,10 +320,13 @@ Archived rooms show their title in haze.
 - **Transport:** three round buttons over the middle of the video: back 10 s, play or pause, forward
   10 s. The side ones are translucent midnight with a 6px blur; play/pause is the lamp. They shrink to
   92% while pressed. They fade after 3 s of no input while playing.
-- **Control bar:** dusk, a line border on top, label size. In fullscreen it lies over the foot of the
-  video on a black-to-transparent fade (80% black at the bottom), and fades out with the transport
-  (300ms). Subtitles slide up while it shows. Fullscreen held upright, it sits on the black under the
-  video instead, and keeps its space while hidden.
+- **Control bar:** label size, moonlight, the same in and out of fullscreen. Where the video is big
+  (the page fits a landscape screen, or fullscreen held sideways) it lies over the foot of the video
+  on a black fade (80% at the bottom, clear 3rem above the bar); subtitles slide up while it shows,
+  and what holds the middle centers above its place, shown or not. Elsewhere the video is short (a
+  phone, out of fullscreen or held upright), so the bar sits on the black under the picture and
+  keeps its space while hidden. It fades out with the transport (300ms). A narrow bar puts the seek bar and
+  time on a row of their own, above the buttons.
 - **Holds the middle:** "Tap to join" (a large round primary button), "Preparing… 42%" (a pill with a
   thin lamp progress bar on dusk), "Waiting for …", "Host is offline" (stays up while the video
   plays: that screen is on its own), "Video missing", "Can't play", "Couldn't get this video ready", "Getting the room
@@ -338,10 +342,12 @@ Archived rooms show their title in haze.
     and that chat still works. No pick there: the others can still watch.
   - The end: a TV episode offers a lamp "Next episode". Anything else gets a title card, "The end" in
     the display face (3xl, 2xl on a phone's box), over a lamp "Watch something else".
-- **Subtitle panel:** a dusk strip over the bar (over the video's foot where the page fits the screen;
-  under the bar where the video is short, like a phone's, or in fullscreen held upright, so it never
-  hides the subtitles; held upright in fullscreen it pushes the chat down and the video stays put), in two labelled groups: "For everyone" (subtitle,
-  timing) and "On this screen" (size). Group labels are semibold moonlight, field labels haze.
+- **Subtitle panel:** a dusk strip above the bar, over the video, where the video is big (a landscape
+  screen at least 64rem wide and 30rem tall, in or out of fullscreen); under the video where it's
+  small, like a phone's or a small window's, or held upright, so it never hides the subtitles (held upright in
+  fullscreen it pushes the chat down and the video stays put), in two labelled groups: "For
+  everyone" (subtitle, timing) and "On this screen" (size). Group labels are semibold moonlight,
+  field labels haze.
 
 ### Pills
 A short line over the video: "Host is offline, reconnecting…" (with a small ember signal icon), "Alice
