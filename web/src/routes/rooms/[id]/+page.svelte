@@ -7,7 +7,7 @@
 	import Dialog from '$lib/Dialog.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import GuestLink from '$lib/GuestLink.svelte';
-	import { me } from '$lib/me.svelte';
+	import { forgetMe, loadMe, me } from '$lib/me.svelte';
 	import {
 		CHAT_PAGE_SIZE,
 		nameColor,
@@ -16,6 +16,7 @@
 		withDeleted,
 		withHistory,
 		withMessage,
+		withName,
 		withOlder,
 		withPeople,
 		withToast
@@ -146,12 +147,14 @@
 		};
 	});
 
-	// A rename may make this browser another person. Join again as them, so the room hears the new name
-	// and the page gets the new user id. The page stays, so the player plays on with no new tap.
-	let named = me.name;
+	// A rename to another person's name makes this browser that person. Join again as them, so the room
+	// hears it and the page gets the new user id. The page stays, so the player plays on with no new tap.
+	// A rename of the person needs none of that: the server renames its sockets. joinedAs is who the
+	// socket joined as, from its hello.
+	let joinedAs = me.id;
 	$effect(() => {
-		if (me.name === named) return;
-		named = me.name;
+		if (me.id === joinedAs) return;
+		joinedAs = me.id;
 		untrack(() => {
 			if (!socket) return;
 			online = false; // hello sets it back, and the player reports its status to the new connection
@@ -197,7 +200,10 @@
 	function received(m: ServerMessage) {
 		switch (m.type) {
 			case 'hello':
-				userId = m.userId;
+				userId = joinedAs = m.userId;
+				// A rename may have come while the socket was down, or made this browser another person:
+				// ask who it is now.
+				loadMe().catch(() => {});
 				online = true;
 				backOnline();
 				break;
@@ -216,6 +222,20 @@
 			case 'presence':
 				watching = m.watching;
 				meet();
+				break;
+			case 'renamed':
+				messages = withName(messages, m.who);
+				toasts = withName(toasts, m.who);
+				if (replyTo?.from.userId === m.who.userId) replyTo = { ...replyTo, from: m.who };
+				// This socket's person, or this browser's: ask the server who this browser is now, so the
+				// header shows it. The answer is newer than the rename.
+				if (m.who.userId === userId || m.who.userId === me.id) loadMe().catch(() => {});
+				break;
+
+			case 'loggedOut':
+				// On another page. With no name, the layout asks for one in place of this page.
+				socket?.close();
+				forgetMe();
 				break;
 			case 'prepare':
 				prepare = m.prepare;

@@ -27,7 +27,7 @@ const MsgChat = "chat"
 
 // Messages the server sends.
 const (
-	MsgHello    = "hello" // always first
+	MsgHello    = "hello" // always first; again when the room finds the browser is another person now
 	MsgState    = "state"
 	MsgRoom     = "room"
 	MsgPresence = "presence"
@@ -35,6 +35,12 @@ const (
 	MsgPaused   = "paused" // for the "Alice paused" note
 	MsgPong     = "pong"
 	MsgDeleted  = "deleted"
+	// MsgRenamed says a person has a new name, so pages fix it in chat. Sent to every room, even one
+	// the person isn't in: their old messages may be there.
+	MsgRenamed = "renamed"
+	// MsgLoggedOut goes to every socket of a browser that logged out (on any of its pages), or that has
+	// no name, just before the server closes it.
+	MsgLoggedOut = "loggedOut"
 	// MsgChatHistory carries the newest messages on join, so a reconnect also fills in what it missed.
 	MsgChatHistory = "chatHistory"
 	MsgChatDeleted = "chatDeleted"
@@ -102,6 +108,11 @@ type Prepare struct {
 	Key      string  `json:"key"`      // ready: the copy's /stream key
 	// Subtitles are the embedded subtitle streams the ready copy has as WebVTT. Never nil.
 	Subtitles []int `json:"subtitles"`
+}
+
+type RenamedMsg struct {
+	Type string `json:"type"`
+	Who  Who    `json:"who"`
 }
 
 type PausedMsg struct {

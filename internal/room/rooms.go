@@ -277,6 +277,22 @@ func (r *Rooms) SaveState(ctx context.Context, id int64, st State) error {
 	return err
 }
 
+// userName is a person's name now. Renames are told to rooms in no fixed order, so a room reads it:
+// the last read sees the last rename.
+func (r *Rooms) userName(ctx context.Context, id int64) (string, error) {
+	var name string
+	err := r.DB.QueryRowContext(ctx, "SELECT name FROM users WHERE id = ?", id).Scan(&name)
+	return name, err
+}
+
+// browserUser is who a browser (its token's hash) is now. A socket's user is read before it joins, so
+// a rename, a move to another person or a log out can land in between: the room reads it again.
+// false: logged out.
+func (r *Rooms) browserUser(ctx context.Context, browser string) (Who, bool, error) {
+	u, ok, err := user.ByTokenHash(ctx, r.DB, []byte(browser))
+	return Who{UserID: u.ID, Name: u.Name}, ok, err
+}
+
 // opened reads a room back after a change.
 func (r *Rooms) opened(ctx context.Context, id int64) (Room, error) {
 	rw, err := r.get(ctx, id)

@@ -14,6 +14,8 @@ export const strings = {
 	continue: 'Continue',
 	cancel: 'Cancel',
 	rename: 'Change name',
+	logOut: 'Log out',
+	logOutFailed: "Couldn't log out. Try again.",
 	nameInvalid,
 	saveFailed: "Couldn't save your name. Try again.",
 	loadFailed: "Can't reach the server. Retrying…",

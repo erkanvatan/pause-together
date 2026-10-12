@@ -1,7 +1,6 @@
 package api
 
 import (
-	"crypto/sha256"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,9 +10,6 @@ import (
 
 	"github.com/erkanvatan/pause-together/internal/room"
 )
-
-// errNoUser: the visitor hasn't picked a name yet, so they can't join a room.
-const errNoUser = "no-user"
 
 // roomSocket joins a room page's socket, /ws?room={id}, to the room's loop. Opening the room queues its
 // prepare again, which matters after a server restart: the page reconnects without reloading.
@@ -28,14 +24,14 @@ func (s *server) roomSocket(w http.ResponseWriter, r *http.Request) {
 		internalError(w, "look up user", err)
 		return
 	}
-	if !ok {
-		writeError(w, http.StatusUnauthorized, errNoUser)
-		return
-	}
 	// Default options: the Origin check stays on. A page on another origin can't join as our user.
 	conn, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return // Accept has answered
+	}
+	if !ok { // no name: logged out on another page
+		room.RefuseLoggedOut(r.Context(), conn)
+		return
 	}
 	// Only past the Origin check: opening queues the prepare, which another origin mustn't trigger.
 	// A browser can't read a refused upgrade's status, so a missing room gets a close code instead.
@@ -49,7 +45,5 @@ func (s *server) roomSocket(w http.ResponseWriter, r *http.Request) {
 		_ = conn.Close(code, "")
 		return
 	}
-	// The browser is its token's hash: the room keeps it in memory only, and never sends it.
-	browser := sha256.Sum256([]byte(token))
-	s.Hub.Serve(r.Context(), conn, rm, room.Who{UserID: u.ID, Name: u.Name}, string(browser[:]))
+	s.Hub.Serve(r.Context(), conn, rm, room.Who{UserID: u.ID, Name: u.Name}, browserOf(token))
 }

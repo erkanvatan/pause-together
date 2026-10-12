@@ -97,6 +97,8 @@ const server: ServerMessage[] = [
 	{ type: 'paused', by: bob },
 	{ type: 'pong', t: 1234.5, serverMs: 98765 },
 	{ type: 'deleted' },
+	{ type: 'renamed', who: alice },
+	{ type: 'loggedOut' },
 	{
 		type: 'chatHistory',
 		messages: [

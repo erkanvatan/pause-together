@@ -8,7 +8,7 @@ This file provides guidance to AI coding agents when working with code in this r
 serves its local video library. Guests reach it over Tailscale and watch in sync from PCs, tablets and
 phones. Same show. Same second. Different places.
 
-**Status: slices 1–21 are built (`docs/plan.md`).** This file is the spec. When
+**Status: slices 1–22 are built (`docs/plan.md`).** This file is the spec. When
 code changes, update the layout and commands below to match reality. The rules here are decided: flag problems,
 but don't quietly change them. Work each slice by the steps under "How to work a slice" in
 `docs/plan.md`.
@@ -164,7 +164,7 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      FolderPicker.svelte, NameForm.svelte, Menu.svelte (a button with a panel of rows), Confirm.svelte
                      (an inline "Are you sure?" row), GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), RoomMeta.svelte
                      (a room's progress, last use and who's watching: homepage cards, the picker), strings.ts,
-                     protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, rejoin after a rename,
+                     protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, rejoin as another person,
                      build ID),
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
                      fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
@@ -241,10 +241,23 @@ container mount for source files, and one name for two things gets mixed up in c
   SQLite's `lower()` and `NOCASE` fold only ASCII, so Go makes the key (`user.NameKey`, also the SQL
   function `name_key`).
 - Picking a name that exists makes this browser that person, with the person's spelling. A rename
-  moves only this browser: to the new name's person, or a new one. The old person keeps its name, its
-  messages and its other browsers; with no browser left, it stays, so its messages still show its name.
-  Renaming to your own name in another case (`mom` → `Mom`) changes the spelling for everyone: it's the
-  only way to fix one.
+  to a name nobody else has renames the person: all their browsers and all their messages show the
+  new name, and no new person is made. That covers your own name in another case (`mom` → `Mom`), the
+  only way to fix a spelling. A rename to another person's name moves only this browser to them. The
+  old person keeps its name, its messages and its other browsers; with no browser left, it stays, so
+  its messages still show its name.
+- A rename reaches open pages at once: the server renames the person's sockets in every room, so
+  "watching now", "Waiting for …" and "… paused" show the new name, and sends every room a `renamed`
+  message, so the chat shows it, and a room page of theirs its header. A rename that moves the
+  browser to another person drops that browser's room sockets: they reconnect as the new person, as
+  after any dropped connection, and every hello makes a page ask who it is. Other pages look again when they become visible. A socket's user is read before it
+  joins, so the room reads who the browser is once more as it joins, and sends a second hello when
+  it's another person now.
+- Log out, in the name menu, forgets this browser: its token is deleted, the cookie cleared, and the
+  page asks for a name again. The person stays. It undoes picking someone else's name by mistake;
+  a rename would rename that person. The browser's other room pages get `loggedOut` and ask for a name
+  too (so does a room socket with no name, as a page can't read a refused upgrade's status), and no
+  room waits for that browser: it can't come back.
 - The cookie gets the longest life browsers allow (Chrome caps it at 400 days) and is refreshed on
   every visit.
 - Cookies are per host name: `localhost`, the Tailscale IP and the MagicDNS name each give a different
@@ -252,17 +265,20 @@ container mount for source files, and one name for two things gets mixed up in c
 - Names: 1–32 runes, trimmed, at least one letter or number. No control characters, no invisible
   format characters (zero-width, text direction), no Unicode line breaks, no emoji. Emoji live in
   Unicode's "other symbol" class with `♥ ★ ©`, so those go too. Rename from a menu, in a dialog over
-  the page: a room page stays, and its socket joins again as the new name, so a rename mid-movie
-  needs no new "Tap to join" and doesn't pause the room.
-- `GET /api/me` returns `{name, isAdmin}` (`name` is null for a new visitor) and refreshes the cookie.
+  the page: a room page stays, so a rename mid-movie needs no new "Tap to join" and doesn't pause the
+  room. When the browser moved to another person, its socket joins again as them.
+- `GET /api/me` returns `{id, name, isAdmin}` (`id` and `name` are null for a new visitor) and
+  refreshes the cookie. `id` is the person's: a page tells a rename from a move to another person by it.
   The admin listener sets `isAdmin`. The page hides admin links when it's false.
 - The admin listener also sends `guestUrl`, the address guests open, built from the guest port's bind
   IP. The host browses on `localhost`, so no URL they could copy works for a guest. The room page shows
   the host "Guest link: http://100.101.102.103:8420/rooms/15" with a Copy button (`localhost` is a
   secure context, so the clipboard works there), and the admin page shows the bare address, or, when
   `PUBLIC_BIND` is still loopback, how to open the guest port.
-- `POST /api/me {name}` moves a known browser to the person with that name, or gives a new browser a
-  token (and sets the cookie) when it's missing or unknown. It answers with the person's spelling.
+- `DELETE /api/me` logs out (above) and answers like a new visitor's `GET /api/me`.
+- `POST /api/me {name}` renames a known browser's person, or moves the browser to the person who has
+  the name (above). A new browser gets a token (and the cookie) when it's missing or unknown. It
+  answers with the person's spelling.
 - The cookie (`pt_token`) is `SameSite=Lax` and never `Secure`: guests use plain HTTP, and their
   browser would drop a `Secure` cookie. `localhost` counts as secure, so dev would hide that bug.
 - Everyone can: see all rooms, create and name rooms, control playback, switch a room's video, chat,

@@ -7,12 +7,14 @@ import (
 
 func TestPresence(t *testing.T) {
 	type step struct {
-		join  *Who  // a socket of this user's opens
-		leave int64 // or: a socket of this user's closes (0 = no leave)
-		left  bool  // the page closed it cleanly
-		at    int64
+		join   *Who  // a socket of this user's opens
+		rename *Who  // or: this user was renamed on another page
+		leave  int64 // or: a socket of this user's closes (0 = no leave)
+		left   bool  // the page closed it cleanly
+		at     int64
 	}
 	join := func(w Who) step { return step{join: &w} }
+	rename := func(w Who) step { return step{rename: &w} }
 	drop := func(w Who, at int64) step { return step{leave: w.UserID, at: at} }
 	closeTab := func(w Who, at int64) step { return step{leave: w.UserID, left: true, at: at} }
 	alicia := Who{UserID: alice.UserID, Name: "Alicia"}
@@ -38,6 +40,9 @@ func TestPresence(t *testing.T) {
 			[]step{join(alice), join(alice), closeTab(alice, 1000), drop(alice, 2000)}, 17_000, []Who{}},
 		{"Alice renamed herself and rejoins → her new name, one entry",
 			[]step{join(alice), join(alicia)}, 0, []Who{alicia}},
+		{"Alice is renamed on another page → her new name, in her place",
+			[]step{join(alice), join(bob), rename(alicia)}, 0, []Who{alicia, bob}},
+		{"someone not here is renamed → nothing changes", []step{join(bob), rename(alicia)}, 0, []Who{bob}},
 		{"Bob, then Alice → in the order they came", []step{join(bob), join(alice)}, 0, []Who{bob, alice}},
 		{"a leave with no socket open changes nothing", []step{drop(alice, 1000)}, 2000, []Who{}},
 		{"Alice drops, a stray second leave → the grace isn't pushed back",
@@ -49,9 +54,12 @@ func TestPresence(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var p Presence
 			for _, s := range tt.steps {
-				if s.join != nil {
+				switch {
+				case s.join != nil:
 					p.Join(*s.join)
-				} else {
+				case s.rename != nil:
+					p.Rename(*s.rename)
+				default:
 					p.Leave(s.leave, s.at, s.left)
 				}
 			}

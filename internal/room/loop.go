@@ -98,8 +98,22 @@ func (l *loop) run(ctx context.Context) {
 	}
 }
 
-// join adds s. It gets the whole picture; everyone else, only what changed.
+// join adds s. It gets the whole picture; everyone else, only what changed. A browser that logged out
+// is turned away.
 func (l *loop) join(s *socket) {
+	switch who, ok, err := l.hub.Rooms.browserUser(l.hub.ctx, s.browser); {
+	case err != nil:
+		slog.Error("read user", "room", l.id, "err", err)
+	case !ok:
+		l.logOut(s)
+		return
+	default:
+		if who.UserID != s.who.UserID {
+			// A rename moved the browser to who: a new hello gives the page who's id.
+			s.send(encode(HelloMsg{Type: MsgHello, BuildID: l.hub.BuildID, UserID: who.UserID}))
+		}
+		s.who = who
+	}
 	now := l.hub.now()
 	l.presence.Join(s.who)
 	e := l.sync.Join(s.id, s.who, s.browser, now)
@@ -120,12 +134,58 @@ func (l *loop) join(s *socket) {
 	l.sockets = append(l.sockets, s)
 }
 
-// leave takes s out. left: the page closed it on purpose.
-func (l *loop) leave(s *socket, left bool) {
+// renamed shows a person's new name: in who's watching, who the room waits for and who paused, and
+// in the chat.
+func (l *loop) renamed(userID int64) {
+	name, err := l.hub.Rooms.userName(l.hub.ctx, userID)
+	if err != nil {
+		slog.Error("read user name", "user", userID, "err", err)
+		return
+	}
+	w := Who{UserID: userID, Name: name}
 	now := l.hub.now()
-	l.sockets = slices.DeleteFunc(l.sockets, func(o *socket) bool { return o == s })
-	l.presence.Leave(s.who.UserID, now, left)
-	l.apply(l.sync.Leave(s.id, now), now)
+	for _, s := range l.sockets {
+		if s.who.UserID == w.UserID {
+			s.who = w
+		}
+	}
+	l.presence.Rename(w)
+	l.apply(l.sync.Rename(w, now), now)
+	l.broadcast(RenamedMsg{Type: MsgRenamed, Who: w})
+}
+
+// loggedOut closes a browser's sockets, and stops waiting for it: it can't come back.
+func (l *loop) loggedOut(browser string) {
+	for _, s := range slices.Clone(l.sockets) {
+		if s.browser == browser {
+			l.logOut(s)
+			l.out(s, true) // now: a closing socket on a sleeping phone may take seconds to go
+		}
+	}
+	now := l.hub.now()
+	l.apply(l.sync.Forget(browser, now), now)
+}
+
+// moved drops a browser's sockets: it is another person now. Their pages reconnect at once, as them,
+// like after any dropped connection, and the browser coming back ready ends any wait for it.
+func (l *loop) moved(browser string) {
+	for _, s := range l.sockets {
+		if s.browser == browser {
+			s.drop()
+		}
+	}
+}
+
+// logOut tells s its browser logged out, and closes it. Once it's gone, nobody waits for it.
+func (l *loop) logOut(s *socket) {
+	s.loggedOut = true
+	s.send(encode(TypeMsg{Type: MsgLoggedOut}))
+	s.closeWith(websocket.StatusNormalClosure)
+}
+
+// leave takes s out, as its socket closed. left: the page closed it on purpose.
+func (l *loop) leave(s *socket, left bool) {
+	l.out(s, left)
 	l.hub.mu.Lock()
 	if r := l.hub.rooms[l.id]; r != nil && r.loop == l {
 		r.sockets--
@@ -133,9 +193,28 @@ func (l *loop) leave(s *socket, left bool) {
 	l.hub.mu.Unlock()
 }
 
+// out takes s out of the room, once: a socket turned away on joining, or taken out on logging out, is
+// not in.
+func (l *loop) out(s *socket, left bool) {
+	if !slices.Contains(l.sockets, s) {
+		return
+	}
+	now := l.hub.now()
+	l.sockets = slices.DeleteFunc(l.sockets, func(o *socket) bool { return o == s })
+	l.presence.Leave(s.who.UserID, now, left || s.loggedOut)
+	l.apply(l.sync.Leave(s.id, now), now)
+	if s.loggedOut {
+		l.apply(l.sync.Forget(s.browser, now), now)
+	}
+}
+
 // intent applies a client's message. In an archived room, which can't play, intents only get the
 // state back, so the sender snaps to it.
 func (l *loop) intent(s *socket, m ClientMsg) {
+	// A logged-out browser's socket, or one turned away on joining, is closing: nothing it sends counts.
+	if s.loggedOut {
+		return
+	}
 	now := l.hub.now()
 	switch m.Type {
 	case MsgStatus:

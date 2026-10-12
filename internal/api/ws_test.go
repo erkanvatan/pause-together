@@ -206,8 +206,6 @@ func TestSocketRefused(t *testing.T) {
 		want                      int
 	}{
 		{"another origin", "1", w.alice, "http://evil.example", http.StatusForbidden},
-		{"no cookie", "1", "", w.srv.URL, http.StatusUnauthorized},
-		{"unknown token", "1", "nope", w.srv.URL, http.StatusUnauthorized},
 		{"malformed room", "x", w.alice, w.srv.URL, http.StatusNotFound},
 	}
 	for _, tt := range tests {
@@ -218,6 +216,24 @@ func TestSocketRefused(t *testing.T) {
 		}
 		if resp == nil || resp.StatusCode != tt.want {
 			t.Errorf("%s: response %v, want status %d", tt.name, resp, tt.want)
+		}
+	}
+}
+
+// A browser with no name, or one that logged out on another page, is told so on the socket, which then
+// closes: a page can't read a refused upgrade's status.
+func TestSocketNoUser(t *testing.T) {
+	w := newWSTest(t)
+	for _, token := range []string{"", "nope"} {
+		c, _, err := w.dial(t, "1", token, w.srv.URL)
+		if err != nil {
+			t.Fatalf("token %q: %v", token, err)
+		}
+		if m, err := read(t, c); err != nil || m["type"] != room.MsgLoggedOut {
+			t.Errorf("token %q: %v, %v; want loggedOut", token, m, err)
+		}
+		if _, err := read(t, c); websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+			t.Errorf("token %q: %v, want a normal close", token, err)
 		}
 	}
 }
@@ -405,6 +421,90 @@ func TestSocketRenameMidMovie(t *testing.T) {
 	until(t, bo, room.MsgPresence, nil)
 	send(t, bo, `{"type":"status","status":"ready","positionMs":3000}`)
 	until(t, b, room.MsgState, func(m msg) bool { return len(waiting(m)) == 0 })
+}
+
+// Alice renames herself Alicia on her laptop, which isn't in the room. Her phone and Bob, in the room,
+// see the new name at once.
+func TestSocketRenameReachesOtherPages(t *testing.T) {
+	w := newWSTest(t)
+	phone := w.join(t, w.alice)
+	until(t, phone, room.MsgPresence, nil)
+	b := w.join(t, w.bob)
+	until(t, b, room.MsgPresence, nil)
+	_, laptop, err := w.d.Users.Create(t.Context(), "Alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if rec := serve(w.guest, meRequest(http.MethodPost, `{"name":"Alicia"}`, laptop)); rec.Code != http.StatusOK {
+		t.Fatalf("rename: %d", rec.Code)
+	}
+	renamed := func(m msg) bool {
+		first := m["watching"].([]any)[0].(map[string]any)
+		return first["userId"] == float64(w.aliceID) && first["name"] == "Alicia"
+	}
+	for _, c := range []*websocket.Conn{phone, b} {
+		until(t, c, room.MsgPresence, renamed)
+	}
+}
+
+// Alice's browser has the room open in two tabs. In a third, she picks Bob's name: both room tabs are
+// dropped, so they reconnect as Bob.
+func TestSocketMovedToAnotherPerson(t *testing.T) {
+	w := newWSTest(t)
+	tabs := []*websocket.Conn{w.join(t, w.alice), w.join(t, w.alice)}
+	for _, c := range tabs {
+		until(t, c, room.MsgPresence, nil)
+	}
+	if rec := serve(w.guest, meRequest(http.MethodPost, `{"name":"bob"}`, w.alice)); rec.Code != http.StatusOK {
+		t.Fatalf("rename: %d", rec.Code)
+	}
+	for _, c := range tabs {
+		for {
+			if _, err := read(t, c); err != nil {
+				break
+			}
+		}
+	}
+	again := w.join(t, w.alice)
+	if m := until(t, again, room.MsgHello, nil); m["userId"] != float64(w.bobID) {
+		t.Errorf("hello = %v, want Bob's id %d", m, w.bobID)
+	}
+}
+
+// Alice logs out on another page mid-movie. Her socket is told and closed, and the room plays on:
+// nobody waits for a browser that can't come back.
+func TestSocketLogOut(t *testing.T) {
+	w := newWSTest(t)
+	a := w.join(t, w.alice)
+	until(t, a, room.MsgPresence, nil)
+	b := w.join(t, w.bob)
+	until(t, b, room.MsgPresence, nil)
+	for _, c := range []*websocket.Conn{a, b} {
+		send(t, c, `{"type":"status","status":"ready"}`)
+	}
+	send(t, b, `{"type":"play"}`)
+	until(t, b, room.MsgState, func(m msg) bool { return m["state"].(map[string]any)["playing"] == true })
+
+	if rec := serve(w.guest, meRequest(http.MethodDelete, "", w.alice)); rec.Code != http.StatusOK {
+		t.Fatalf("log out: %d", rec.Code)
+	}
+	until(t, a, room.MsgLoggedOut, nil)
+	for {
+		if _, err := read(t, a); err != nil {
+			if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+				t.Errorf("after loggedOut: %v, want a normal close", err)
+			}
+			break
+		}
+	}
+	until(t, b, room.MsgPresence, func(m msg) bool { return len(m["watching"].([]any)) == 1 })
+	time.Sleep((room.StallGraceMs + 500) * time.Millisecond)
+	send(t, b, `{"type":"seek","positionMs":5000}`)
+	st := until(t, b, room.MsgState, nil)["state"].(map[string]any)
+	if st["playing"] != true || len(st["waiting"].([]any)) != 0 {
+		t.Errorf("state = %v, want playing with nobody to wait for", st)
+	}
 }
 
 // A message reaches everyone in the room, with the room's video and position. Only its sender can

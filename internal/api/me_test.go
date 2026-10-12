@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/erkanvatan/pause-together/internal/room"
 	"github.com/erkanvatan/pause-together/internal/store"
 	"github.com/erkanvatan/pause-together/internal/user"
 )
@@ -27,10 +28,11 @@ func testUsers(t *testing.T) *user.Store {
 const testCookie = "pt_test"
 
 func deps(users *user.Store) Deps {
-	return Deps{Users: users, TokenCookie: testCookie}
+	return Deps{Users: users, Hub: room.NewHub(context.Background(), nil, ""), TokenCookie: testCookie}
 }
 
 type meBody struct {
+	ID       *int64  `json:"id"`
 	Name     *string `json:"name"`
 	IsAdmin  bool    `json:"isAdmin"`
 	GuestURL string  `json:"guestUrl"`
@@ -140,7 +142,7 @@ func TestMeCreateThenReturn(t *testing.T) {
 	}
 }
 
-// A rename to a new name keeps the browser's token, and makes a new person. The old one stays.
+// A rename to a free name keeps the browser's token, and renames the person: no new one is made.
 func TestMeRenameKeepsToken(t *testing.T) {
 	users := testUsers(t)
 	h := Guest(fakeBuild(), deps(users))
@@ -153,8 +155,37 @@ func TestMeRenameKeepsToken(t *testing.T) {
 	if c := tokenFrom(rec); c == nil || c.Value != token {
 		t.Errorf("rename cookie = %v, want the same token", c)
 	}
-	if n := userCount(t, users); n != 2 {
-		t.Errorf("users = %d, want 2", n)
+	if n := userCount(t, users); n != 1 {
+		t.Errorf("users = %d, want 1", n)
+	}
+}
+
+// Logging out deletes the cookie and forgets its token: the old token is a new visitor again.
+func TestMeLogOut(t *testing.T) {
+	users := testUsers(t)
+	h := Guest(fakeBuild(), deps(users))
+	token := tokenFrom(serve(h, meRequest(http.MethodPost, `{"name":"Alice"}`, ""))).Value
+
+	rec := serve(h, meRequest(http.MethodDelete, "", token))
+	if b := decodeMe(t, rec); b.Name != nil {
+		t.Errorf("name = %v, want null", *b.Name)
+	}
+	if c := tokenFrom(rec); c == nil || c.MaxAge >= 0 {
+		t.Errorf("cookie = %v, want it deleted", c)
+	}
+	if b := decodeMe(t, serve(h, meRequest(http.MethodGet, "", token))); b.Name != nil {
+		t.Errorf("GET with the old token: name = %v, want null", *b.Name)
+	}
+	if n := userCount(t, users); n != 1 {
+		t.Errorf("users = %d, want 1: the person stays", n)
+	}
+	// A name picked with the old cookie still there makes a new browser of the person.
+	rec = serve(h, meRequest(http.MethodPost, `{"name":"Alice"}`, token))
+	if c := tokenFrom(rec); c == nil || c.Value == token || c.MaxAge <= 0 {
+		t.Errorf("cookie = %v, want a new token", c)
+	}
+	if b := decodeMe(t, rec); b.Name == nil || *b.Name != "Alice" {
+		t.Errorf("name = %v, want Alice", b.Name)
 	}
 }
 

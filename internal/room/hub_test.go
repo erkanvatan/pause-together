@@ -7,9 +7,10 @@ import (
 	"time"
 )
 
-// testSocket is a socket with no connection: its messages stay in out.
+// testSocket is a socket with no connection, in a browser of w's: its messages stay in out.
 func testSocket(w Who) *socket {
-	return &socket{who: w, out: make(chan []byte, sendBuffer), quit: make(chan struct{}), drop: func() {}}
+	return &socket{who: w, browser: w.Name, out: make(chan []byte, sendBuffer), quit: make(chan struct{}),
+		drop: func() {}}
 }
 
 // nextMsg returns the socket's next message, decoded loosely.
@@ -33,7 +34,8 @@ func nextMsg(t *testing.T, s *socket) map[string]any {
 func TestHubJoinStaleRoom(t *testing.T) {
 	ctx := context.Background()
 	r := newTestRooms(t)
-	if _, err := r.DB.Exec(`INSERT INTO users (id, name, name_key) VALUES (1, 'Alice', 'alice')`); err != nil {
+	if _, err := r.DB.Exec(`INSERT INTO users (id, name, name_key) VALUES (1, 'Alice', 'alice');
+		INSERT INTO tokens (token_hash, user_id) VALUES (CAST('Alice' AS BLOB), 1)`); err != nil {
 		t.Fatal(err)
 	}
 	h := NewHub(t.Context(), r, "build")
@@ -68,6 +70,63 @@ func TestHubJoinStaleRoom(t *testing.T) {
 		}
 		if l := h.loop(rm.ID); l != nil {
 			t.Error("the deleted room still has a loop")
+		}
+	})
+
+	t.Run("logged out in between → told and closed, never in", func(t *testing.T) {
+		rm := mustCreate(t, r, pick(1, stream(1)))
+		s := testSocket(alice)
+		s.browser = "laptop" // no token: logged out
+		h.join(rm, s)
+		if m := nextMsg(t, s); m["type"] != MsgLoggedOut {
+			t.Errorf("first message = %v, want loggedOut", m)
+		}
+		select {
+		case <-s.quit:
+		case <-time.After(5 * time.Second):
+			t.Error("socket not closed")
+		}
+		if w := h.Watching(rm.ID); len(w) != 0 {
+			t.Errorf("watching = %v, want nobody", w)
+		}
+	})
+
+	t.Run("moved to another person in between → joins as them, and its page gets their id", func(t *testing.T) {
+		rm := mustCreate(t, r, pick(1, stream(1)))
+		if _, err := r.DB.Exec(`INSERT INTO users (id, name, name_key) VALUES (2, 'Bob', 'bob');
+			INSERT INTO tokens (token_hash, user_id) VALUES (CAST('tv' AS BLOB), 2)`); err != nil {
+			t.Fatal(err)
+		}
+		s := testSocket(alice) // read before the move
+		s.browser = "tv"
+		h.join(rm, s)
+		if m := nextMsg(t, s); m["type"] != MsgHello || m["userId"] != float64(2) {
+			t.Errorf("first message = %v, want hello with Bob's id", m)
+		}
+		for {
+			if m := nextMsg(t, s); m["type"] == MsgPresence {
+				if w := m["watching"].([]any); len(w) != 1 || w[0].(map[string]any)["name"] != "Bob" {
+					t.Errorf("watching = %v, want Bob", w)
+				}
+				return
+			}
+		}
+	})
+
+	t.Run("renamed in between → joins with the new name", func(t *testing.T) {
+		rm := mustCreate(t, r, pick(1, stream(1)))
+		if _, err := r.DB.Exec(`UPDATE users SET name = 'Alicia' WHERE id = 1`); err != nil {
+			t.Fatal(err)
+		}
+		s := testSocket(alice) // read before the rename
+		h.join(rm, s)
+		for {
+			if m := nextMsg(t, s); m["type"] == MsgPresence {
+				if w := m["watching"].([]any); len(w) != 1 || w[0].(map[string]any)["name"] != "Alicia" {
+					t.Errorf("watching = %v, want Alicia", w)
+				}
+				return
+			}
 		}
 	})
 }

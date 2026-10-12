@@ -64,6 +64,18 @@ export function nameColor(userId: number, me: number, colors: NameColors): strin
 	return at === undefined ? '' : personColors[at];
 }
 
+// withName gives a renamed person's messages, and their quotes, the new name. It returns the same list
+// when none needs it.
+export function withName(list: ChatMessage[], who: Who): ChatMessage[] {
+	const theirs = (w: Who) => w.userId === who.userId && w.name !== who.name;
+	if (!list.some((m) => theirs(m.from) || (m.replyTo && theirs(m.replyTo.from)))) return list;
+	return list.map((m) => {
+		if (theirs(m.from)) m = { ...m, from: who };
+		if (m.replyTo && theirs(m.replyTo.from)) m = { ...m, replyTo: { ...m.replyTo, from: who } };
+		return m;
+	});
+}
+
 // withMessage adds a new message at the end, unless the list has it.
 export function withMessage(list: ChatMessage[], m: ChatMessage): ChatMessage[] {
 	return list.some((o) => o.id === m.id) ? list : [...list, m];
@@ -103,12 +115,17 @@ export function withToast(toasts: ChatMessage[], m: ChatMessage): ChatMessage[] 
 // withHistory takes the newest messages a (re)joined socket gets. Older ones loaded before stay when
 // they join up with the history; otherwise messages sent in between would be missing, so the history
 // replaces the list. keptOlder: the loaded older ones stayed.
+// The history has everyone's name as it is now, so the older ones take it too: a rename while the socket
+// was down never reached them.
 export function withHistory(
 	list: ChatMessage[],
 	history: ChatMessage[]
 ): { list: ChatMessage[]; keptOlder: boolean } {
 	const first = history[0];
 	const joins = first !== undefined && list.some((m) => m.id >= first.id);
-	const older = joins ? list.filter((m) => m.id < first.id) : [];
+	let older = joins ? list.filter((m) => m.id < first.id) : [];
+	for (const who of new Map(history.map((m) => [m.from.userId, m.from])).values()) {
+		older = withName(older, who);
+	}
 	return { list: [...older, ...history], keptOlder: older.length > 0 };
 }

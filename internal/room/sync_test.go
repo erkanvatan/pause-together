@@ -168,6 +168,37 @@ func TestSync(t *testing.T) {
 		sc.at(31_000).wantPos(15_000)
 	})
 
+	t.Run("the room waits for Alice, renamed Alicia on another page → it waits for Alicia, and says so", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		sc.at(10_000).status(a, Buffering)
+		sc.at(14_000)
+		alicia := Who{UserID: alice.UserID, Name: "Alicia"}
+		sc.e = sc.s.Rename(alicia, sc.now)
+		sc.check("waiting", sc.waiting(), []Who{alicia})
+		sc.check("changed", sc.e.Changed, true)
+		sc.pause(a)
+		sc.check("paused by", sc.e.PausedBy, &alicia)
+	})
+
+	t.Run("Alice left, renamed Alicia on another page → the room waits for Alicia", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		sc.at(10_000).leave(a)
+		alicia := Who{UserID: alice.UserID, Name: "Alicia"}
+		sc.e = sc.s.Rename(alicia, sc.now)
+		sc.at(14_000)
+		sc.check("waiting", sc.waiting(), []Who{alicia})
+	})
+
+	t.Run("Alice left, then logged out → the room stops waiting for her browser", func(t *testing.T) {
+		sc, a, _ := watching(t)
+		sc.at(10_000).leave(a)
+		sc.at(14_000)
+		sc.check("waiting", sc.waiting(), []Who{alice})
+		sc.e = sc.s.Forget(alice.Name, sc.now)
+		sc.check("waiting", sc.waiting(), []Who{})
+		sc.check("running", sc.running(), true)
+	})
+
 	t.Run("Alice has two tabs, one buffers → room waits for Alice, listed once", func(t *testing.T) {
 		sc, a, _ := watching(t)
 		a2 := sc.join(alice)

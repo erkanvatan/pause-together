@@ -7,7 +7,7 @@
 	import Icon from '$lib/Icon.svelte';
 	import Menu from '$lib/Menu.svelte';
 	import NameForm from '$lib/NameForm.svelte';
-	import { loadMe, me } from '$lib/me.svelte';
+	import { loadMe, logOut, me } from '$lib/me.svelte';
 	import { strings } from '$lib/strings';
 
 	let { children } = $props();
@@ -18,6 +18,7 @@
 
 	let loadFailed = $state(false);
 	let renaming = $state(false);
+	let logOutFailed = $state(false);
 
 	// The page loaded, so the server was just up: a failure is likely brief (a restart, a busy
 	// database). Keep trying instead of leaving the tab stuck.
@@ -40,10 +41,38 @@
 
 	onMount(load);
 
+	// Logged out on another page: the name form takes the page, and the rename dialog must not come back
+	// with the next name.
+	$effect(() => {
+		if (me.name === null) renaming = false;
+	});
+
+	// Another page may have renamed this person, or logged this browser out. Look again on coming back.
+	function visible() {
+		if (document.visibilityState === 'visible' && me.loaded) loadMe().catch(() => {});
+	}
+
+	// The failure note goes after a while: staying logged in may be fine.
+	const logOutNoteMs = 5000;
+
+	let loggingOut = false;
+	let logOutNote: ReturnType<typeof setTimeout> | undefined;
+
+	async function leave() {
+		if (loggingOut) return;
+		loggingOut = true;
+		logOutFailed = !(await logOut());
+		loggingOut = false;
+		clearTimeout(logOutNote);
+		if (logOutFailed) logOutNote = setTimeout(() => (logOutFailed = false), logOutNoteMs);
+	}
+
 	function closeRename() {
 		renaming = false;
 	}
 </script>
+
+<svelte:document onvisibilitychange={visible} />
 
 <svelte:head>
 	<meta name="theme-color" content={themeColor} />
@@ -92,6 +121,15 @@
 						>
 							{strings.rename}
 						</button>
+						<button
+							onclick={() => {
+								close();
+								leave();
+							}}
+							class="row"
+						>
+							{strings.logOut}
+						</button>
 						{#if me.isAdmin}
 							<a href="/admin" onclick={close} class="row sm:hidden">{strings.admin}</a>
 						{/if}
@@ -99,6 +137,11 @@
 				</Menu>
 			</div>
 		</header>
+		{#if logOutFailed}
+			<p class="mx-auto w-full {wide ? '' : 'max-w-6xl'} px-4 text-sm text-ember" role="alert">
+				{strings.logOutFailed}
+			</p>
+		{/if}
 		{@render children()}
 		<!-- A dialog over the page, not a page of its own: a room page stays, so a rename mid-movie never
 		leaves the room. -->

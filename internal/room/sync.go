@@ -83,7 +83,7 @@ type client struct {
 	id  int64
 	who Who
 	// browser tells one browser's tabs from another's. A person can have several (a TV and a phone, both
-	// "Dad"). A rename keeps it, though who changes.
+	// "Dad"). A rename keeps it. who keeps its user, unless the new name is another person's.
 	browser   string
 	status    Status // 0: nothing reported yet
 	since     int64  // when its current stall began
@@ -163,6 +163,22 @@ func (s *Sync) State(now int64) State {
 // Join adds a socket. It blocks nobody until it has been ready once.
 func (s *Sync) Join(id int64, w Who, browser string, now int64) Effect {
 	s.clients = append(s.clients, &client{id: id, who: w, browser: browser})
+	return s.settle(now, Effect{})
+}
+
+// Rename shows a person's new name, given on any of their pages.
+func (s *Sync) Rename(w Who, now int64) Effect {
+	for _, c := range s.clients {
+		if c.who.UserID == w.UserID {
+			c.who = w
+		}
+	}
+	return s.settle(now, Effect{})
+}
+
+// Forget stops waiting for a browser that left and can't come back: it logged out.
+func (s *Sync) Forget(browser string, now int64) Effect {
+	s.clients = slices.DeleteFunc(s.clients, func(c *client) bool { return c.gone && c.browser == browser })
 	return s.settle(now, Effect{})
 }
 

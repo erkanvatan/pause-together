@@ -58,6 +58,8 @@ export type ServerMessage =
 	| { type: 'paused'; by: Who }
 	| { type: 'pong'; t: number; serverMs: number }
 	| { type: 'deleted' }
+	| { type: 'renamed'; who: Who } // a person's new name, for the chat
+	| { type: 'loggedOut' } // this browser logged out on another page; the socket closes next
 	| { type: 'chatHistory'; messages: ChatMessage[] } // on join: the newest, oldest first
 	| { type: 'chat'; message: ChatMessage }
 	| { type: 'chatDeleted'; id: number };

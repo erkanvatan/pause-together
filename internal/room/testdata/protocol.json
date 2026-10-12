@@ -93,6 +93,8 @@
 		{ "type": "paused", "by": { "userId": 2, "name": "Bob" } },
 		{ "type": "pong", "t": 1234.5, "serverMs": 98765 },
 		{ "type": "deleted" },
+		{ "type": "renamed", "who": { "userId": 1, "name": "Alice" } },
+		{ "type": "loggedOut" },
 		{
 			"type": "chatHistory",
 			"messages": [

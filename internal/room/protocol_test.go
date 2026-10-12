@@ -82,6 +82,8 @@ func TestProtocol(t *testing.T) {
 		PausedMsg{Type: MsgPaused, By: bob},
 		PongMsg{Type: MsgPong, T: 1234.5, ServerMs: 98_765},
 		TypeMsg{Type: MsgDeleted},
+		RenamedMsg{Type: MsgRenamed, Who: alice},
+		TypeMsg{Type: MsgLoggedOut},
 		ChatHistoryMsg{Type: MsgChatHistory, Messages: []Message{hello}},
 		ChatMsg{Type: MsgChat, Message: right},
 		ChatDeletedMsg{Type: MsgChatDeleted, ID: 12},

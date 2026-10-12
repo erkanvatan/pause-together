@@ -52,6 +52,7 @@ func (s *server) mux(web fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/health", health)
 	mux.HandleFunc("GET /api/me", s.getMe)
 	mux.HandleFunc("POST /api/me", s.postMe)
+	mux.HandleFunc("DELETE /api/me", s.deleteMe)
 	mux.HandleFunc("GET /api/videos", s.listVideos)
 	mux.HandleFunc("GET /api/videos/{id}", s.getVideo)
 	mux.HandleFunc("GET /api/languages", s.getLanguages)

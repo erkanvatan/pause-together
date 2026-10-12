@@ -4,6 +4,7 @@ package user_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -43,7 +44,7 @@ func who(t *testing.T, s *user.Store, token string) user.User {
 
 func rename(t *testing.T, s *user.Store, token, name string) user.User {
 	t.Helper()
-	u, err := s.Rename(context.Background(), token, who(t, s, token), name)
+	_, u, err := s.Rename(context.Background(), token, name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,6 +93,43 @@ func TestSameNameIsOnePerson(t *testing.T) {
 	}
 }
 
+// Logging out forgets the browser's token. The person stays, with its other browsers.
+func TestForget(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+	ali, phone := create(t, s, "Ali")
+	_, laptop := create(t, s, "Ali")
+	if forgot, err := s.Forget(ctx, phone); !forgot || err != nil {
+		t.Fatalf("Forget = %v, %v; want true", forgot, err)
+	}
+	if forgot, err := s.Forget(ctx, phone); forgot || err != nil {
+		t.Errorf("Forget again = %v, %v; want false", forgot, err)
+	}
+	if _, ok, err := s.ByToken(ctx, phone); ok || err != nil {
+		t.Errorf("phone after Forget = %v, %v; want not found", ok, err)
+	}
+	if got := who(t, s, laptop); got != ali {
+		t.Errorf("laptop = %+v, want %+v", got, ali)
+	}
+}
+
+// A rename by a browser that logged out meanwhile says so, and changes nobody.
+func TestRenameUnknownToken(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+	ali, token := create(t, s, "Ali")
+	if _, err := s.Forget(ctx, token); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.Rename(ctx, token, "Bo"); !errors.Is(err, user.ErrUnknownToken) {
+		t.Errorf("Rename = %v, want ErrUnknownToken", err)
+	}
+	var name string
+	if err := s.DB.QueryRow("SELECT name FROM users WHERE id = ?", ali.ID).Scan(&name); err != nil || name != "Ali" {
+		t.Errorf("Ali = %q, %v; want unchanged", name, err)
+	}
+}
+
 func TestUnknownToken(t *testing.T) {
 	ctx := context.Background()
 	s := testStore(t)
@@ -103,34 +141,45 @@ func TestUnknownToken(t *testing.T) {
 	}
 }
 
-// A rename to a new name moves only this browser. The old person keeps its name and other browsers.
+// A rename to a free name renames the person, for every browser of theirs. No new person is made.
 func TestRenameToNewName(t *testing.T) {
 	s := testStore(t)
 	ali, phone := create(t, s, "Ali")
 	_, laptop := create(t, s, "Ali")
 
-	bo := rename(t, s, laptop, "Bo")
-	if bo.ID == ali.ID || bo.Name != "Bo" {
-		t.Errorf("renamed = %+v, want a new person Bo", bo)
+	bo := user.User{ID: ali.ID, Name: "Bo"}
+	if got := rename(t, s, laptop, "Bo"); got != bo {
+		t.Errorf("renamed = %+v, want %+v", got, bo)
 	}
-	if got := who(t, s, laptop); got != bo {
-		t.Errorf("laptop = %+v, want %+v", got, bo)
+	for _, token := range []string{phone, laptop} {
+		if got := who(t, s, token); got != bo {
+			t.Errorf("ByToken = %+v, want %+v", got, bo)
+		}
 	}
-	if got := who(t, s, phone); got != ali {
-		t.Errorf("phone = %+v, want %+v", got, ali)
+	if n := userCount(t, s); n != 1 {
+		t.Errorf("users = %d, want 1", n)
+	}
+	// The old name is free again: picking it makes a new person.
+	if got, _ := create(t, s, "Ali"); got.ID == ali.ID {
+		t.Errorf("Ali after the rename = %+v, want a new person", got)
 	}
 }
 
-// A rename to a taken name joins that person, with its spelling.
+// A rename to a taken name moves only this browser to that person, with its spelling. The person it
+// leaves keeps its name and its other browsers.
 func TestRenameToTakenName(t *testing.T) {
 	s := testStore(t)
 	ali, _ := create(t, s, "Ali")
-	_, token := create(t, s, "Can")
-	if got := rename(t, s, token, "ALI"); got != ali {
+	can, phone := create(t, s, "Can")
+	_, laptop := create(t, s, "Can")
+	if got := rename(t, s, laptop, "ALI"); got != ali {
 		t.Errorf("renamed = %+v, want %+v", got, ali)
 	}
-	if got := who(t, s, token); got != ali {
-		t.Errorf("ByToken = %+v, want %+v", got, ali)
+	if got := who(t, s, laptop); got != ali {
+		t.Errorf("laptop = %+v, want %+v", got, ali)
+	}
+	if got := who(t, s, phone); got != can {
+		t.Errorf("phone = %+v, want %+v", got, can)
 	}
 }
 
@@ -149,10 +198,11 @@ func TestRenameSpelling(t *testing.T) {
 	}
 }
 
-// A person whose last browser picks another name stays: their messages still show it.
+// A person whose last browser picks another person's name stays: their messages still show it.
 func TestPersonWithNoBrowserStays(t *testing.T) {
 	s := testStore(t)
 	ali, token := create(t, s, "Ali")
+	create(t, s, "Bo")
 	rename(t, s, token, "Bo")
 	var name string
 	if err := s.DB.QueryRow("SELECT name FROM users WHERE id = ?", ali.ID).Scan(&name); err != nil || name != "Ali" {

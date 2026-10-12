@@ -10,6 +10,7 @@ import {
 	withDeleted,
 	withHistory,
 	withMessage,
+	withName,
 	withOlder,
 	withPeople,
 	withToast
@@ -84,6 +85,11 @@ describe('withHistory', () => {
 	it('takes an empty history as it is', () => {
 		expect(withHistory(range(1, 3), [])).toEqual({ list: [], keptOlder: false });
 	});
+	it('gives the older ones the names the history has: a rename while away', () => {
+		const alicia = { userId: 1, name: 'Alicia' };
+		const got = withHistory(range(1, 5), [{ ...message(4), from: alicia }, { ...message(5), from: alicia }]);
+		expect(got.list.map((m) => m.from.name)).toEqual(['Alicia', 'Alicia', 'Alicia', 'Alicia', 'Alicia']);
+	});
 	it('drops loaded messages deleted while away', () => {
 		expect(ids(withHistory(range(1, 5), [message(1), message(2), message(4)]).list)).toEqual([1, 2, 4]);
 	});
@@ -121,6 +127,29 @@ describe('withToast', () => {
 		let toasts: ChatMessage[] = [];
 		for (let id = 1; id <= MAX_TOASTS + 2; id++) toasts = withToast(toasts, message(id));
 		expect(ids(toasts)).toEqual(Array.from({ length: MAX_TOASTS }, (_, k) => k + 3));
+	});
+});
+
+describe('withName', () => {
+	const bob = { userId: 2, name: 'Bob' };
+	const alicia = { userId: 1, name: 'Alicia' };
+
+	it("gives a renamed person's messages and quotes the new name", () => {
+		const list = [message(1), { ...message(2, 1), from: bob }];
+		const got = withName(list, alicia);
+		expect(got.map((m) => m.from.name)).toEqual(['Alicia', 'Bob']);
+		expect(got[1].replyTo?.from.name).toBe('Alicia');
+		expect(list[0].from.name).toBe('Alice'); // a new list, the old one untouched
+	});
+
+	it("keeps the messages that aren't theirs as they were", () => {
+		const bobs = { ...message(1), from: bob };
+		expect(withName([bobs, message(2)], alicia)[0]).toBe(bobs);
+	});
+
+	it('returns the same list when none is theirs', () => {
+		const list = [{ ...message(1), from: bob }];
+		expect(withName(list, alicia)).toBe(list);
 	});
 });
 

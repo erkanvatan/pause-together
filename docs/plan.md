@@ -514,3 +514,54 @@ colors. There are no accounts, so the name is the only thing that can join them.
 "watching now". Rename one to `Bo`: two people again, the old messages still say `Ali`.
 
 **Not here:** passwords or any other proof of who you are. Choosing your own color.
+
+### [x] 22. Rename the person, and log out
+
+**Goal:** a rename renames the person, everywhere, at once. And a way out for a browser that picked
+someone else's name by mistake.
+
+Why: slice 21 moved only the renaming browser to a new person. So a rename made a new user, and the
+person's other devices and old messages kept the old name.
+
+- A rename to a name nobody else has updates the person's row (`name`, `name_key`): all their
+  browsers and all their messages show it. No new person is made. Your own name in another case
+  (`mom` → `Mom`) is just this case now. One guarded `UPDATE … WHERE NOT EXISTS`, in one transaction
+  with the token read, so a name can't be taken between the check and the write.
+- A rename to another person's name moves only this browser to them, as before. The old person keeps
+  its name, its messages and its other browsers.
+- Live push: `user.Store.Rename` returns who the browser was and is now, and `POST /api/me` tells the
+  hub:
+  - Same person, new name → `Hub.Renamed`: every room renames that person's sockets (presence, sync's
+    "Waiting for …" and "… paused") and sends a new `renamed {who}` message. Pages fix the chat's names
+    and quotes, toasts and the reply bar, and a page of that person reloads its header.
+  - Moved to another person → `Hub.Moved`: that browser's room sockets are dropped. They reconnect as
+    the new person.
+  - A socket's user is read before it joins, so the room reads who the browser is once more as it
+    joins. Another person now → a second `hello` with the new id. Renamed → the new name.
+  - Pages that missed it look again (`GET /api/me`) when they become visible.
+- `GET /api/me` adds `id`: a page tells a rename from a move by it, and rejoins its room socket only on
+  a move.
+- Log out, in the name menu: `DELETE /api/me` deletes this browser's token and clears the cookie. The
+  person stays. The browser's other room pages get a new `loggedOut` message and ask for a name. So
+  does a room socket with no user: it's accepted, told `loggedOut` and closed, since a page can't read
+  a refused upgrade's status. No room waits for that browser (`Sync.Forget`): it can't come back.
+- Update AGENTS.md: the rename rule, the live push, log out and `DELETE /api/me` under "Users".
+
+**Done when (tests):**
+- Store: rename to a free name → one person, both browsers renamed. To a taken name → this browser
+  moves, the old person keeps its other browser. `mom` → `Mom` for both. A person with no browser left
+  stays. An unknown token → `ErrUnknownToken`, nobody changed. Forget → that token only.
+- API: rename and log out answers and cookies.
+- Socket: a rename reaches other pages' presence and chat; a move drops and rejoins as the new person;
+  a log out sends `loggedOut` and stops the room waiting; no user → `loggedOut`.
+- Hub: logged out, moved or renamed between the upgrade and the join → each handled.
+- Sync and presence: `Rename` and `Forget`, table-driven. `withName` in `chat.ts`. `me` answers taken
+  in order.
+- Protocol fixture has `renamed` and `loggedOut`, both sides.
+
+**By hand:** Dad on a laptop and a phone, Mom on a TV, one room. Rename the laptop to `Papa`: the phone,
+the TV's "watching now" and the old chat say `Papa` at once. Rename the phone to `Mom`: it rejoins as
+Mom, the laptop stays `Papa`. Log out on the phone with two tabs open: both ask for a name, no cookie
+left.
+
+**Not here:** passwords or any other proof of who you are. Undoing a rename.

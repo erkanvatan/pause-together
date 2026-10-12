@@ -26,6 +26,13 @@ func (p *Presence) Join(w Who) {
 	v.sockets++
 }
 
+// Rename shows a user's new name.
+func (p *Presence) Rename(w Who) {
+	if v := p.find(w.UserID); v != nil {
+		v.who = w
+	}
+}
+
 // Leave counts a socket of a user's as closed. With their last one gone, the grace starts, unless the
 // page left on purpose (closed the socket cleanly): then they aren't coming back soon.
 func (p *Presence) Leave(userID, now int64, left bool) {

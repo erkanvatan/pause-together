@@ -135,6 +135,13 @@ func (h *Hub) read(ctx context.Context, conn *websocket.Conn, l *loop, s *socket
 	}
 }
 
+// RefuseLoggedOut tells a socket of a browser with no name that it's logged out, and closes it. The
+// page asks for a name: a browser can't read a refused upgrade's status.
+func RefuseLoggedOut(ctx context.Context, conn *websocket.Conn) {
+	_ = conn.Write(ctx, websocket.MessageText, encode(TypeMsg{Type: MsgLoggedOut}))
+	_ = conn.Close(websocket.StatusNormalClosure, "")
+}
+
 // gone closes a socket whose loop has stopped: its room was deleted, or the server is stopping.
 func (h *Hub) gone(s *socket) {
 	if h.ctx.Err() != nil {
@@ -167,6 +174,38 @@ func (h *Hub) Changed(rm Room) {
 	if l := h.loop(rm.ID); l != nil {
 		l.do(func() { l.changed(rm) })
 	}
+}
+
+// Renamed shows a person's new name in every room, on every page of theirs and everyone else's. Call it
+// after the rename is stored: each room reads the name.
+func (h *Hub) Renamed(userID int64) {
+	for _, l := range h.allLoops() {
+		l.do(func() { l.renamed(userID) })
+	}
+}
+
+// Moved drops every socket of a browser that a rename made another person: they reconnect as them.
+func (h *Hub) Moved(browser string) {
+	for _, l := range h.allLoops() {
+		l.do(func() { l.moved(browser) })
+	}
+}
+
+// LoggedOut closes every socket of a browser that logged out, and stops every room waiting for it.
+func (h *Hub) LoggedOut(browser string) {
+	for _, l := range h.allLoops() {
+		l.do(func() { l.loggedOut(browser) })
+	}
+}
+
+func (h *Hub) allLoops() []*loop {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	loops := make([]*loop, 0, len(h.rooms))
+	for _, r := range h.rooms {
+		loops = append(loops, r.loop)
+	}
+	return loops
 }
 
 // Deleted tells everyone in a deleted room, and closes their sockets.
@@ -214,6 +253,7 @@ type socket struct {
 	quit      chan struct{} // closed by closeWith: send what's queued, then close
 	closeOnce sync.Once
 	code      websocket.StatusCode
+	loggedOut bool // its browser logged out: nobody waits for it once it's gone. The loop's.
 }
 
 // send queues a message. A socket too far behind is dropped.
