@@ -83,7 +83,7 @@ type client struct {
 	id  int64
 	who Who
 	// browser tells one browser's tabs from another's. A person can have several (a TV and a phone, both
-	// "Dad"). A rename keeps it. who keeps its user, unless the new name is another person's.
+	// "Dad"). A rename keeps it. who keeps its user, unless the browser joins another person.
 	browser   string
 	status    Status // 0: nothing reported yet
 	since     int64  // when its current stall began

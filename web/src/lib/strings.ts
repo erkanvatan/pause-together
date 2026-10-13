@@ -12,6 +12,11 @@ export const strings = {
 	nameWhy: "Pick a name so the others know it's you.",
 	joining: (room: string) => `You're joining ${room}.`,
 	namePlaceholder: 'Your name',
+	// A name is a person: picking someone's name makes this browser them, so it asks first.
+	nameTaken: (name: string) => `Someone here is already called ${name}.`,
+	nameTakenAsk: "If that's you, go on. If not, pick another name.",
+	continueAs: (name: string) => `Continue as ${name}`,
+	pickAnotherName: 'Pick another name',
 	save: 'Save',
 	continue: 'Continue',
 	cancel: 'Cancel',

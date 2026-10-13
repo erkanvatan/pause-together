@@ -22,10 +22,14 @@ func testStore(t *testing.T) *user.Store {
 	return &user.Store{DB: db}
 }
 
-// create makes a browser with name, and returns its person and token.
+// create makes a browser with name, and returns its person and token. A taken name joins its holder,
+// as the page does once asked.
 func create(t *testing.T, s *user.Store, name string) (user.User, string) {
 	t.Helper()
 	u, token, err := s.Create(context.Background(), name)
+	if errors.Is(err, user.ErrNameTaken) {
+		_, u, token, err = s.Join(context.Background(), "", u.ID)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,9 +46,13 @@ func who(t *testing.T, s *user.Store, token string) user.User {
 	return u
 }
 
+// rename renames the browser's person, or, when the name is taken, joins its holder.
 func rename(t *testing.T, s *user.Store, token, name string) user.User {
 	t.Helper()
 	_, u, err := s.Rename(context.Background(), token, name)
+	if errors.Is(err, user.ErrNameTaken) {
+		_, u, _, err = s.Join(context.Background(), token, u.ID)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,6 +219,71 @@ func TestPersonWithNoBrowserStays(t *testing.T) {
 	// Picking the name again makes this browser that person once more.
 	if got := rename(t, s, token, "ali"); got != ali {
 		t.Errorf("back = %+v, want %+v", got, ali)
+	}
+}
+
+// A name another person has is refused with that person, and nothing changes. A free name and your
+// own name in another case still work.
+func TestNameTaken(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+	ali, _ := create(t, s, "Ali")
+	can, token := create(t, s, "Can")
+
+	u, newToken, err := s.Create(ctx, "ALI")
+	if !errors.Is(err, user.ErrNameTaken) || u != ali || newToken != "" {
+		t.Errorf("Create = %+v, %q, %v; want %+v, no token, ErrNameTaken", u, newToken, err, ali)
+	}
+	if _, to, err := s.Rename(ctx, token, "ali"); !errors.Is(err, user.ErrNameTaken) || to != ali {
+		t.Errorf("Rename = %+v, %v; want %+v, ErrNameTaken", to, err, ali)
+	}
+	if got := who(t, s, token); got != can {
+		t.Errorf("after the refused rename: %+v, want %+v", got, can)
+	}
+	if n := userCount(t, s); n != 2 {
+		t.Errorf("users = %d, want 2", n)
+	}
+
+	if _, to, err := s.Rename(ctx, token, "CAN"); err != nil || to.ID != can.ID || to.Name != "CAN" {
+		t.Errorf("own spelling: %+v, %v; want id %d, CAN", to, err, can.ID)
+	}
+	if _, to, err := s.Rename(ctx, token, "Bob"); err != nil || to.ID != can.ID {
+		t.Errorf("free name: %+v, %v; want id %d", to, err, can.ID)
+	}
+	if u, _, err := s.Create(ctx, "Carol"); err != nil || u.Name != "Carol" {
+		t.Errorf("Create free name = %+v, %v", u, err)
+	}
+}
+
+// Join goes by id: a person who renamed after the page asked is still the one it joins. A known browser
+// keeps its token; a new or unknown one gets one.
+func TestJoin(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+	ali, aliToken := create(t, s, "Ali")
+	can, token := create(t, s, "Can")
+	bob := rename(t, s, aliToken, "Bob")
+
+	from, to, newToken, err := s.Join(ctx, token, ali.ID)
+	if err != nil || from != can || to != bob || newToken != "" {
+		t.Errorf("Join = %+v, %+v, %q, %v; want %+v, %+v, no new token", from, to, newToken, err, can, bob)
+	}
+	if got := who(t, s, token); got != bob {
+		t.Errorf("browser = %+v, want %+v", got, bob)
+	}
+	for _, tok := range []string{"", "AAAAAAAAAAAAAAAAAAAAAAAAAA"} {
+		from, to, newToken, err := s.Join(ctx, tok, ali.ID)
+		if err != nil || from != (user.User{}) || to != bob || newToken == "" {
+			t.Errorf("Join(%q) = %+v, %+v, %q, %v; want a new token for %+v", tok, from, to, newToken, err, bob)
+		} else if got := who(t, s, newToken); got != bob {
+			t.Errorf("new browser = %+v, want %+v", got, bob)
+		}
+	}
+	if _, _, _, err := s.Join(ctx, token, 999); !errors.Is(err, user.ErrUnknownPerson) {
+		t.Errorf("Join unknown id = %v, want ErrUnknownPerson", err)
+	}
+	if n := userCount(t, s); n != 2 {
+		t.Errorf("users = %d, want 2", n)
 	}
 }
 

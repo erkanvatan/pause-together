@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -179,8 +180,14 @@ func TestMeLogOut(t *testing.T) {
 	if n := userCount(t, users); n != 1 {
 		t.Errorf("users = %d, want 1: the person stays", n)
 	}
-	// A name picked with the old cookie still there makes a new browser of the person.
+	// Picking the name again with the old cookie still there asks first, and clears the dead cookie.
 	rec = serve(h, meRequest(http.MethodPost, `{"name":"Alice"}`, token))
+	taken := decodeTaken(t, rec)
+	if c := tokenFrom(rec); c == nil || c.MaxAge >= 0 {
+		t.Errorf("cookie = %v, want it deleted", c)
+	}
+	// Joining makes a new browser of the person.
+	rec = serve(h, meRequest(http.MethodPost, fmt.Sprintf(`{"join":%d}`, taken.ID), token))
 	if c := tokenFrom(rec); c == nil || c.Value == token || c.MaxAge <= 0 {
 		t.Errorf("cookie = %v, want a new token", c)
 	}
@@ -195,7 +202,8 @@ func TestMeSameNameIsOnePerson(t *testing.T) {
 	h := Guest(fakeBuild(), deps(users))
 	serve(h, meRequest(http.MethodPost, `{"name":"Ali"}`, ""))
 
-	rec := serve(h, meRequest(http.MethodPost, `{"name":"ali"}`, ""))
+	taken := decodeTaken(t, serve(h, meRequest(http.MethodPost, `{"name":"ali"}`, "")))
+	rec := serve(h, meRequest(http.MethodPost, fmt.Sprintf(`{"join":%d}`, taken.ID), ""))
 	if b := decodeMe(t, rec); b.Name == nil || *b.Name != "Ali" {
 		t.Errorf("POST ali: name = %v, want Ali", b.Name)
 	}
@@ -204,6 +212,60 @@ func TestMeSameNameIsOnePerson(t *testing.T) {
 	}
 	if n := userCount(t, users); n != 1 {
 		t.Errorf("users = %d, want 1", n)
+	}
+}
+
+// decodeTaken reads a 409 that says who has the name.
+func decodeTaken(t *testing.T, rec *httptest.ResponseRecorder) takenResponse {
+	t.Helper()
+	var b takenResponse
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 (body %q)", rec.Code, rec.Body.String())
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil || b.Error != errTaken {
+		t.Fatalf("decode %q: %+v, %v", rec.Body.String(), b, err)
+	}
+	return b
+}
+
+// Another person's name answers 409 with who has it, and changes nothing. join then makes the browser
+// them, by id: a rename since the question doesn't matter.
+func TestMeNameTaken(t *testing.T) {
+	users := testUsers(t)
+	h := Guest(fakeBuild(), deps(users))
+	ali := decodeMe(t, serve(h, meRequest(http.MethodPost, `{"name":"Ali"}`, "")))
+	can := tokenFrom(serve(h, meRequest(http.MethodPost, `{"name":"Can"}`, ""))).Value
+
+	tests := []struct {
+		name, token string
+		cleared     bool // a dead cookie goes; a live one stays as it is
+	}{
+		{"new browser", "", false},
+		{"rename", can, false},
+		{"unknown token", "AAAAAAAAAAAAAAAAAAAAAAAAAA", true},
+	}
+	for _, tt := range tests {
+		rec := serve(h, meRequest(http.MethodPost, `{"name":"ali"}`, tt.token))
+		if b := decodeTaken(t, rec); b.ID != *ali.ID || b.Name != "Ali" {
+			t.Errorf("%s: taken = %+v, want Ali's id %d", tt.name, b, *ali.ID)
+		}
+		c := tokenFrom(rec)
+		if cleared := c != nil && c.MaxAge < 0; cleared != tt.cleared || (c != nil && !cleared) {
+			t.Errorf("%s: cookie = %v, want cleared %v", tt.name, c, tt.cleared)
+		}
+	}
+	if b := decodeMe(t, serve(h, meRequest(http.MethodGet, "", can))); b.Name == nil || *b.Name != "Can" {
+		t.Errorf("after the refused rename: name = %v, want Can", b.Name)
+	}
+	if n := userCount(t, users); n != 2 {
+		t.Errorf("users = %d, want 2", n)
+	}
+
+	if b := decodeMe(t, serve(h, meRequest(http.MethodPost, fmt.Sprintf(`{"join":%d}`, *ali.ID), can))); b.Name == nil || *b.Name != "Ali" {
+		t.Errorf("join: name = %v, want Ali", b.Name)
+	}
+	if rec := serve(h, meRequest(http.MethodPost, `{"join":999}`, can)); rec.Code != http.StatusNotFound {
+		t.Errorf("join unknown person: %d, want 404", rec.Code)
 	}
 }
 
@@ -312,7 +374,9 @@ func TestMeCrossOrigin(t *testing.T) {
 	for hName, h := range handlers(t) {
 		for _, tt := range tests {
 			t.Run(hName+"/"+tt.name, func(t *testing.T) {
-				req := httptest.NewRequest(http.MethodPost, "/api/me", strings.NewReader(`{"name":"Alice"}`))
+				// A name of its own each: both handlers share the users.
+				body := fmt.Sprintf(`{"name":"%s %s"}`, hName, strings.Fields(tt.name)[0])
+				req := httptest.NewRequest(http.MethodPost, "/api/me", strings.NewReader(body))
 				req.Host = hosts[hName]
 				origin := tt.origin
 				if origin == "self" {

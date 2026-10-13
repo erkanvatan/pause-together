@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { forgetMe, loadMe, logOut, me, saveName } from './me.svelte';
+import { forgetMe, joinPerson, loadMe, logOut, me, saveName } from './me.svelte';
 
 function respond(status: number, body: string) {
 	vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status })));
@@ -33,8 +33,25 @@ describe('saveName', () => {
 		expect(me.name).toBeNull();
 	});
 
+	it("reports another person's name, and joins them by id", async () => {
+		respond(409, '{"error":"taken","id":2,"name":"Ali"}');
+		expect(await saveName('ali')).toEqual({ taken: { id: 2, name: 'Ali' } });
+		expect(me.name).toBeNull();
+
+		respond(200, '{"id":2,"name":"Bob","isAdmin":false}');
+		expect(await joinPerson(2)).toBe('ok');
+		expect(vi.mocked(fetch).mock.calls[0][1]?.body).toBe('{"join":2}');
+		expect(me.name).toBe('Bob');
+	});
+
+	it("doesn't blame the name when a join is refused", async () => {
+		respond(404, 'unknown person');
+		expect(await joinPerson(999)).toBe('failed');
+	});
+
 	it.each([
 		['server error', () => respond(500, 'oops')],
+		['taken, but not who', () => respond(409, '{"error":"taken","name":"Ali"}')],
 		['refused (403)', () => respond(403, 'forbidden')],
 		['not JSON', () => respond(200, '<html>proxy error</html>')],
 		[

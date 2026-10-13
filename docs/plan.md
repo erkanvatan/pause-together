@@ -505,7 +505,8 @@ colors. There are no accounts, so the name is the only thing that can join them.
   trimmed.
 - Two browsers pick `Ali` and `ali` → one user, one presence entry; each can delete the other's message.
 - Rename to a new name → this browser only; the other browser and the old messages keep the old name.
-  Rename to a taken name → joins that person. `mom` → `Mom` → spelling changes for both browsers.
+  Rename to a taken name → joins that person (since then, only once the page asks: a 409, then
+  `{join: id}`). `mom` → `Mom` → spelling changes for both browsers.
 - Migration test: three users `Ali`, `ali`, `Can` with messages → two users, every message and token
   kept, `Ali`'s spelling wins. `foreign_key_check` clean.
 - The rest pass unchanged.
@@ -528,7 +529,8 @@ person's other devices and old messages kept the old name.
   (`mom` → `Mom`) is just this case now. One guarded `UPDATE … WHERE NOT EXISTS`, in one transaction
   with the token read, so a name can't be taken between the check and the write.
 - A rename to another person's name moves only this browser to them, as before. The old person keeps
-  its name, its messages and its other browsers.
+  its name, its messages and its other browsers. (Since then, only once the page asks: the name answers
+  409 with who has it, and `{join: id}` moves the browser.)
 - Live push: `user.Store.Rename` returns who the browser was and is now, and `POST /api/me` tells the
   hub:
   - Same person, new name → `Hub.Renamed`: every room renames that person's sockets (presence, sync's

@@ -241,16 +241,18 @@ container mount for source files, and one name for two things gets mixed up in c
   name in NFC, then case-folded (`cases.Fold`). Turkish isn't special: `ALİ` and `ali` are two people.
   SQLite's `lower()` and `NOCASE` fold only ASCII, so Go makes the key (`user.NameKey`, also the SQL
   function `name_key`).
-- Picking a name that exists makes this browser that person, with the person's spelling. A rename
+- Picking a name that exists makes this browser that person, with the person's spelling, but only
+  after the page asks: "Someone here is already called Ali. If that's you, go on. If not, pick another
+  name." So two relatives who both type "Ali" don't become one person by accident. A rename
   to a name nobody else has renames the person: all their browsers and all their messages show the
   new name, and no new person is made. That covers your own name in another case (`mom` → `Mom`), the
-  only way to fix a spelling. A rename to another person's name moves only this browser to them. The
-  old person keeps its name, its messages and its other browsers; with no browser left, it stays, so
-  its messages still show its name.
+  only way to fix a spelling. A rename to another person's name, once asked, moves only this browser
+  to them. The old person keeps its name, its messages and its other browsers; with no browser left,
+  it stays, so its messages still show its name.
 - A rename reaches open pages at once: the server renames the person's sockets in every room, so
   "watching now", "Waiting for …" and "… paused" show the new name, and sends every room a `renamed`
-  message, so the chat shows it, and a room page of theirs its header. A rename that moves the
-  browser to another person drops that browser's room sockets: they reconnect as the new person, as
+  message, so the chat shows it, and a room page of theirs its header. A move to another person
+  (`{join: id}`, below) drops that browser's room sockets: they reconnect as the new person, as
   after any dropped connection, and every hello makes a page ask who it is. Other pages look again when they become visible. A socket's user is read before it
   joins, so the room reads who the browser is once more as it joins, and sends a second hello when
   it's another person now.
@@ -277,9 +279,12 @@ container mount for source files, and one name for two things gets mixed up in c
   secure context, so the clipboard works there), and the admin page shows the bare address, or, when
   `PUBLIC_BIND` is still loopback, how to open the guest port.
 - `DELETE /api/me` logs out (above) and answers like a new visitor's `GET /api/me`.
-- `POST /api/me {name}` renames a known browser's person, or moves the browser to the person who has
-  the name (above). A new browser gets a token (and the cookie) when it's missing or unknown. It
-  answers with the person's spelling.
+- `POST /api/me {name}` renames a known browser's person (above). A new browser gets a token (and the
+  cookie) when it's missing or unknown. Another person's name answers 409 `{error: "taken", id, name}`
+  and changes nothing; your own name in another case is no one else's. `POST /api/me {join: id}` then
+  moves the browser to that person, by id, so a rename since the question doesn't matter. The
+  question is the page's: the server joins any id it's sent, as the tailnet is trusted, like any name
+  typed. Both answer with the person's spelling.
 - The cookie (`pt_token`) is `SameSite=Lax` and never `Secure`: guests use plain HTTP, and their
   browser would drop a `Secure` cookie. `localhost` counts as secure, so dev would hide that bug.
 - Everyone can: see all rooms, create and name rooms, control playback, switch a room's video, chat,

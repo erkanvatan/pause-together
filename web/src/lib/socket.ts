@@ -53,9 +53,9 @@ export class RoomSocket {
 		this.drop(CLOSE_LEFT);
 	}
 
-	// rejoin joins again on a new connection: after a rename moved the browser to another person, as
-	// them. The clean close drops the old one from the room at once, and the same browser coming back
-	// ready ends any wait for it.
+	// rejoin joins again on a new connection: after the browser joined another person, as them. The
+	// clean close drops the old one from the room at once, and the same browser coming back ready ends
+	// any wait for it.
 	rejoin() {
 		if (this.closed) return;
 		clearTimeout(this.retryTimer);

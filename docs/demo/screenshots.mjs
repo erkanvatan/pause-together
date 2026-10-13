@@ -3,7 +3,7 @@
 // network of a throwaway app container (library.sh's library). Writes PNGs into OUT, for the task to
 // copy into docs/screenshots.
 import { chromium } from 'playwright';
-import { ADMIN, GUEST, api, prepared, until } from './app.mjs';
+import { ADMIN, GUEST, api, pickName, prepared, until } from './app.mjs';
 
 const OUT = process.env.OUT;
 
@@ -31,7 +31,7 @@ const desktop = { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 }
 
 async function person(name, base = GUEST) {
 	const ctx = await browser.newContext(desktop);
-	if (name) await ctx.request.post(`${base}/api/me`, { data: { name } });
+	if (name) await pickName(ctx.request, base, name);
 	return ctx.newPage();
 }
 

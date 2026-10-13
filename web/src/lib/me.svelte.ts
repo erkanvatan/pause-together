@@ -59,17 +59,35 @@ export function forgetMe() {
 	me.id = me.name = null;
 }
 
-export type SaveResult = 'ok' | 'invalid' | 'failed';
+// taken: the name is another person's: their id, to join them, and their spelling, to ask.
+export type SaveResult = 'ok' | 'invalid' | 'failed' | { taken: { id: number; name: string } };
 
-// saveName creates the user on first use and renames it after. It never throws.
-export async function saveName(name: string): Promise<SaveResult> {
+// saveName creates the user on first use and renames it after. Another person's name is taken: ask,
+// then joinPerson. It never throws.
+export function saveName(name: string): Promise<SaveResult> {
+	return post({ name });
+}
+
+// joinPerson makes this browser the person a taken name belongs to. It goes by id, so a rename since
+// the question doesn't matter. It never throws, and never says 'invalid': no name was sent.
+export async function joinPerson(id: number): Promise<SaveResult> {
+	const r = await post({ join: id });
+	return r === 'invalid' ? 'failed' : r;
+}
+
+async function post(body: { name: string } | { join: number }): Promise<SaveResult> {
 	try {
 		const res = await fetch('/api/me', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ name })
+			body: JSON.stringify(body)
 		});
 		if (res.status === 400) return 'invalid';
+		if (res.status === 409) {
+			const r = await res.json();
+			const taken = r.error === 'taken' && typeof r.id === 'number' && typeof r.name === 'string';
+			return taken ? { taken: { id: r.id, name: r.name } } : 'failed';
+		}
 		if (!res.ok) return 'failed';
 		const r = await res.json();
 		apply(++started, r);

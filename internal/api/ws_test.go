@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/erkanvatan/pause-together/internal/room"
+	"github.com/erkanvatan/pause-together/internal/user"
 )
 
 // wsTest is a guest server with room 1 on Heat, and two users.
@@ -419,7 +421,12 @@ func TestSocketSameName(t *testing.T) {
 	w := newWSTest(t)
 	phone := w.join(t, w.alice)
 	until(t, phone, room.MsgPresence, nil)
-	laptopUser, laptop, err := w.d.Users.Create(t.Context(), "alice")
+	// "alice" is Alice's name: the page asks, then joins her.
+	alice, _, err := w.d.Users.Create(t.Context(), "alice")
+	if !errors.Is(err, user.ErrNameTaken) {
+		t.Fatalf("Create alice = %v, want ErrNameTaken", err)
+	}
+	_, laptopUser, laptop, err := w.d.Users.Join(t.Context(), "", alice.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -476,7 +483,7 @@ func TestSocketRenameReachesOtherPages(t *testing.T) {
 	until(t, phone, room.MsgPresence, nil)
 	b := w.join(t, w.bob)
 	until(t, b, room.MsgPresence, nil)
-	_, laptop, err := w.d.Users.Create(t.Context(), "Alice")
+	_, _, laptop, err := w.d.Users.Join(t.Context(), "", w.aliceID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,7 +508,7 @@ func TestSocketMovedToAnotherPerson(t *testing.T) {
 	for _, c := range tabs {
 		until(t, c, room.MsgPresence, nil)
 	}
-	if rec := serve(w.guest, meRequest(http.MethodPost, `{"name":"bob"}`, w.alice)); rec.Code != http.StatusOK {
+	if rec := serve(w.guest, meRequest(http.MethodPost, fmt.Sprintf(`{"join":%d}`, w.bobID), w.alice)); rec.Code != http.StatusOK {
 		t.Fatalf("rename: %d", rec.Code)
 	}
 	for _, c := range tabs {

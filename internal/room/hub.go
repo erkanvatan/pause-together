@@ -185,7 +185,7 @@ func (h *Hub) Renamed(userID int64) {
 	}
 }
 
-// Moved drops every socket of a browser that a rename made another person: they reconnect as them.
+// Moved drops every socket of a browser that joined another person: they reconnect as them.
 func (h *Hub) Moved(browser string) {
 	for _, l := range h.allLoops() {
 		l.do(func() { l.moved(browser) })

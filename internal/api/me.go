@@ -80,14 +80,24 @@ func (s *server) getMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.me(&u))
 }
 
-// postMe gives this browser's person the name, or makes this browser the person who has it (see
-// user.Store.Rename). A new browser gets a token.
+// postMe gives this browser's person the name: a new browser gets a token, a known one renames its
+// person (see user.Store.Rename). A name another person has answers 409 with who has it, so the page
+// can ask first; {join: id} then makes this browser that person.
 func (s *server) postMe(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name string `json:"name"`
+		Join int64  `json:"join"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&req); err != nil {
 		http.Error(w, "bad JSON", http.StatusBadRequest)
+		return
+	}
+	token := ""
+	if c, err := r.Cookie(s.TokenCookie); err == nil {
+		token = c.Value
+	}
+	if req.Join != 0 {
+		s.join(w, r, token, req.Join)
 		return
 	}
 	name, err := user.CleanName(req.Name)
@@ -96,34 +106,74 @@ func (s *server) postMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u user.User
-	token := ""
-	if c, err := r.Cookie(s.TokenCookie); err == nil {
-		from, to, err := s.Users.Rename(r.Context(), c.Value, name)
+	if token != "" {
+		from, to, err := s.Users.Rename(r.Context(), token, name)
 		switch {
-		case errors.Is(err, user.ErrUnknownToken): // a new browser after all
+		case errors.Is(err, user.ErrUnknownToken): // a new browser after all: its dead cookie goes below
+		case errors.Is(err, user.ErrNameTaken):
+			writeTaken(w, to)
+			return
 		case err != nil:
 			internalError(w, "rename user", err)
 			return
 		default:
-			u, token = to, c.Value
-			switch {
-			case to.ID != from.ID: // this browser's other pages join again as the new person
-				s.Hub.Moved(browserOf(c.Value))
-			case to.Name != from.Name: // every page of theirs, and everyone else's, shows the new name
+			if to.Name != from.Name { // every page of theirs, and everyone else's, shows the new name
 				s.Hub.Renamed(to.ID)
 			}
-		}
-	}
-	if token == "" {
-		if u, token, err = s.Users.Create(r.Context(), name); err != nil {
-			internalError(w, "create user", err)
+			s.setTokenCookie(w, token)
+			writeJSON(w, s.me(&to))
 			return
 		}
 	}
-	s.setTokenCookie(w, token)
-	// The person's spelling, which may not be the one typed: "ali" joins "Ali".
+	u, newToken, err := s.Users.Create(r.Context(), name)
+	if errors.Is(err, user.ErrNameTaken) {
+		if token != "" {
+			s.setTokenCookie(w, "") // unknown, or Rename would have answered
+		}
+		writeTaken(w, u)
+		return
+	}
+	if err != nil {
+		internalError(w, "create user", err)
+		return
+	}
+	s.setTokenCookie(w, newToken)
 	writeJSON(w, s.me(&u))
+}
+
+// join makes this browser person id, the one a 409 named.
+func (s *server) join(w http.ResponseWriter, r *http.Request, token string, id int64) {
+	from, to, newToken, err := s.Users.Join(r.Context(), token, id)
+	if errors.Is(err, user.ErrUnknownPerson) {
+		http.Error(w, "unknown person", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		internalError(w, "join user", err)
+		return
+	}
+	if newToken != "" {
+		token = newToken
+	} else if from.ID != to.ID { // this browser's other pages join again as the new person
+		s.Hub.Moved(browserOf(token))
+	}
+	s.setTokenCookie(w, token)
+	// The person's spelling now: they may have renamed since the page asked.
+	writeJSON(w, s.me(&to))
+}
+
+// errTaken refuses a name another person has.
+const errTaken = "taken"
+
+// takenResponse says who has the name: their id, to join them, and their spelling, to ask.
+type takenResponse struct {
+	Error string `json:"error"` // errTaken
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+}
+
+func writeTaken(w http.ResponseWriter, holder user.User) {
+	writeJSONStatus(w, http.StatusConflict, takenResponse{errTaken, holder.ID, holder.Name})
 }
 
 // deleteMe logs this browser out: its token goes, and the page asks for a name again. The person stays.

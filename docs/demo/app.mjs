@@ -29,3 +29,11 @@ export const prepared = () =>
 		const c = await api('GET', '/api/admin/jobs');
 		return c.jobs.length === 0 && c.cacheBytes > 0;
 	});
+
+// Makes a browser context (its request) a person: the name, or, when someone has it, them, as a page
+// does once asked.
+export async function pickName(request, base, name) {
+	let res = await request.post(`${base}/api/me`, { data: { name } });
+	if (res.status() === 409) res = await request.post(`${base}/api/me`, { data: { join: (await res.json()).id } });
+	if (!res.ok()) throw new Error(`pick ${name}: ${res.status()}`);
+}

@@ -109,7 +109,7 @@ func (l *loop) join(s *socket) {
 		return
 	default:
 		if who.UserID != s.who.UserID {
-			// A rename moved the browser to who: a new hello gives the page who's id.
+			// The browser joined another person, who: a new hello gives the page who's id.
 			s.send(encode(HelloMsg{Type: MsgHello, BuildID: l.hub.BuildID, UserID: who.UserID}))
 		}
 		s.who = who

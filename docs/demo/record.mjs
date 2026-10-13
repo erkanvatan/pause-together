@@ -4,7 +4,7 @@
 // video, and how long it runs) into OUT, for webp.sh.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
-import { GUEST, api, prepared, until } from './app.mjs';
+import { GUEST, api, pickName, prepared, until } from './app.mjs';
 
 const OUT = process.env.OUT;
 
@@ -56,7 +56,7 @@ async function person(name, file, opts) {
 	await ctx.addInitScript(pointer, !opts.hasTouch);
 	const page = await ctx.newPage();
 	const created = Date.now();
-	await page.request.post(`${GUEST}/api/me`, { data: { name } });
+	await pickName(page.request, GUEST, name);
 	await page.goto(`${GUEST}/rooms/${room.id}`);
 	return { ctx, page, created, file };
 }
