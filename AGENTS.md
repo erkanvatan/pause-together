@@ -161,8 +161,10 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      picker.ts (pure picker logic: grouping, search, default audio and subtitle, next episode and
                      carrying the audio and subtitle over to it),
                      Picker.svelte, Dialog.svelte (modals on the browser's <dialog>: focus, Escape, inert page),
-                     FolderPicker.svelte, NameForm.svelte, Menu.svelte (a button with a panel of rows), Confirm.svelte
-                     (an inline "Are you sure?" row), GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), RoomMeta.svelte
+                     FolderPicker.svelte, Welcome.svelte (a first visit: what the app is, the room, the name),
+                     NameForm.svelte (the name field and "already called …": welcome and rename),
+                     Menu.svelte (a button with a panel of rows), Confirm.svelte (an inline "Are you sure?" row),
+                     GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), RoomMeta.svelte
                      (a room's progress, last use and who's watching: homepage cards, the picker), strings.ts,
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, rejoin as another person,
                      build ID),

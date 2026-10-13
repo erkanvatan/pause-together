@@ -21,6 +21,8 @@ export const strings = {
 	continue: 'Continue',
 	cancel: 'Cancel',
 	rename: 'Change name',
+	// A rename renames the person, not the browser.
+	renameWhy: 'Your new name shows on all your devices and old messages.',
 	logOut: 'Log out',
 	logOutFailed: "Couldn't log out. Try again.",
 	nameInvalid,

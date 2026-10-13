@@ -7,6 +7,7 @@
 	import Icon from '$lib/Icon.svelte';
 	import Menu from '$lib/Menu.svelte';
 	import NameForm from '$lib/NameForm.svelte';
+	import Welcome from '$lib/Welcome.svelte';
 	import { loadMe, logOut, me } from '$lib/me.svelte';
 	import { strings } from '$lib/strings';
 
@@ -41,7 +42,7 @@
 
 	onMount(load);
 
-	// Logged out on another page: the name form takes the page, and the rename dialog must not come back
+	// Logged out on another page: the welcome takes the page, and the rename dialog must not come back
 	// with the next name.
 	$effect(() => {
 		if (me.name === null) renaming = false;
@@ -87,7 +88,7 @@
 		<!-- Loading: show nothing rather than a flash of the name picker. -->
 	{:else if me.name === null}
 		<main class="flex min-h-dvh items-center justify-center p-4">
-			<NameForm roomId={wide ? Number(page.params.id) : undefined} />
+			<Welcome roomId={wide ? Number(page.params.id) : undefined} />
 		</main>
 	{:else}
 		<header class="mx-auto flex w-full {wide ? '' : 'max-w-6xl'} items-center justify-between gap-4 px-4 py-3">
@@ -147,8 +148,15 @@
 		leaves the room. -->
 		{#if renaming}
 			<Dialog label={strings.rename} onclose={closeRename} class="items-center justify-center p-4">
-				<div class="flex w-full max-w-sm justify-center rounded-panel border border-line bg-dusk p-5">
-					<NameForm initial={me.name} ondone={closeRename} oncancel={closeRename} />
+				<div class="w-full max-w-sm rounded-panel border border-line bg-dusk p-5">
+					<NameForm
+						label={strings.rename}
+						action={strings.save}
+						hint={strings.renameWhy}
+						initial={me.name}
+						ondone={closeRename}
+						oncancel={closeRename}
+					/>
 				</div>
 			</Dialog>
 		{/if}
