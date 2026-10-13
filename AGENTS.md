@@ -246,13 +246,13 @@ container mount for source files, and one name for two things gets mixed up in c
   SQLite's `lower()` and `NOCASE` fold only ASCII, so Go makes the key (`user.NameKey`, also the SQL
   function `name_key`).
 - Picking a name that exists makes this browser that person, with the person's spelling, but only
-  after the page asks: "Someone here is already called Ali. If that's you, continue. If not, pick
-  another name." Neither answer is the main button. So two relatives who both type "Ali" don't become
+  after the page asks: "Someone here is already called Alice. If that's you, continue. If not, pick
+  another name." Neither answer is the main button. So two relatives who both type "Alice" don't become
   one person by accident. A rename to a name nobody else has renames the person: all their browsers
   and all their messages show the new name, and no new person is made. That covers your own name in
-  another case (`mom` → `Mom`), the only way to fix a spelling. A rename to another person's name,
-  once asked, moves only this browser to them, and the question says so: "this device becomes Ali, and
-  messages sent as Mom stay as Mom". The old person keeps its name, its messages and its other
+  another case (`alice` → `Alice`), the only way to fix a spelling. A rename to another person's name,
+  once asked, moves only this browser to them, and the question says so: "this device becomes Alice, and
+  messages sent as Bob stay as Bob". The old person keeps its name, its messages and its other
   browsers; with no browser left, it stays, so its messages still show its name.
 - A rename reaches open pages at once: the server renames the person's sockets in every room, so
   "watching now", "Waiting for …" and "… paused" show the new name, and sends every room a `renamed`
@@ -690,6 +690,9 @@ So each room's video is **prepared once**, then served as a plain file.
   media file committed to the repo. So the clips keep one file per case, and the dev library
   (`DEV_MEDIA_ROOT=testdata/media`) shows it too. `TestScanTestdata` lists every video, skipped file
   and sidecar the clips hold, so a new file goes there as well.
+- Placeholder people, in tests, docs and examples, reuse the names already there: Alice, Bob and Carol;
+  Ali and Can where Turkish letters or case matter (`ALİ`, `ali`); Mom and Dad for one family's
+  devices. Don't invent new ones.
 - SQLite: every connection sets `foreign_keys=ON` (off by default, and cascades silently don't run
   without it), WAL and `busy_timeout`, via `_pragma` in the DSN. Also `_txlock=immediate`: a
   transaction that reads, then writes, can otherwise fail with `SQLITE_BUSY` at once, without waiting.
