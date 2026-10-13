@@ -87,7 +87,9 @@
 	{:else if !me.loaded}
 		<!-- Loading: show nothing rather than a flash of the name picker. -->
 	{:else if me.name === null}
-		<main class="flex min-h-dvh items-center justify-center p-4">
+		<!-- Centered, a touch screen's keyboard would cover Continue: there it starts near the top, held
+		either way. Only with a mouse is it centered. -->
+		<main class="flex min-h-dvh items-start justify-center p-4 pt-8 pointer-fine:items-center pointer-fine:pt-4">
 			<Welcome roomId={wide ? Number(page.params.id) : undefined} />
 		</main>
 	{:else}
@@ -147,11 +149,17 @@
 		<!-- A dialog over the page, not a page of its own: a room page stays, so a rename mid-movie never
 		leaves the room. -->
 		{#if renaming}
-			<Dialog label={strings.rename} onclose={closeRename} class="items-center justify-center p-4">
+			<!-- Near the top on a touch screen, as the welcome, so the keyboard leaves Save in view. -->
+			<Dialog
+				label={strings.rename}
+				onclose={closeRename}
+				class="items-start justify-center p-4 pt-8 pointer-fine:items-center pointer-fine:pt-4"
+			>
 				<div class="w-full max-w-sm rounded-panel border border-line bg-dusk p-5">
 					<NameForm
 						label={strings.rename}
 						action={strings.save}
+						enterkeyhint="done"
 						hint={strings.renameWhy}
 						initial={me.name}
 						ondone={closeRename}

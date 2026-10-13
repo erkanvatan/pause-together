@@ -11,6 +11,7 @@
 		action,
 		hint = '',
 		describedby = '',
+		enterkeyhint = 'go',
 		initial = '',
 		ondone,
 		oncancel
@@ -20,6 +21,7 @@
 		action: string; // the submit button
 		hint?: string; // under the field, until an error takes its place
 		describedby?: string; // ids of the lines around the form, read out with the field
+		enterkeyhint?: 'go' | 'done'; // the label on a phone keyboard's Enter: go to a page, or done in a dialog
 		initial?: string; // a rename's current name: Save stays off until it changes
 		ondone?: () => void;
 		oncancel?: () => void;
@@ -129,6 +131,9 @@
 		aria-invalid={shown?.invalid || undefined}
 		placeholder={strings.namePlaceholder}
 		autocomplete="nickname"
+		autocorrect="off"
+		spellcheck="false"
+		{enterkeyhint}
 		autofocus
 		class="field"
 	/>
