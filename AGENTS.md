@@ -171,7 +171,8 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, rejoin as another person,
                      build ID),
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
-                     fullscreen, where the chat panel and toasts sit), subtitles.ts (pure: WebVTT cues, cue sanitizer, subtitle URL),
+                     fullscreen, where the room's title, the chat panel and toasts sit), subtitles.ts (pure: WebVTT
+                     cues, cue sanitizer, subtitle URL),
                      Subtitles.svelte (the subtitle overlay), prefs.ts (per-device player settings in
                      localStorage), time.ts (1:40:00), layout.ts (pure: where the control bar, subtitles
                      and the video's middle sit), chat.ts (pure: message length, the message list, name colors),
@@ -576,6 +577,8 @@ So each room's video is **prepared once**, then served as a plain file.
 - Browsers block autoplay with sound, so entering a room shows a "Tap to join" button first ("Click to
   join" where the pointer is a mouse).
 - While the copy is prepared, the player shows "Preparing… 42%" with a progress bar, or its place in line.
+- Held upright out of fullscreen, the video comes first, right under the header, then the room's
+  title with its actions, then the chat. Elsewhere the title sits above the video.
 - Fullscreen the player wrapper, not the `<video>`, so chat and subtitles stay on top. Where
   `document.fullscreenEnabled` is false (iPhone Safari), fill the window with CSS instead.
 - In fullscreen every phone turns as its own auto-rotate setting says, the same on iPhone and

@@ -417,6 +417,64 @@
 	}
 </script>
 
+{#snippet roomHeading(room: Room)}
+	<!-- The title with its video name under it, the room's few actions beside it, the host's guest link
+	and why the last change failed. -->
+	<div class="flex flex-col gap-2">
+		<div class="flex items-start gap-3">
+			<div class="min-w-0 flex-1">
+				<h1 class="font-display text-xl font-bold break-words sm:text-2xl">{roomTitle(room)}</h1>
+				{#if roomSubtitle(room)}
+					<p class="break-words text-haze">{roomSubtitle(room)}</p>
+				{/if}
+			</div>
+			<div class="flex shrink-0 items-center gap-2 pt-1">
+				<!-- A missing video's pick sits in the player, in its place. -->
+				{#if !room.archived && !missing}
+					<button onclick={() => (picking = true)} class="btn btn-quiet btn-small">
+						{strings.switchVideo}
+					</button>
+				{/if}
+				<Menu label={strings.roomActions} buttonClass="btn btn-quiet btn-small px-2 pointer-coarse:min-w-11">
+					{#snippet button()}
+						<Icon name="more" class="size-5" />
+					{/snippet}
+					{#snippet items(close)}
+						{#if next && !room.archived && !missing}
+							<button
+								onclick={() => {
+									close();
+									playNext();
+								}}
+								class="row"
+							>
+								{strings.nextEpisode}
+							</button>
+						{/if}
+						<button
+							onclick={() => {
+								close();
+								startRename();
+							}}
+							class="row"
+						>
+							{strings.renameRoom}
+						</button>
+					{/snippet}
+				</Menu>
+			</div>
+		</div>
+		<!-- Only the admin port sends a guest link: guests never see this. -->
+		{#if me.guestUrl && !room.archived}
+			<GuestLink path="/rooms/{room.id}" />
+		{/if}
+
+		{#if error}
+			<p class="text-ember" role="alert">{error}</p>
+		{/if}
+	</div>
+{/snippet}
+
 {#snippet chatPanel(readOnly: boolean)}
 	<Chat
 		{messages}
@@ -473,58 +531,9 @@
 			<a href="/" class="btn btn-quiet">{strings.backHome}</a>
 		</div>
 	{:else if room}
-		<!-- The title with its video name under it, and the room's few actions beside it, so the video
-		starts high on a phone. -->
-		<div class="flex items-start gap-3">
-			<div class="min-w-0 flex-1">
-				<h1 class="font-display text-xl font-bold break-words sm:text-2xl">{roomTitle(room)}</h1>
-				{#if roomSubtitle(room)}
-					<p class="break-words text-haze">{roomSubtitle(room)}</p>
-				{/if}
-			</div>
-			<div class="flex shrink-0 items-center gap-2 pt-1">
-				<!-- A missing video's pick sits in the player, in its place. -->
-				{#if !room.archived && !missing}
-					<button onclick={() => (picking = true)} class="btn btn-quiet btn-small">
-						{strings.switchVideo}
-					</button>
-				{/if}
-				<Menu label={strings.roomActions} buttonClass="btn btn-quiet btn-small px-2 pointer-coarse:min-w-11">
-					{#snippet button()}
-						<Icon name="more" class="size-5" />
-					{/snippet}
-					{#snippet items(close)}
-						{#if next && !room?.archived && !missing}
-							<button
-								onclick={() => {
-									close();
-									playNext();
-								}}
-								class="row"
-							>
-								{strings.nextEpisode}
-							</button>
-						{/if}
-						<button
-							onclick={() => {
-								close();
-								startRename();
-							}}
-							class="row"
-						>
-							{strings.renameRoom}
-						</button>
-					{/snippet}
-				</Menu>
-			</div>
-		</div>
-		<!-- Only the admin port sends a guest link: guests never see this. -->
-		{#if me.guestUrl && !room.archived}
-			<div class="-mt-2"><GuestLink path="/rooms/{room.id}" /></div>
-		{/if}
-
-		{#if error}
-			<p class="text-ember" role="alert">{error}</p>
+		<!-- The player places it, as it moves under the video when held upright. -->
+		{#if room.archived}
+			{@render roomHeading(room)}
 		{/if}
 
 		{#if !room.archived}
@@ -545,6 +554,7 @@
 				onnext={playNext}
 				bind:chatOpen
 				{chatShown}
+				heading={roomHeading}
 			>
 				{#snippet side()}
 					{@render chatPanel(false)}

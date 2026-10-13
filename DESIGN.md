@@ -238,8 +238,8 @@ labels.
   right, 3:2), and one column below. Notes and hints stop at 48ch: Atkinson's wide "0" makes 70ch
   hold about 100 characters.
 - The room page goes full width. Wide landscape screens put the chat beside the video (18rem, 20rem
-  from `lg`). Portrait screens put the chat under the video, filling the rest of the screen, and
-  always show it.
+  from `lg`). Portrait screens put the room's title, then the chat, under the video, the chat filling
+  the rest of the screen, and always show it.
 - On phones the video runs edge to edge (it cancels the gutter). A landscape window at least 30rem
   tall (the `fit` variant in `app.css`) never scrolls: the player fills what's left of the screen,
   and the video box fills it, as in fullscreen: the picture keeps its own shape between black bars,
@@ -411,8 +411,9 @@ A plain header row: the lamp pause icon and the app name on the left, your name 
 button with a chevron on the right. Its menu is a dusk panel with a line border, holding rows.
 
 The room page's title sits with the video's name right under it, and its actions beside it: a quiet
-"Switch video", and a "⋯" menu (the same panel) with "Next episode" and "Rename room". Nothing else
-stands between the title and the video, so the video starts high on a phone.
+"Switch video", and a "⋯" menu (the same panel) with "Next episode" and "Rename room". On a
+landscape screen it sits above the video, with nothing else in between. On a portrait screen the
+video comes first, right under the header, and the title sits between it and the chat, on midnight.
 
 ## Do's and Don'ts
 

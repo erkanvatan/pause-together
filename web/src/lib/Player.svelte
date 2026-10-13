@@ -46,6 +46,7 @@
 		onnext,
 		chatOpen = $bindable(),
 		chatShown,
+		heading,
 		side,
 		overlay
 	}: {
@@ -65,6 +66,9 @@
 		onnext: () => Promise<boolean>; // false: it failed, and the page says why
 		chatOpen: boolean; // the viewer's choice, followed in landscape
 		chatShown: boolean; // what shows: upright, the chat always does
+		// The room's title and actions: held upright out of fullscreen, between the video and the chat;
+		// elsewhere above the player.
+		heading: Snippet<[Room]>;
 		// The chat panel: beside the video in landscape, under it in portrait.
 		side: Snippet;
 		overlay: Snippet; // new chat messages over the video, while the chat is closed
@@ -146,6 +150,8 @@
 	// full width, and the picture sits inside at its own shape, between black bars.
 	const fill = $derived(full || fits.current);
 	const tall = $derived(full && portrait.current); // fullscreen held upright
+	// Held upright the video comes first, right under the header, then the room's title, then the chat.
+	const headingInside = $derived(portrait.current && !full);
 	let aspect = $state(16 / 9); // the picture's shape, as the video last said
 	// On loadedmetadata too: not every browser fires resize for the first size.
 	function measure() {
@@ -731,6 +737,10 @@ Compact on a phone's small video box, so it never spills out of it. -->
 	</div>
 {/snippet}
 
+{#if !headingInside}
+	{@render heading(room)}
+{/if}
+
 <!-- Clipped, not overflow-hidden: a hidden box still scrolls from code, and iPhone Safari scrolls it to
 bring the chat's box above the keyboard, then leaves the player scrolled out of place. A clipped box
 can't scroll at all. -->
@@ -1123,6 +1133,14 @@ can't scroll at all. -->
 			{@render subtitlePanel()}
 		{/if}
 	</div>
+
+	{#if headingInside}
+		<!-- Above the chat, so the room menu's panel drops over it. In the page's gutter: a phone's video
+		cancels it, a bigger screen's doesn't. -->
+		<div class="relative z-20 bg-midnight px-4 py-3 sm:px-0">
+			{@render heading(room)}
+		</div>
+	{/if}
 
 	{#if chatShown}
 		<!-- Landscape: the panel takes the row's height. Portrait: the screen's rest under the video, in
