@@ -5,11 +5,11 @@
 	import Confirm from '$lib/Confirm.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import Picker from '$lib/Picker.svelte';
-	import RoomMeta from '$lib/RoomMeta.svelte';
+	import RoomHeading from '$lib/RoomHeading.svelte';
 	import { deleteRoom } from '$lib/admin';
 	import { createRoom, listRooms, setArchived, type Pick, type Result, type RoomCard } from '$lib/api';
 	import { me } from '$lib/me.svelte';
-	import { roomJoinable, roomSubtitle, roomTitle, splitRooms } from '$lib/rooms';
+	import { roomJoinable, roomTitle, splitRooms } from '$lib/rooms';
 	import { strings } from '$lib/strings';
 
 	// How often the room list is asked again while the tab is visible: others make, archive and
@@ -90,7 +90,6 @@
 </svelte:head>
 
 {#snippet card(r: RoomCard)}
-	{@const subtitle = roomSubtitle(r)}
 	{@const joinable = roomJoinable(r)}
 	<li class="relative flex flex-col gap-3 py-3 pl-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
 		{#if joinable}
@@ -98,19 +97,7 @@
 			<span class="absolute inset-y-3 left-0 w-1 rounded-full bg-lamp" aria-hidden="true"></span>
 		{/if}
 		<a href="/rooms/{r.id}" class="group flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-control">
-			<span class="min-w-0 flex-1">
-				<span
-					class="block font-display text-xl font-bold break-words decoration-lamp decoration-2 underline-offset-4 group-hover:underline {r.archived
-						? 'text-haze'
-						: ''}"
-				>
-					{roomTitle(r)}
-				</span>
-				{#if subtitle}
-					<span class="mt-1 block break-words text-haze">{subtitle}</span>
-				{/if}
-				<span class="mt-1 block"><RoomMeta room={r} {now} /></span>
-			</span>
+			<span class="min-w-0 flex-1"><RoomHeading room={r} {now} /></span>
 			<!-- A room with nobody in it has no Join button: the chevron says the row opens it. -->
 			{#if !managing && !joinable}
 				<Icon name="chevron" class="size-5 shrink-0 text-haze group-hover:text-moonlight" />

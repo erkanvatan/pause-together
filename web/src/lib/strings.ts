@@ -13,7 +13,7 @@ export const strings = {
 
 	namePrompt: 'What should we call you?',
 	nameWhy: "Pick a name so the others know it's you.",
-	joining: (room: string) => `You're joining ${room}.`,
+	joining: (room: string) => `You're joining ${room}.`, // for screen readers: the card shows it
 	saving: 'Saving…',
 	namePlaceholder: 'Your name',
 	// A name is a person: picking someone's name makes this browser them, so it asks first.

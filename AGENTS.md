@@ -162,10 +162,12 @@ web/src/lib/         api.ts (fetch helper, shared API), admin.ts (admin API), me
                      carrying the audio and subtitle over to it),
                      Picker.svelte, Dialog.svelte (modals on the browser's <dialog>: focus, Escape, inert page),
                      FolderPicker.svelte, Welcome.svelte (a first visit: what the app is, the room, the name),
-                     NameForm.svelte (the name field and "already called …": welcome and rename),
+                     NameForm.svelte (the name field and "already called …": welcome and rename), RoomHeading.svelte
+                     (a room card's title, the line under it and RoomMeta: homepage, a room link's welcome),
                      Menu.svelte (a button with a panel of rows), Confirm.svelte (an inline "Are you sure?" row),
                      GuestLink.svelte (the guest link, host only), rooms.ts (pure room helpers), RoomMeta.svelte
-                     (a room's progress, last use and who's watching: homepage cards, the picker), strings.ts,
+                     (a room's progress, last use and who's watching: homepage cards, the picker, a room link's
+                     welcome), strings.ts,
                      protocol.ts (socket messages), socket.ts (room socket: ping, reconnect, rejoin as another person,
                      build ID),
                      Player.svelte (the <video>, prepare progress, "Tap to join", controls, the follow loop, subtitle panel,
