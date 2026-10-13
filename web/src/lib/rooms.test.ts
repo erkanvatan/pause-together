@@ -65,7 +65,7 @@ describe('roomTitle', () => {
 describe('roomSubtitle', () => {
 	const heat4k = { ...room(1).video, version: '4K', edition: "Director's Cut" };
 	it.each([
-		['the whole video name under a room name', room(1, { name: 'Movie night', video: heat4k }), "Heat (1995) · Director's Cut · 4K"],
+		['the whole video name under a room name', room(1, { name: 'Movie night', video: heat4k }), "Heat (1995)\u00a0· Director's Cut\u00a0· 4K"],
 		['the version label under a video title', room(1, { video: heat4k }), '4K'],
 		['nothing when there is no more to say', room(1), '']
 	])('shows %s', (_, r, want) => {
@@ -224,14 +224,14 @@ describe('waitText', () => {
 		[
 			'one other person: named once, with why and how long',
 			[alice],
-			{ headline: 'Waiting for Alice', lines: ['stepped away · 0:12'], action: 'Play without Alice' }
+			{ headline: 'Waiting for Alice', lines: ['stepped away\u00a0· 0:12'], action: 'Play without Alice' }
 		],
 		[
 			'several: a line each',
 			[alice, bob, carol],
 			{
 				headline: 'Waiting for Alice, Bob, and Carol',
-				lines: ['Alice: stepped away · 0:12', 'Bob: loading · 0:04', 'Carol: left the room · 0:22'],
+				lines: ['Alice: stepped away\u00a0· 0:12', 'Bob: loading\u00a0· 0:04', 'Carol: left the room\u00a0· 0:22'],
 				action: 'Play without Alice, Bob, and Carol'
 			}
 		],
@@ -245,7 +245,7 @@ describe('waitText', () => {
 			[bob, { ...alice, userId: 9, reason: 'buffering' }],
 			{
 				headline: "Everyone's waiting for you",
-				lines: ['Your video is still loading…', 'Bob: loading · 0:04'],
+				lines: ['Your video is still loading…', 'Bob: loading\u00a0· 0:04'],
 				action: 'Play anyway'
 			}
 		]

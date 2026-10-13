@@ -207,6 +207,14 @@ Two lamp-colored things fighting on one screen means one of them is wrong.
 
 **Character:** A tall, condensed marquee face for titles over a calm, highly legible reading face.
 Both are bundled with the app, never loaded from a CDN, and both include latin-ext for Turkish.
+Big Shoulders loads with its optical size axis, so each title gets the cut drawn for its size: tight
+at the tagline, sturdier in a small heading.
+
+Headings and anything in the display face balance their lines, so a long film name never leaves
+one word alone on a line. All other text wraps "pretty": no lone last word. Both are base rules in
+`app.css`. Lists joined by a dot ("Dark (2017) · S01E02 · Secrets", "English · 5.1", "stepped away ·
+0:12") use `dot` from `strings.ts`, which glues the dot to the part before it: a wrapped line ends
+with the dot, and the next never starts with one.
 
 ### Hierarchy
 - **Display** (800, 3.5rem, 0.95): the homepage tagline only, from `lg`; Headline size below, so it

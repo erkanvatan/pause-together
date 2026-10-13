@@ -247,12 +247,12 @@ describe('roomsLine', () => {
 	];
 	it.each([
 		['no rooms', new Map(), ''],
-		['one room names its video', new Map([[2, ['a']]]), 'In a room · Two'],
+		['one room names its video', new Map([[2, ['a']]]), 'In a room\u00a0· Two'],
 		['two rooms of one video', new Map([[1, ['a', 'b']]]), 'In 2 rooms'],
 		['rooms across videos', new Map([[1, ['a']], [2, ['b']]]), 'In 2 rooms'],
 		['a video this device cannot play', new Map([[3, ['a']]]), ''],
 		['another show or folder', new Map([[9, ['a']]]), ''],
-		['an episode by its code', new Map([[4, ['a']]]), 'In a room · S01E02']
+		['an episode by its code', new Map([[4, ['a']]]), 'In a room\u00a0· S01E02']
 	])('%s', (_, byVideo, want) => {
 		expect(roomsLine(vs, byVideo, browser)).toBe(want);
 	});
@@ -303,10 +303,10 @@ describe('search', () => {
 
 describe('names', () => {
 	it.each([
-		[summary({ title: 'Heat', year: 1995, edition: "Director's Cut", version: '4K' }), "Heat (1995) · Director's Cut · 4K"],
-		[summary({ type: 'tv', title: 'Dark', year: 2017, season: 1, episode: 2, episodeEnd: 3, episodeTitle: 'Lies' }), 'Dark (2017) · S01E02-E03 · Lies'],
-		[summary({ type: 'tv', title: 'Dark', season: 0, episode: 1, episodeEnd: 1 }), 'Dark · S00E01'],
-		[summary({ type: 'other', title: 'Day 1', group: 'Trips' }), 'Trips · Day 1'],
+		[summary({ title: 'Heat', year: 1995, edition: "Director's Cut", version: '4K' }), "Heat (1995)\u00a0· Director's Cut\u00a0· 4K"],
+		[summary({ type: 'tv', title: 'Dark', year: 2017, season: 1, episode: 2, episodeEnd: 3, episodeTitle: 'Lies' }), 'Dark (2017)\u00a0· S01E02-E03\u00a0· Lies'],
+		[summary({ type: 'tv', title: 'Dark', season: 0, episode: 1, episodeEnd: 1 }), 'Dark\u00a0· S00E01'],
+		[summary({ type: 'other', title: 'Day 1', group: 'Trips' }), 'Trips\u00a0· Day 1'],
 		[summary({ type: 'other', title: 'Day 1' }), 'Day 1']
 	])('%#', (v, want) => {
 		expect(videoName(v)).toBe(want);
@@ -423,7 +423,7 @@ describe('nextEpisode', () => {
 
 describe('audioLabel', () => {
 	it.each([
-		['language and channels', { ...audio(1, 'en'), channels: 6, title: 'Commentary' }, 'English · 5.1 · Commentary'],
+		['language and channels', { ...audio(1, 'en'), channels: 6, title: 'Commentary' }, 'English\u00a0· 5.1\u00a0· Commentary'],
 		['no language: the rest names it', audio(1, ''), 'Stereo'],
 		['nothing at all', { ...audio(1, ''), channels: 0 }, 'Unknown language']
 	])('%s', (_, t, want) => {
@@ -448,9 +448,9 @@ describe('subtitleLabel', () => {
 	const english = opt('f2', 'en', true, { forced: true, sdh: true });
 
 	it.each([
-		['flags in order', english, [english], 'English · Forced · SDH'],
+		['flags in order', english, [english], 'English\u00a0· Forced\u00a0· SDH'],
 		['a lone file: where it comes from is no news', file, [file, english], 'Turkish'],
-		['a file beside an embedded twin is marked', file, [embedded, file], 'Turkish · Separate file'],
+		['a file beside an embedded twin is marked', file, [embedded, file], 'Turkish\u00a0· Separate file'],
 		['the embedded twin stays plain', embedded, [embedded, file], 'Turkish']
 	])('%s', (_, o, all, want) => {
 		expect(subtitleLabel(o, all)).toBe(want);

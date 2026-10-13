@@ -727,7 +727,7 @@ Compact on a phone's small video box, so it never spills out of it. -->
 	<div
 		class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 p-5 @max-md:gap-2 @max-md:p-3"
 	>
-		<p class="text-lg break-words {error ? 'text-ember' : ''}">{headline}</p>
+		<p class="text-lg break-words text-balance {error ? 'text-ember' : ''}">{headline}</p>
 		<p class="break-words @max-md:text-sm">{why}</p>
 		{#if pick}
 			<button onclick={pickAnother} disabled={!online} class="btn btn-primary">
@@ -956,7 +956,7 @@ can't scroll at all. -->
 							class="flex max-w-md flex-col items-center gap-4 rounded-panel bg-dusk/90 px-5 py-4 @max-md:gap-2 @max-md:p-3"
 						>
 							<div class="flex flex-col items-center gap-1">
-								<p class="text-lg break-words">{waits.headline}</p>
+								<p class="text-lg break-words text-balance">{waits.headline}</p>
 								{#each waits.lines as line, i (i)}
 									<p class="text-sm break-words text-haze tabular-nums">{line}</p>
 								{/each}

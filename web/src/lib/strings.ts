@@ -1,6 +1,10 @@
 import { MAX_NAME } from '$lib/me.svelte';
 
 const appName = 'PauseTogether';
+
+// Joins a list's parts: "Dark (2017) · S01E02 · Secrets". The dot is glued to the part before it (a
+// no-break space), so a line that wraps ends with the dot and the next never starts with one.
+export const dot = '\u00a0· ';
 const nameTooLong = `Too long: a name can have up to ${MAX_NAME} characters.`;
 const nameInvalid = `Use up to ${MAX_NAME} characters, with a letter or number. No emoji or symbols like ♥.`;
 
@@ -9,7 +13,7 @@ export const strings = {
 	locale: 'en', // for language names, sorting titles, and joining names into a list
 	appName,
 	// A page's tab title: what it is, then the app.
-	pageTitle: (what: string) => `${what} · ${appName}`,
+	pageTitle: (what: string) => `${what}${dot}${appName}`,
 	tagline: "Distance can't pause us.",
 	// What the app is, in plain words, for a first visit: the tagline doesn't say it.
 	about: 'Watch videos together with people far away, at the same second.',
@@ -250,9 +254,9 @@ export const strings = {
 	otherScreenAway: 'Another of your screens stepped away.',
 	// Why the room waits for someone (protocol Wait reasons), and for how long: "stepped away · 0:12".
 	waitReasons: { buffering: 'loading', away: 'stepped away', left: 'left the room' },
-	waitLine: (reason: string, time: string) => (time ? `${reason} · ${time}` : reason),
+	waitLine: (reason: string, time: string) => (time ? `${reason}${dot}${time}` : reason),
 	waitLineNamed: (name: string, reason: string, time: string) =>
-		time ? `${name}: ${reason} · ${time}` : `${name}: ${reason}`,
+		time ? `${name}: ${reason}${dot}${time}` : `${name}: ${reason}`,
 	behind: (name: string, ms: number) => `${name} is ${Math.round(ms / 1000)} s behind`,
 	// What someone else did to the room, as a note over the video.
 	pausedBy: (name: string) => `${name} paused`,
@@ -356,7 +360,7 @@ export const strings = {
 	// In the homepage's picker, a video's one room or how many it has. Under a video, where says where
 	// the room is ("19:19 of 2:34:27"); under a show or folder, which of its videos it plays ("S01E04",
 	// or a title). inRooms counts a show's or folder's rooms across all its videos.
-	inRoom: (where: string) => `In a room · ${where}`,
+	inRoom: (where: string) => `In a room${dot}${where}`,
 	inRooms: (n: number) => `In ${n} rooms`,
 	unknownLanguage: 'Unknown language',
 	forced: 'Forced',

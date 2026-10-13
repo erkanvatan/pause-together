@@ -1,7 +1,9 @@
 @import 'tailwindcss';
 /* Bundled into the build, never from a CDN: guests may have no route to the internet. Both include
-latin-ext, which Turkish needs. */
-@import '@fontsource-variable/big-shoulders';
+latin-ext, which Turkish needs. Big Shoulders with its optical size axis, so the browser draws each
+title in the cut made for its size: the tight marquee one for the tagline, a sturdier one in chat's
+header. The plain file stops at the 14 px cut. */
+@import '@fontsource-variable/big-shoulders/opsz.css';
 @import '@fontsource-variable/atkinson-hyperlegible-next';
 @import '@fontsource-variable/atkinson-hyperlegible-next/wght-italic.css';
 
@@ -65,6 +67,15 @@ palette is cleared, so a stray neutral-700 builds to nothing. */
 		color: var(--color-moonlight);
 		accent-color: var(--color-lamp);
 		-webkit-tap-highlight-color: transparent;
+		text-wrap: pretty; /* no lone last word on a line */
+	}
+
+	/* A long film name never leaves one word alone on its second line. */
+	h1,
+	h2,
+	h3,
+	.font-display {
+		text-wrap: balance;
 	}
 
 	:focus-visible {

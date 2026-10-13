@@ -117,7 +117,7 @@
 </script>
 
 <form onsubmit={submit} class="flex w-full flex-col gap-4">
-	<svelte:element this={heading} class="font-display text-2xl font-bold text-balance">
+	<svelte:element this={heading} class="font-display text-2xl font-bold">
 		<label for="{id}-name" class="block">{label}</label>
 	</svelte:element>
 	<!-- No maxlength: it counts UTF-16 units, not characters. nameLength counts as the server does. -->

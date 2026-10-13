@@ -9,7 +9,7 @@ import type {
 	VideoDetail,
 	VideoSummary
 } from '$lib/api';
-import { reasonText, strings } from '$lib/strings';
+import { dot, reasonText, strings } from '$lib/strings';
 import { sameSubtitle } from '$lib/subtitles';
 
 export type SubtitleOption = {
@@ -229,13 +229,13 @@ export function withYear(title: string, year: number): string {
 // videoName names a video on its own, as in search results: "Heat (1995) · Director's Cut",
 // "Dark (2017) · S01E02 · Secrets", "Trips/Rome · Day 1".
 export function videoName(v: VideoSummary): string {
-	return videoNameParts(v).join(' · ');
+	return videoNameParts(v).join(dot);
 }
 
 // videoTitle is videoName without the version label ("1080p.BrRip.x264"), for big type: release tags
 // are noise in a heading. The version goes on a quiet line of its own.
 export function videoTitle(v: VideoSummary): string {
-	return videoNameParts({ ...v, version: '' }).join(' · ');
+	return videoNameParts({ ...v, version: '' }).join(dot);
 }
 
 function videoNameParts(v: VideoSummary): string[] {
@@ -347,7 +347,7 @@ export function langName(code: string): string {
 // the rest names it ("Stereo"): "Unknown language" is noise in a list of one or two.
 export function audioLabel(t: AudioTrack): string {
 	const label = [t.lang ? langName(t.lang) : '', strings.channels(t.channels), t.title];
-	return label.filter(Boolean).join(' · ') || strings.unknownLanguage;
+	return label.filter(Boolean).join(dot) || strings.unknownLanguage;
 }
 
 // subtitleLabel: "English · Forced · SDH · Signs". A subtitle from a separate file says so only when
@@ -355,11 +355,11 @@ export function audioLabel(t: AudioTrack): string {
 export function subtitleLabel(o: SubtitleOption, all: SubtitleOption[]): string {
 	const label = plainSubtitleLabel(o);
 	const twin = all.some((x) => x.key !== o.key && plainSubtitleLabel(x) === label);
-	return twin && 'sidecar' in o.choice ? `${label} · ${strings.sidecarFile}` : label;
+	return twin && 'sidecar' in o.choice ? `${label}${dot}${strings.sidecarFile}` : label;
 }
 
 function plainSubtitleLabel(o: SubtitleOption): string {
 	return [langName(o.lang), o.forced ? strings.forced : '', o.sdh ? strings.sdh : '', o.title]
 		.filter(Boolean)
-		.join(' · ');
+		.join(dot);
 }
