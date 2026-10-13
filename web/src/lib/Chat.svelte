@@ -25,7 +25,8 @@
 		onsend,
 		ondelete,
 		onolder,
-		onclose
+		onclose,
+		titled = true
 	}: {
 		messages: ChatMessage[]; // oldest first
 		more: boolean; // older ones may be on the server
@@ -42,6 +43,7 @@
 		ondelete: (id: number) => void;
 		onolder: () => Promise<boolean>; // false: loading failed
 		onclose?: () => void;
+		titled?: boolean; // false: "Chat" is for screen readers only
 	} = $props();
 
 	// How close to an edge counts as at it, in pixels.
@@ -185,7 +187,7 @@
 </script>
 
 <section class="flex h-full min-h-0 flex-col bg-dusk">
-	<header class="flex items-center justify-between py-1 pr-1 pl-4">
+	<header class="flex items-center justify-between py-1 pr-1 pl-4 {titled ? '' : 'sr-only'}">
 		<h2 class="font-display text-lg font-bold">{strings.chat}</h2>
 		{#if onclose}
 			<button onclick={onclose} aria-label={strings.closeChat} class="icon-btn text-haze">
@@ -197,7 +199,7 @@
 	<!-- Who's here, like a chat app's online list. Two lines at most, then it scrolls, so it never
 	pushes the messages off a phone. -->
 	{#if watching.length > 0}
-		<section aria-label={strings.watchingNow} class="shrink-0 border-b border-line px-4 pb-2 text-sm">
+		<section aria-label={strings.watchingNow} class="shrink-0 border-b border-line px-4 pb-2 text-sm {titled ? '' : 'pt-2.5'}">
 			<!-- The label flows with the names, so they wrap under it at full width. -->
 			<!-- Focusable, so a keyboard can scroll it. -->
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -217,15 +219,24 @@
 	{/if}
 
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions (the keys move between its buttons) -->
-	<ol bind:this={list} onscroll={scrolled} onkeydown={listKey} class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
+	<ol bind:this={list} onscroll={scrolled} onkeydown={listKey} class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2 {titled || watching.length > 0
+			? ''
+			: 'pt-2.5'}">
 		{#if olderFailed}
 			<li class="px-2 text-sm text-ember">{strings.olderFailed}</li>
 		{/if}
 		{#if messages.length === 0}
 			<li class="m-auto text-haze">{strings.noMessages}</li>
 		{/if}
-		{#each messages as m (m.id)}
-			<li class="rounded-control {selected === m.id ? 'bg-midnight/60' : ''}">
+		{#each messages as m, i (m.id)}
+			{@const prev = messages[i - 1]}
+			<!-- A gap where the speaker or the video changes, so one person's run of messages reads as one
+			turn. -->
+			<li
+				class="rounded-control {prev && (prev.from.userId !== m.from.userId || prev.video.id !== m.video.id)
+					? 'mt-2'
+					: ''} {selected === m.id ? 'bg-midnight/60' : ''}"
+			>
 				<button
 					data-message={m.id}
 					tabindex={m.id === focusable ? 0 : -1}

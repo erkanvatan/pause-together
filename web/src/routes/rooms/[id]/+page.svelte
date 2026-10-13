@@ -476,6 +476,8 @@
 {/snippet}
 
 {#snippet chatPanel(readOnly: boolean)}
+	<!-- Held upright, a live chat fills the screen under the video, where a phone's room is tight and
+	the input and messages say what it is: "Watching now" heads it, not a "Chat" title. -->
 	<Chat
 		{messages}
 		{more}
@@ -492,6 +494,7 @@
 		ondelete={(chatId) => socket?.send({ type: 'deleteChat', id: chatId })}
 		onolder={olderChat}
 		onclose={readOnly || portrait.current ? undefined : () => (chatOpen = false)}
+		titled={readOnly || !portrait.current}
 	/>
 {/snippet}
 
