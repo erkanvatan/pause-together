@@ -62,6 +62,7 @@ tasks:
       - >-
         test -f "{{.OUT}}/media/Movies/Big Buck Bunny (2008)/Big Buck Bunny (2008).mp4" ||
         {{.PLAYWRIGHT}} {{.PLAYWRIGHT_IMAGE}} sh /src/docs/demo/film.sh /src/{{.OUT}}
+      - cp docs/demo/subtitles.en.srt "{{.OUT}}/media/Movies/Big Buck Bunny (2008)/Big Buck Bunny (2008).en.srt"
       # A throwaway app on the prod image: no ports, its database in memory, so every run starts empty
       # and nothing touches the real server or library.
       - docker rm -f pausetogether-demo >/dev/null 2>&1 || true

@@ -147,7 +147,8 @@ internal/user/       name rules and the name key, users (one per person), tokens
 testdata/make.sh     makes the test clips in testdata/media (git-ignored), one per case the app handles, so
                      DEV_MEDIA_ROOT=testdata/media shows them all (libraries: Movies, TV, Other)
 docs/plan.md         build order in slices, and how to work one
-docs/demo/           task demo: film.sh (downloads Big Buck Bunny into .cache/demo), record.mjs (Playwright:
+docs/demo/           task demo: film.sh (downloads Big Buck Bunny into .cache/demo), subtitles.en.srt (its
+                     made-up captions, copied next to it), record.mjs (Playwright:
                      a throwaway app, a laptop and a phone in one room), webp.sh (both side by side, as an animated WebP);
                      task screenshots: library.sh (Blender's films as grey clips, in .cache/screenshots), screenshots.mjs
                      (Playwright: welcome, homepage, picker, admin into docs/screenshots); app.mjs (both talk to the app)

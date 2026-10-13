@@ -7,7 +7,7 @@ import { ADMIN, GUEST, api, pickName, prepared, until } from './app.mjs';
 
 const OUT = process.env.OUT;
 
-// The library, and two rooms: Alice and Sam in "Movie night", and an episode nobody is in.
+// The library, and two rooms: Alice and Bob in "Movie night", and an episode nobody is in.
 for (const [path, type] of [['Movies', 'movies'], ['TV', 'tv'], ['Home Videos', 'other']]) {
 	await api('POST', '/api/admin/libraries', { path, type });
 }
@@ -46,8 +46,8 @@ async function seek(page, id, ms) {
 const alice = await person('Alice');
 await seek(alice, episode.id, 74_000);
 await seek(alice, night.id, 372_000);
-const sam = await person('Sam');
-await sam.goto(`${GUEST}/rooms/${night.id}`);
+const bob = await person('Bob');
+await bob.goto(`${GUEST}/rooms/${night.id}`);
 
 async function shot(page, file, fullPage = false) {
 	await page.waitForTimeout(500);

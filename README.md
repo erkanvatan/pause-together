@@ -8,7 +8,7 @@ A self-hosted watch-together app. Same show. Same second. Different places.
 
 [Features](#features) • [Screenshots](#screenshots) • [How it works](#how-it-works) • [Getting started](#getting-started) • [Tailscale](#connecting-devices-with-tailscale) • [Development](#development)
 
-<img src="docs/demo.webp" width="900" alt="Alice on a laptop and Sam on a phone in one room. Alice presses play and both screens play the same frame. Sam pauses, and both stop, with &quot;Sam paused&quot; on Alice's screen. Alice's chat message shows up on Sam's phone, and Sam presses play for both." />
+<img src="docs/demo.webp" width="900" alt="Alice on a laptop and Bob on a phone in one room. Alice presses play and both screens play the same frame. She drags the seek bar, and Bob's phone jumps with her, saying &quot;Alice jumped to 4:02&quot;. She turns on English subtitles for both, sets them a little later, and makes them bigger on her laptop only. Bob's phone locks: 3 seconds later the room pauses, with &quot;Waiting for Bob&quot; on Alice's screen, and plays on when he's back. Alice's chat message shows up on Bob's phone." />
 
 <sub>Film: <a href="https://peach.blender.org">Big Buck Bunny</a> © Blender Foundation, CC BY 3.0.</sub>
 
@@ -45,7 +45,7 @@ watch in sync from PCs, tablets and phones. When one of them buffers or steps aw
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/home.png" alt="The homepage: a room called Movie night with Alice and Sam watching Sintel at 6:12, a Join button, and a Caminandes episode room last used 2 days ago." /></td>
+    <td width="50%"><img src="docs/screenshots/home.png" alt="The homepage: a room called Movie night with Alice and Bob watching Sintel at 6:12, a Join button, and a Caminandes episode room last used 2 days ago." /></td>
     <td width="50%"><img src="docs/screenshots/picker.png" alt="The video picker: search, sort, tabs for Movies, TV Shows and Other Videos, and Sintel marked as in a room at 6:12." /></td>
   </tr>
   <tr>
@@ -53,7 +53,7 @@ watch in sync from PCs, tablets and phones. When one of them buffers or steps aw
     <td align="center"><sub><b>Picker.</b> A video that already has a room says so.</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/welcome.png" alt="The first visit to a room link: what the app is, You're joining Movie night, and What should we call you?" /></td>
+    <td><img src="docs/screenshots/welcome.png" alt="The first visit to a room link: what the app is, Alice and Bob watching Movie night with a Join them, and What should we call you?" /></td>
     <td><img src="docs/screenshots/admin.png" alt="The admin page: the guest link, three libraries, files we can't use grouped by reason, prepare jobs, language defaults and cache clean-up." /></td>
   </tr>
   <tr>
