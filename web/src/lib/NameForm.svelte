@@ -48,7 +48,7 @@
 		clearTimeout(slowTimer);
 	});
 	const id = $props.id();
-	// Who has the name, until "If that's you, go on" is answered.
+	// Who has the name, until "If that's you, continue" is answered.
 	let taken = $state<{ id: number; name: string } | null>(null);
 	// The answers stay off this long after the question shows, so a double tap or a second Enter on
 	// Continue can't answer it, or wave it away, unread.
@@ -141,16 +141,20 @@
 		<div class="flex flex-col gap-3">
 			<p class="break-words" role="alert">
 				{strings.nameTaken(taken.name)}
-				<span class="text-haze">{strings.nameTakenAsk}</span>
+				<!-- A rename says what a move does: this device goes, the old name and its messages stay. -->
+				<span class="text-haze"
+					>{initial ? strings.renameTakenAsk(taken.name, initial) : strings.nameTakenAsk}</span
+				>
 			</p>
 			{#if error}
 				<p id="{id}-error" class="text-sm text-ember" role="alert">{error.text}</p>
 			{/if}
+			<!-- Both answers quiet: the lamp would push the one that makes this browser someone else. -->
 			<button
 				type="button"
 				onclick={join}
 				disabled={saving || reading}
-				class="btn btn-primary break-words py-2"
+				class="btn btn-quiet break-words py-2"
 			>
 				{strings.continueAs(taken.name)}
 			</button>

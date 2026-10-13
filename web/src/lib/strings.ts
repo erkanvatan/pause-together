@@ -20,7 +20,10 @@ export const strings = {
 	namePlaceholder: 'Your name',
 	// A name is a person: picking someone's name makes this browser them, so it asks first.
 	nameTaken: (name: string) => `Someone here is already called ${name}.`,
-	nameTakenAsk: "If that's you, go on. If not, pick another name.",
+	nameTakenAsk: "If that's you, continue. If not, pick another name.",
+	// A rename to a taken name moves only this browser: the old person keeps its name and messages.
+	renameTakenAsk: (name: string, old: string) =>
+		`If that's you, this device becomes ${name}, and messages sent as ${old} stay as ${old}. If not, pick another name.`,
 	continueAs: (name: string) => `Continue as ${name}`,
 	pickAnotherName: 'Pick another name',
 	save: 'Save',

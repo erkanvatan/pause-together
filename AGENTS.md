@@ -246,13 +246,14 @@ container mount for source files, and one name for two things gets mixed up in c
   SQLite's `lower()` and `NOCASE` fold only ASCII, so Go makes the key (`user.NameKey`, also the SQL
   function `name_key`).
 - Picking a name that exists makes this browser that person, with the person's spelling, but only
-  after the page asks: "Someone here is already called Ali. If that's you, go on. If not, pick another
-  name." So two relatives who both type "Ali" don't become one person by accident. A rename
-  to a name nobody else has renames the person: all their browsers and all their messages show the
-  new name, and no new person is made. That covers your own name in another case (`mom` → `Mom`), the
-  only way to fix a spelling. A rename to another person's name, once asked, moves only this browser
-  to them. The old person keeps its name, its messages and its other browsers; with no browser left,
-  it stays, so its messages still show its name.
+  after the page asks: "Someone here is already called Ali. If that's you, continue. If not, pick
+  another name." Neither answer is the main button. So two relatives who both type "Ali" don't become
+  one person by accident. A rename to a name nobody else has renames the person: all their browsers
+  and all their messages show the new name, and no new person is made. That covers your own name in
+  another case (`mom` → `Mom`), the only way to fix a spelling. A rename to another person's name,
+  once asked, moves only this browser to them, and the question says so: "this device becomes Ali, and
+  messages sent as Mom stay as Mom". The old person keeps its name, its messages and its other
+  browsers; with no browser left, it stays, so its messages still show its name.
 - A rename reaches open pages at once: the server renames the person's sockets in every room, so
   "watching now", "Waiting for …" and "… paused" show the new name, and sends every room a `renamed`
   message, so the chat shows it, and a room page of theirs its header. A move to another person
