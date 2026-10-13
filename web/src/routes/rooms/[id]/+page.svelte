@@ -447,7 +447,7 @@
 {/snippet}
 
 <svelte:head>
-	<title>{room ? `${roomTitle(room)} · ` : ''}{strings.appName}</title>
+	<title>{room ? strings.pageTitle(roomTitle(room)) : strings.appName}</title>
 </svelte:head>
 
 <!-- In portrait, the player with its chat fills the screen down to the bottom edge. -->

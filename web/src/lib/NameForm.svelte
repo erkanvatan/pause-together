@@ -7,15 +7,19 @@
 
 	let {
 		label,
+		heading = 'h2',
 		action,
 		hint = '',
+		describedby = '',
 		initial = '',
 		ondone,
 		oncancel
 	}: {
 		label: string; // the question, as the field's label
+		heading?: 'h1' | 'h2'; // the label is the page's or the dialog's heading
 		action: string; // the submit button
 		hint?: string; // under the field, until an error takes its place
+		describedby?: string; // ids of the lines around the form, read out with the field
 		initial?: string; // a rename's current name: Save stays off until it changes
 		ondone?: () => void;
 		oncancel?: () => void;
@@ -24,28 +28,40 @@
 	// svelte-ignore state_referenced_locally (only the starting value is wanted)
 	let name = $state(initial);
 	const trimmed = $derived(name.trim());
-	let error = $state('');
+	// invalid: the name itself is wrong, not just the save.
+	let error = $state<{ text: string; invalid: boolean } | null>(null);
 	let saving = $state(false);
+	// "Saving…" shows only on a slow answer, so a quick one never flashes it.
+	const SLOW_MS = 300;
+	let slow = $state(false);
+	let slowTimer: ReturnType<typeof setTimeout> | undefined;
+	let readTimer: ReturnType<typeof setTimeout> | undefined;
+	onDestroy(() => {
+		clearTimeout(readTimer);
+		clearTimeout(slowTimer);
+	});
+	const id = $props.id();
 	// Who has the name, until "If that's you, go on" is answered.
 	let taken = $state<{ id: number; name: string } | null>(null);
 	// The answers stay off this long after the question shows, so a double tap or a second Enter on
 	// Continue can't answer it, or wave it away, unread.
 	const READ_MS = 500;
 	let reading = $state(false);
-	let readTimer: ReturnType<typeof setTimeout> | undefined;
-	onDestroy(() => clearTimeout(readTimer));
 	let input = $state<HTMLInputElement>();
 	let pickButton = $state<HTMLButtonElement>();
 
 	async function save(send: () => Promise<SaveResult>) {
 		saving = true;
+		error = null; // a retry that fails the same way shows its error anew
+		slowTimer = setTimeout(() => (slow = true), SLOW_MS);
 		const result = await send();
-		saving = false;
+		clearTimeout(slowTimer);
+		saving = slow = false;
 		if (result === 'ok') {
-			error = '';
+			error = null;
 			ondone?.();
 		} else if (typeof result === 'object') {
-			error = '';
+			error = null;
 			taken = result.taken;
 			reading = true;
 			clearTimeout(readTimer);
@@ -58,7 +74,10 @@
 			}, READ_MS);
 		} else {
 			// A failed join keeps its question, to try again.
-			error = result === 'invalid' ? strings.nameInvalid : strings.saveFailed;
+			error =
+				result === 'invalid'
+					? { text: strings.nameInvalid, invalid: true }
+					: { text: strings.saveFailed, invalid: false };
 		}
 	}
 
@@ -70,14 +89,14 @@
 	}
 
 	function join() {
-		const id = taken?.id;
-		if (id !== undefined) save(() => joinPerson(id));
+		const person = taken?.id;
+		if (person !== undefined) save(() => joinPerson(person));
 	}
 
-	// Typing or "Pick another name" drops the question.
+	// Typing or "Pick another name" drops the question, and an error about the name before.
 	function clearTaken() {
 		taken = null;
-		error = '';
+		error = null;
 	}
 
 	function pickAnother() {
@@ -88,15 +107,21 @@
 </script>
 
 <form onsubmit={submit} class="flex w-full flex-col gap-4">
-	<label for="name" class="font-display text-2xl font-bold text-balance">{label}</label>
+	<svelte:element this={heading} class="font-display text-2xl font-bold text-balance">
+		<label for="{id}-name" class="block">{label}</label>
+	</svelte:element>
 	<!-- No maxlength: it counts UTF-16 units, not runes. The server decides. -->
 	<!-- svelte-ignore a11y_autofocus -->
 	<input
-		id="name"
+		id="{id}-name"
 		bind:this={input}
 		bind:value={name}
-		oninput={() => taken && clearTaken()}
+		oninput={clearTaken}
 		readonly={saving}
+		aria-describedby={[describedby, error ? `${id}-error` : hint && !taken ? `${id}-hint` : '']
+			.filter(Boolean)
+			.join(' ') || undefined}
+		aria-invalid={error?.invalid || undefined}
 		placeholder={strings.namePlaceholder}
 		autocomplete="nickname"
 		autofocus
@@ -109,7 +134,7 @@
 				<span class="text-haze">{strings.nameTakenAsk}</span>
 			</p>
 			{#if error}
-				<p class="text-sm text-ember" role="alert">{error}</p>
+				<p id="{id}-error" class="text-sm text-ember" role="alert">{error.text}</p>
 			{/if}
 			<button
 				type="button"
@@ -136,9 +161,9 @@
 		</div>
 	{:else}
 		{#if error}
-			<p class="text-sm text-ember" role="alert">{error}</p>
+			<p id="{id}-error" class="text-sm text-ember" role="alert">{error.text}</p>
 		{:else if hint}
-			<p class="-mt-2 text-sm text-haze">{hint}</p>
+			<p id="{id}-hint" class="-mt-2 text-sm text-haze">{hint}</p>
 		{/if}
 		<div class="flex gap-2">
 			<!-- A rename's Save stays off until the name changes: a form at rest shows no lit lamp. -->
@@ -147,7 +172,7 @@
 				disabled={saving || trimmed === '' || trimmed === initial}
 				class="btn btn-primary flex-1"
 			>
-				{action}
+				{slow ? strings.saving : action}
 			</button>
 			{#if oncancel}
 				<button type="button" onclick={oncancel} disabled={saving} class="btn btn-quiet flex-1">

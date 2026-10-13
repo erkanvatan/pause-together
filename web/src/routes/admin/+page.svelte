@@ -205,7 +205,7 @@
 <svelte:document onvisibilitychange={visibilityChanged} />
 
 <svelte:head>
-	<title>{strings.admin} · {strings.appName}</title>
+	<title>{strings.pageTitle(strings.admin)}</title>
 </svelte:head>
 
 {#snippet heading(text: string)}

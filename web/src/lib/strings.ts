@@ -1,9 +1,12 @@
+const appName = 'PauseTogether';
 const nameInvalid = 'Use 1 to 32 letters, numbers, spaces or punctuation. No emoji.';
 
 // Every piece of UI text lives here, so a Turkish version is one more object later.
 export const strings = {
 	locale: 'en', // for language names, sorting titles, and joining names into a list
-	appName: 'PauseTogether',
+	appName,
+	// A page's tab title: what it is, then the app.
+	pageTitle: (what: string) => `${what} · ${appName}`,
 	tagline: "Distance can't pause us.",
 	// What the app is, in plain words, for a first visit: the tagline doesn't say it.
 	about: 'Watch videos together with people far away, at the same second.',
@@ -11,6 +14,7 @@ export const strings = {
 	namePrompt: 'What should we call you?',
 	nameWhy: "Pick a name so the others know it's you.",
 	joining: (room: string) => `You're joining ${room}.`,
+	saving: 'Saving…',
 	namePlaceholder: 'Your name',
 	// A name is a person: picking someone's name makes this browser them, so it asks first.
 	nameTaken: (name: string) => `Someone here is already called ${name}.`,
