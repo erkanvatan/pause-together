@@ -6,7 +6,11 @@
 
 	// A room's meta line, on the homepage's cards and in the picker's rooms to join: where the room is,
 	// so a guest sees where they left off before opening it, and who's there.
-	let { room: r, now }: { room: RoomCard; now: number } = $props(); // now: for "3 days ago"
+	let {
+		room: r,
+		now, // for "3 days ago"
+		watching = true // false where the page says who's watching itself
+	}: { room: RoomCard; now: number; watching?: boolean } = $props();
 
 	const joinable = $derived(roomJoinable(r));
 	// Tells rooms with the same video apart, and says which one was on last.
@@ -23,7 +27,7 @@
 	{#if ago}
 		<span class="text-haze">{ago}</span>
 	{/if}
-	{#if joinable}
+	{#if joinable && watching}
 		<span class="flex min-w-0 items-center gap-2">
 			<span class="size-2 shrink-0 rounded-full bg-lamp" aria-hidden="true"></span>
 			<span class="min-w-0 break-words">

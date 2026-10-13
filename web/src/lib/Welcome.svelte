@@ -52,8 +52,8 @@
 	<title>{room ? strings.pageTitle(strings.joinRoom(roomTitle(room))) : strings.appName}</title>
 </svelte:head>
 
-<div class="flex w-full max-w-80 flex-col gap-4">
-	<div class="mb-4 flex flex-col gap-1">
+<div class="flex w-full max-w-80 flex-col gap-6">
+	<div class="flex flex-col gap-1">
 		<p class="flex items-center gap-1.5">
 			<Brand />
 		</p>
@@ -62,14 +62,22 @@
 		<p id="{id}-about" class="mt-1 text-haze">{strings.about}</p>
 	</div>
 	{#if room}
-		<!-- The room as the homepage shows it, so the guest sees who's waiting for them. -->
-		<div class="relative mb-4 {roomJoinable(room) ? 'pl-5' : ''}">
-			{#if roomJoinable(room)}
-				<!-- The lamp is on: someone is in this room. -->
-				<span class="absolute inset-y-0 left-0 w-1 rounded-full bg-lamp" aria-hidden="true"></span>
-			{/if}
-			<p id="{id}-room" class="sr-only">{strings.joining(roomTitle(room))}</p>
-			<RoomHeading {room} {now} metaId="{id}-meta" />
+		{@const joinable = roomJoinable(room)}
+		<!-- "Join them" only where the room can play: a gone video's card says "Video missing". -->
+		{@const named = joinable && !room.gone}
+		<!-- Who's waiting for the guest, said in words, then the room as the homepage shows it. The
+		card leaves out its own small "Watching" line when this one names them. -->
+		<div class="flex flex-col gap-2">
+			<p id="{id}-lead" class="break-words">
+				{named ? strings.watchingLead(room.watching.map((w) => w.name)) : strings.joiningLead}
+			</p>
+			<div class="relative {joinable ? 'pl-5' : ''}">
+				{#if joinable}
+					<!-- The lamp is on: someone is in this room. -->
+					<span class="absolute inset-y-0 left-0 w-1 rounded-full bg-lamp" aria-hidden="true"></span>
+				{/if}
+				<RoomHeading {room} {now} titleId="{id}-title" metaId="{id}-meta" watching={!named} />
+			</div>
 		</div>
 	{/if}
 	{#if ready}
@@ -79,7 +87,7 @@
 			heading="h1"
 			action={strings.continue}
 			hint={strings.nameWhy}
-			describedby={room ? `${id}-about ${id}-room ${id}-meta` : `${id}-about`}
+			describedby={room ? `${id}-about ${id}-lead ${id}-title ${id}-meta` : `${id}-about`}
 		/>
 	{/if}
 </div>

@@ -9,17 +9,23 @@
 	let {
 		room: r,
 		now,
-		metaId
+		titleId,
+		metaId,
+		watching = true
 	}: {
 		room: RoomCard;
 		now: number; // for "3 days ago"
-		metaId?: string; // so a field can be described by where the room is and who's in it
+		// So a field can be described by the room's title, where it is and who's in it.
+		titleId?: string;
+		metaId?: string;
+		watching?: boolean; // false where the page says who's watching itself
 	} = $props();
 
 	const subtitle = $derived(roomSubtitle(r));
 </script>
 
 <span
+	id={titleId}
 	class="block font-display text-xl font-bold break-words decoration-lamp decoration-2 underline-offset-4 group-hover:underline {r.archived
 		? 'text-haze'
 		: ''}"
@@ -29,4 +35,4 @@
 {#if subtitle}
 	<span class="mt-1 block break-words text-haze">{subtitle}</span>
 {/if}
-<span id={metaId} class="mt-1 block"><RoomMeta room={r} {now} /></span>
+<span id={metaId} class="mt-1 block"><RoomMeta room={r} {now} {watching} /></span>

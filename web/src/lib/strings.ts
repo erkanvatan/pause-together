@@ -15,7 +15,10 @@ export const strings = {
 
 	namePrompt: 'What should we call you?',
 	nameWhy: "Pick a name so the others know it's you.",
-	joining: (room: string) => `You're joining ${room}.`, // for screen readers: the card shows it
+	// Over a room link's card, so the guest sees who's waiting for them, in words, not only on the card.
+	watchingLead: (names: string[]) =>
+		`${list(names)} ${names.length === 1 ? 'is' : 'are'} watching. Join them:`,
+	joiningLead: "You're joining", // then the room's card, its title first
 	saving: 'Saving…',
 	namePlaceholder: 'Your name',
 	// A name is a person: picking someone's name makes this browser them, so it asks first.
