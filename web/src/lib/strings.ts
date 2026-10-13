@@ -1,5 +1,7 @@
+import { MAX_NAME } from '$lib/me.svelte';
+
 const appName = 'PauseTogether';
-const nameInvalid = 'Use 1 to 32 letters, numbers, spaces or punctuation. No emoji.';
+const nameInvalid = `Use up to ${MAX_NAME} characters, with a letter or number. No emoji or symbols like ♥.`;
 
 // Every piece of UI text lives here, so a Turkish version is one more object later.
 export const strings = {
@@ -30,6 +32,8 @@ export const strings = {
 	logOut: 'Log out',
 	logOutFailed: "Couldn't log out. Try again.",
 	nameInvalid,
+	// No count: it's read out as an alert, and a count would be read again on every key.
+	nameTooLong: `Too long: a name can have up to ${MAX_NAME} characters.`,
 	saveFailed: "Couldn't save your name. Try again.",
 	loadFailed: "Can't reach the server. Retrying…",
 

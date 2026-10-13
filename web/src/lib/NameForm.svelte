@@ -2,7 +2,7 @@
 	// Picking a name: the field, "Someone here is already called …" when it's taken, and the buttons.
 	// The welcome and the rename dialog each put their own words around it.
 	import { onDestroy, tick } from 'svelte';
-	import { joinPerson, saveName, type SaveResult } from '$lib/me.svelte';
+	import { joinPerson, MAX_NAME, nameLength, saveName, type SaveResult } from '$lib/me.svelte';
 	import { strings } from '$lib/strings';
 
 	let {
@@ -30,6 +30,11 @@
 	const trimmed = $derived(name.trim());
 	// invalid: the name itself is wrong, not just the save.
 	let error = $state<{ text: string; invalid: boolean } | null>(null);
+	// Too long says so while typing, before any save: the server would only say the rules again.
+	const length = $derived(nameLength(name));
+	const shown = $derived(
+		length > MAX_NAME ? { text: strings.nameTooLong, invalid: true } : error
+	);
 	let saving = $state(false);
 	// "Saving…" shows only on a slow answer, so a quick one never flashes it.
 	const SLOW_MS = 300;
@@ -110,7 +115,7 @@
 	<svelte:element this={heading} class="font-display text-2xl font-bold text-balance">
 		<label for="{id}-name" class="block">{label}</label>
 	</svelte:element>
-	<!-- No maxlength: it counts UTF-16 units, not runes. The server decides. -->
+	<!-- No maxlength: it counts UTF-16 units, not characters. nameLength counts as the server does. -->
 	<!-- svelte-ignore a11y_autofocus -->
 	<input
 		id="{id}-name"
@@ -118,10 +123,10 @@
 		bind:value={name}
 		oninput={clearTaken}
 		readonly={saving}
-		aria-describedby={[describedby, error ? `${id}-error` : hint && !taken ? `${id}-hint` : '']
+		aria-describedby={[describedby, shown ? `${id}-error` : hint && !taken ? `${id}-hint` : '']
 			.filter(Boolean)
 			.join(' ') || undefined}
-		aria-invalid={error?.invalid || undefined}
+		aria-invalid={shown?.invalid || undefined}
 		placeholder={strings.namePlaceholder}
 		autocomplete="nickname"
 		autofocus
@@ -160,8 +165,8 @@
 			{/if}
 		</div>
 	{:else}
-		{#if error}
-			<p id="{id}-error" class="text-sm text-ember" role="alert">{error.text}</p>
+		{#if shown}
+			<p id="{id}-error" class="text-sm text-ember" role="alert">{shown.text}</p>
 		{:else if hint}
 			<p id="{id}-hint" class="-mt-2 text-sm text-haze">{hint}</p>
 		{/if}
@@ -169,7 +174,7 @@
 			<!-- A rename's Save stays off until the name changes: a form at rest shows no lit lamp. -->
 			<button
 				type="submit"
-				disabled={saving || trimmed === '' || trimmed === initial}
+				disabled={saving || trimmed === '' || trimmed === initial || length > MAX_NAME}
 				class="btn btn-primary flex-1"
 			>
 				{slow ? strings.saving : action}

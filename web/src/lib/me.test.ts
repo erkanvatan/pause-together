@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { forgetMe, joinPerson, loadMe, logOut, me, saveName } from './me.svelte';
+import { forgetMe, joinPerson, loadMe, logOut, me, nameLength, saveName } from './me.svelte';
 
 function respond(status: number, body: string) {
 	vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status })));
@@ -68,6 +68,19 @@ describe('saveName', () => {
 		setup();
 		expect(await saveName('Alice')).toBe('failed');
 		expect(me.name).toBeNull();
+	});
+});
+
+describe('nameLength', () => {
+	it.each([
+		['ALİ', 3],
+		['  Ali  ', 3],
+		['🎬x', 2], // one character, two UTF-16 units
+		['', 0],
+		['ş'.repeat(32) + '  ', 32], // the longest name, spaces aside
+		['ş'.repeat(33), 33]
+	])('%j is %i', (name, n) => {
+		expect(nameLength(name)).toBe(n);
 	});
 });
 

@@ -59,6 +59,15 @@ export function forgetMe() {
 	me.id = me.name = null;
 }
 
+// MAX_NAME is the longest name, in characters (code points), as user.MaxNameRunes in Go.
+export const MAX_NAME = 32;
+
+// nameLength counts a name as the server does: trimmed, in characters (code points), so 🎬 is one, not
+// two UTF-16 units. A decomposed ş (s and a combining cedilla) is two, there too.
+export function nameLength(name: string): number {
+	return [...name.trim()].length;
+}
+
 // taken: the name is another person's: their id, to join them, and their spelling, to ask.
 export type SaveResult = 'ok' | 'invalid' | 'failed' | { taken: { id: number; name: string } };
 

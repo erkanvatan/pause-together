@@ -13,7 +13,7 @@ import (
 )
 
 // MaxNameRunes is the longest name, in runes. Not bytes (Turkish letters take two), and not UTF-16
-// units (an input's maxlength counts those, so the server decides).
+// units (an input's maxlength counts those, so pages count runes too: MAX_NAME in me.svelte.ts).
 const MaxNameRunes = 32
 
 // ErrBadName means a name breaks the rules in CleanName.
