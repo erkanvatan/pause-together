@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { forgetMe, joinPerson, loadMe, logOut, me, nameLength, saveName } from './me.svelte';
+import {
+	forgetMe,
+	joinPerson,
+	loadMe,
+	logOut,
+	me,
+	nameLength,
+	saveName
+} from './me.svelte';
 
 function respond(status: number, body: string) {
 	vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status })));
@@ -27,10 +35,19 @@ describe('saveName', () => {
 		});
 	});
 
-	it('reports a name the server refused', async () => {
-		respond(400, 'bad name');
-		expect(await saveName('a\tb')).toBe('invalid');
+	it('reports a name the server refused, and why', async () => {
+		respond(400, '{"error":"name-symbol","symbol":"😀"}');
+		expect(await saveName('Ali 😀')).toEqual({ invalid: { reason: 'name-symbol', symbol: '😀' } });
 		expect(me.name).toBeNull();
+	});
+
+	it.each([
+		['not JSON', 'bad JSON'],
+		['null', 'null'],
+		['not about the name', '{"error":"bad-request"}']
+	])("doesn't blame the name for another 400 (%s)", async (_, body) => {
+		respond(400, body);
+		expect(await saveName('Ali')).toBe('failed');
 	});
 
 	it("reports another person's name, and joins them by id", async () => {

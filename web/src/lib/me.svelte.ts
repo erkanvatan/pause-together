@@ -1,5 +1,7 @@
 // Who this visitor is. The server decides: the token lives in an HttpOnly cookie the page can't read.
 
+import { isNameReason } from '$lib/api';
+
 export const me = $state({
 	loaded: false,
 	id: null as number | null, // the person's; a rename keeps it, a move to another person's name doesn't
@@ -69,7 +71,12 @@ export function nameLength(name: string): number {
 }
 
 // taken: the name is another person's: their id, to join them, and their spelling, to ask.
-export type SaveResult = 'ok' | 'invalid' | 'failed' | { taken: { id: number; name: string } };
+// invalid: the server refused the name: why (user.NameError's reason) and, for a symbol, which.
+export type SaveResult =
+	| 'ok'
+	| 'failed'
+	| { taken: { id: number; name: string } }
+	| { invalid: { reason: string; symbol: string } };
 
 // saveName creates the user on first use and renames it after. Another person's name is taken: ask,
 // then joinPerson. It never throws.
@@ -78,10 +85,10 @@ export function saveName(name: string): Promise<SaveResult> {
 }
 
 // joinPerson makes this browser the person a taken name belongs to. It goes by id, so a rename since
-// the question doesn't matter. It never throws, and never says 'invalid': no name was sent.
+// the question doesn't matter. It never throws, and never says invalid: no name was sent.
 export async function joinPerson(id: number): Promise<SaveResult> {
 	const r = await post({ join: id });
-	return r === 'invalid' ? 'failed' : r;
+	return typeof r === 'object' && 'invalid' in r ? 'failed' : r;
 }
 
 async function post(body: { name: string } | { join: number }): Promise<SaveResult> {
@@ -91,7 +98,12 @@ async function post(body: { name: string } | { join: number }): Promise<SaveResu
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body)
 		});
-		if (res.status === 400) return 'invalid';
+		if (res.status === 400) {
+			// Only the name's rules blame the name. Any other 400 is a save that failed.
+			const r = await res.json().catch(() => null);
+			if (!isNameReason(r?.error)) return 'failed';
+			return { invalid: { reason: r.error, symbol: typeof r.symbol === 'string' ? r.symbol : '' } };
+		}
 		if (res.status === 409) {
 			const r = await res.json();
 			const taken = r.error === 'taken' && typeof r.id === 'number' && typeof r.name === 'string';

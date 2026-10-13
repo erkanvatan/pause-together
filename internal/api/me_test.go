@@ -314,6 +314,22 @@ func TestMeBadInput(t *testing.T) {
 	}
 }
 
+// A refused name says why, and which symbol, so the page can say what to fix.
+func TestPostMeBadNameReason(t *testing.T) {
+	h := Guest(fakeBuild(), deps(testUsers(t)))
+	rec := serve(h, meRequest(http.MethodPost, `{"name":"Ali 😀"}`, ""))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+	var got map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["error"] != user.ReasonSymbol || got["symbol"] != "😀" {
+		t.Errorf("body = %v, want %s 😀", got, user.ReasonSymbol)
+	}
+}
+
 func TestMeIsAdmin(t *testing.T) {
 	users := testUsers(t)
 	build := fakeBuild()

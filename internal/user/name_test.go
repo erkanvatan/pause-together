@@ -70,6 +70,55 @@ func TestCleanName(t *testing.T) {
 	}
 }
 
+// A refusal says why, and names a symbol the page can show.
+func TestCleanNameReason(t *testing.T) {
+	tests := []struct {
+		in     string
+		reason string
+		symbol string
+	}{
+		{in: "   ", reason: ReasonEmpty},
+		{in: strings.Repeat("ş", 33), reason: ReasonLong},
+		{in: "🎬 Film", reason: ReasonSymbol, symbol: "🎬"},
+		{in: "Ali ❤\ufe0f", reason: ReasonSymbol, symbol: "❤\ufe0f"},
+		{in: "Ali 👨\u200d👩\u200d👧 x", reason: ReasonSymbol, symbol: "👨\u200d👩\u200d👧"},
+		{in: "Ali 👍\U0001f3fd", reason: ReasonSymbol, symbol: "👍\U0001f3fd"},
+		{in: "Ali 🇹🇷🇩🇪", reason: ReasonSymbol, symbol: "🇹🇷"},
+		{in: "Ali 🏴\U000e0067\U000e0062\U000e0065\U000e006e\U000e0067\U000e007f", reason: ReasonSymbol,
+			symbol: "🏴\U000e0067\U000e0062\U000e0065\U000e006e\U000e0067\U000e007f"},
+		{in: "Ali \U0001f3fd", reason: ReasonSymbol, symbol: "\U0001f3fd"},
+		{in: "Ali ★", reason: ReasonSymbol, symbol: "★"},
+		{in: "A\ufe0fli", reason: ReasonHidden}, // not "A": the selector is what's wrong
+		{in: "Ali 1\ufe0f\u20e3", reason: ReasonSymbol, symbol: "1\ufe0f\u20e3"},
+		{in: "Ali #\u20e3", reason: ReasonSymbol, symbol: "#\u20e3"},
+		{in: "Ali ↔\ufe0f", reason: ReasonSymbol, symbol: "↔\ufe0f"},
+		{in: "Ali ™\ufe0f", reason: ReasonSymbol, symbol: "™\ufe0f"},
+		{in: "Ali!\ufe0f", reason: ReasonHidden}, // not "!": it's allowed, the selector isn't
+		{in: "Ali #\ufe0f", reason: ReasonHidden},
+		{in: "★\u200dAli", reason: ReasonSymbol, symbol: "★"}, // not "★A"
+		{in: "Ali 🏳\ufe0f\u200d🌈", reason: ReasonSymbol, symbol: "🏳\ufe0f\u200d🌈"},
+		{in: "Ali \ufe0f", reason: ReasonHidden},
+		{in: "\ufe0fAli", reason: ReasonHidden},
+		{in: "Al\u200bice", reason: ReasonHidden},
+		{in: "Ali (TR)\u200e", reason: ReasonHidden}, // not ")": nothing after it is an emoji part
+		{in: "Ali,\tB", reason: ReasonHidden},
+		{in: "a\u2028b", reason: ReasonHidden},
+		{in: "...", reason: ReasonNoLetter},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			_, err := CleanName(tt.in)
+			var ne *NameError
+			if !errors.As(err, &ne) || ne.Reason != tt.reason || ne.Symbol != tt.symbol {
+				t.Errorf("CleanName(%q) = %v; want %s %q", tt.in, err, tt.reason, tt.symbol)
+			}
+			if !errors.Is(err, ErrBadName) {
+				t.Errorf("CleanName(%q) = %v; want it to match ErrBadName", tt.in, err)
+			}
+		})
+	}
+}
+
 func TestNameKey(t *testing.T) {
 	tests := []struct {
 		name string

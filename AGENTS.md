@@ -289,7 +289,11 @@ container mount for source files, and one name for two things gets mixed up in c
   and changes nothing; your own name in another case is no one else's. `POST /api/me {join: id}` then
   moves the browser to that person, by id, so a rename since the question doesn't matter. The
   question is the page's: the server joins any id it's sent, as the tailnet is trusted, like any name
-  typed. Both answer with the person's spelling.
+  typed. Both answer with the person's spelling. A name that breaks the rules answers 400
+  `{error, symbol}`: a reason code (`Reason*` in `internal/user/name.go`, turned into text by
+  `nameRefused` in `web/src/lib/strings.ts`; add a new one to both) and, for an emoji or symbol, the
+  first one, so the page says which. A room name that breaks them answers the same. The rules live
+  only in Go: the page checks just the length while typing.
 - The cookie (`pt_token`) is `SameSite=Lax` and never `Secure`: guests use plain HTTP, and their
   browser would drop a `Secure` cookie. `localhost` counts as secure, so dev would hide that bug.
 - Everyone can: see all rooms, create and name rooms, control playback, switch a room's video, chat,

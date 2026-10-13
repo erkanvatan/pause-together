@@ -299,6 +299,8 @@ and moonlight while on: state, not the lamp.
 - **Style:** dusk fill, a border of haze at 60% (stronger than line: the edge is what shows where to
   type, 3:1 on midnight and dusk), gentle corners, 2.5rem tall (2.75rem on touch).
 - **Focus:** the border turns lamp, plus the lamp focus ring.
+- **Invalid:** the border and the focus ring turn ember, so a field never shows lamp and ember at once,
+  with the error in ember under the field.
 - **Disabled:** 45% opacity. Placeholders are haze at full opacity.
 
 ### Rows

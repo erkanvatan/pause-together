@@ -101,7 +101,14 @@ export type Quote = { id: number; from: Who; text: string; deleted: boolean }; /
 export type RoomCard = Room & { watching: Who[]; gone: boolean; usedAt: number };
 
 // The server's error code, or 'failed' for no connection, a server error, or an unexpected body.
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
+// symbol: a refused name's emoji or symbol (the name-symbol error), so the page can say which.
+export type Result<T> = { ok: true; value: T } | { ok: false; error: string; symbol?: string };
+
+// isNameReason tells a refused name, a person's or a room's (user.NameError's reasons, all "name-…"),
+// from other error codes.
+export function isNameReason(code: unknown): code is string {
+	return typeof code === 'string' && code.startsWith('name-');
+}
 
 export async function call<T>(method: string, url: string, body?: unknown): Promise<Result<T>> {
 	try {
@@ -116,11 +123,10 @@ export async function call<T>(method: string, url: string, body?: unknown): Prom
 				: undefined;
 			return { ok: true, value };
 		}
-		const code = await res
-			.json()
-			.then((b) => b?.error)
-			.catch(() => undefined);
-		return { ok: false, error: typeof code === 'string' ? code : 'failed' };
+		const b = await res.json().catch(() => undefined);
+		const code = b?.error;
+		const symbol = typeof b?.symbol === 'string' ? b.symbol : undefined;
+		return { ok: false, error: typeof code === 'string' ? code : 'failed', symbol };
 	} catch {
 		return { ok: false, error: 'failed' };
 	}

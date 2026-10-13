@@ -56,7 +56,7 @@ func TestRooms(t *testing.T) {
 		{"open malformed", guest, http.MethodGet, "/api/rooms/x", "", http.StatusNotFound, `{"error":"not-found"}`},
 		{"rename", guest, http.MethodPut, "/api/rooms/1/name", `{"name":" Movie night "}`, http.StatusOK, ""},
 		{"rename, bad name", guest, http.MethodPut, "/api/rooms/1/name", `{"name":"😀"}`, http.StatusBadRequest,
-			`{"error":"bad-name"}`},
+			`{"error":"name-symbol","symbol":"😀"}`},
 		{"rename unknown", guest, http.MethodPut, "/api/rooms/2/name", `{"name":"x"}`, http.StatusNotFound, `{"error":"not-found"}`},
 		{"switch", guest, http.MethodPut, "/api/rooms/1/video", `{"videoId":7,"audio":1}`, http.StatusOK, ""},
 		{"switch, bad pick", guest, http.MethodPut, "/api/rooms/1/video", `{"videoId":8,"audio":1}`,

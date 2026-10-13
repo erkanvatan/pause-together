@@ -102,7 +102,7 @@ func (s *server) postMe(w http.ResponseWriter, r *http.Request) {
 	}
 	name, err := user.CleanName(req.Name)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeBadName(w, err)
 		return
 	}
 
@@ -195,6 +195,17 @@ func (s *server) deleteMe(w http.ResponseWriter, r *http.Request) {
 // browserOf is how rooms tell one browser from another: its token's hash. They keep it in memory only,
 // and never send it.
 func browserOf(token string) string { return string(user.TokenHash(token)) }
+
+// writeBadName answers a refused name with why, so the page can say what to fix: 400
+// {error: reason, symbol}, the symbol only for name-symbol.
+func writeBadName(w http.ResponseWriter, err error) {
+	ne := &user.NameError{Reason: user.ReasonOther}
+	errors.As(err, &ne)
+	writeJSONStatus(w, http.StatusBadRequest, struct {
+		Error  string `json:"error"`
+		Symbol string `json:"symbol,omitempty"`
+	}{ne.Reason, ne.Symbol})
+}
 
 func writeJSON(w http.ResponseWriter, v any) {
 	writeJSONStatus(w, http.StatusOK, v)

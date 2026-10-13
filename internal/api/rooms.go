@@ -10,10 +10,10 @@ import (
 	"github.com/erkanvatan/pause-together/internal/room"
 )
 
-// Error codes the room pages turn into text.
+// Error codes the room pages turn into text. A refused room name answers as a refused user name
+// does (writeBadName).
 const (
 	errBadPick  = "bad-pick"
-	errBadName  = "bad-name"
 	errArchived = "archived"
 	errWatching = "watching" // archive refused: someone is in the room
 	// The room page tells a room that is gone from a failed connection by this code.
@@ -185,7 +185,7 @@ func roomError(w http.ResponseWriter, what string, err error) {
 	case errors.Is(err, room.ErrBadPick):
 		writeError(w, http.StatusBadRequest, errBadPick)
 	case errors.Is(err, room.ErrBadName):
-		writeError(w, http.StatusBadRequest, errBadName)
+		writeBadName(w, err)
 	case errors.Is(err, room.ErrArchived):
 		writeError(w, http.StatusConflict, errArchived)
 	case errors.Is(err, room.ErrWatching):

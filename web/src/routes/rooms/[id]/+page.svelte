@@ -28,6 +28,7 @@
 	import {
 		getLanguages,
 		getVideo,
+		isNameReason,
 		listVideos,
 		olderMessages,
 		openRoom,
@@ -70,6 +71,7 @@
 	let renaming = $state(false);
 	let name = $state('');
 	let renameError = $state(''); // the rename dialog's own, so the page's stays as it was
+	let renameInvalid = $state(false); // the error is about the name: the field turns ember until it's edited
 	let savingName = $state(false);
 	let watching = $state<Who[]>([]);
 	let prepare = $state<Prepare | null>(null);
@@ -388,6 +390,7 @@
 	function startRename() {
 		name = room?.name ?? '';
 		renameError = '';
+		renameInvalid = false;
 		renaming = true;
 	}
 
@@ -399,7 +402,10 @@
 		if (r.ok) room = r.value;
 		else if (r.error === 'not-found') notFound = true;
 		else {
-			renameError = strings.roomErrors[r.error] ?? strings.actionFailed;
+			renameInvalid = isNameReason(r.error);
+			renameError = renameInvalid
+				? strings.nameRefused(r.error, r.symbol ?? '')
+				: (strings.roomErrors[r.error] ?? strings.actionFailed);
 			return;
 		}
 		renaming = false;
@@ -578,11 +584,20 @@
 			<label for="room-name" class="font-display text-2xl font-bold">{strings.roomName}</label>
 			<!-- No maxlength: it counts UTF-16 units, not runes. The server decides. -->
 			<!-- svelte-ignore a11y_autofocus -->
-			<input id="room-name" bind:value={name} placeholder={videoName(room.video)} autofocus class="field" />
+			<input
+				id="room-name"
+				bind:value={name}
+				oninput={() => (renameInvalid = false)}
+				aria-invalid={renameInvalid || undefined}
+				aria-describedby={renameError ? 'room-name-error' : 'room-name-hint'}
+				placeholder={videoName(room.video)}
+				autofocus
+				class="field"
+			/>
 			{#if renameError}
-				<p class="-mt-2 text-sm text-ember" role="alert">{renameError}</p>
+				<p id="room-name-error" class="-mt-2 text-sm break-words text-ember" role="alert">{renameError}</p>
 			{:else}
-				<p class="-mt-2 text-sm text-haze">{strings.roomNameHint}</p>
+				<p id="room-name-hint" class="-mt-2 text-sm text-haze">{strings.roomNameHint}</p>
 			{/if}
 			<div class="flex gap-2">
 				<!-- Off until the name changes: a form at rest shows no lit lamp. -->

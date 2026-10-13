@@ -1,6 +1,7 @@
 import { MAX_NAME } from '$lib/me.svelte';
 
 const appName = 'PauseTogether';
+const nameTooLong = `Too long: a name can have up to ${MAX_NAME} characters.`;
 const nameInvalid = `Use up to ${MAX_NAME} characters, with a letter or number. No emoji or symbols like ♥.`;
 
 // Every piece of UI text lives here, so a Turkish version is one more object later.
@@ -38,8 +39,27 @@ export const strings = {
 	logOut: 'Log out',
 	logOutFailed: "Couldn't log out. Try again.",
 	nameInvalid,
-	// No count: it's read out as an alert, and a count would be read again on every key.
-	nameTooLong: `Too long: a name can have up to ${MAX_NAME} characters.`,
+	// Said while typing. It shows a count, but screen readers get the line without it: the alert
+	// would be read again on every key.
+	nameTooLong: (over: number) =>
+		`${over} ${over === 1 ? 'character' : 'characters'} too long. A name can have up to ${MAX_NAME}.`,
+	nameTooLongSpoken: nameTooLong,
+	// Why the server refused a name: user.NameError's reasons in Go. Add a new one to both.
+	nameRefused: (reason: string, symbol: string) => {
+		switch (reason) {
+			case 'name-symbol':
+				return `A name can't have ${symbol} in it. No emoji or symbols.`;
+			case 'name-hidden':
+				return "A name can't have hidden characters or line breaks. Type it again.";
+			case 'name-no-letter':
+			case 'name-empty':
+				return 'A name needs at least one letter or number.';
+			case 'name-long':
+				return nameTooLong;
+			default:
+				return nameInvalid;
+		}
+	},
 	saveFailed: "Couldn't save your name. Try again.",
 	loadFailed: "Can't reach the server. Retrying…",
 
@@ -197,7 +217,6 @@ export const strings = {
 	// Why a room change failed (the room API's error codes). Others show actionFailed.
 	roomErrors: {
 		'bad-pick': "That video can't be picked any more. Try another.",
-		'bad-name': nameInvalid,
 		archived: 'This room is archived.',
 		watching: 'Someone is in this room. Archive it once it is empty.'
 	} as Record<string, string>,

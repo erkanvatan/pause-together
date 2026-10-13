@@ -30,13 +30,17 @@
 	// svelte-ignore state_referenced_locally (only the starting value is wanted)
 	let name = $state(initial);
 	const trimmed = $derived(name.trim());
-	// invalid: the name itself is wrong, not just the save.
-	let error = $state<{ text: string; invalid: boolean } | null>(null);
-	// Too long says so while typing, before any save: the server would only say the rules again.
-	const length = $derived(nameLength(name));
+	// invalid: the name itself is wrong, not just the save. spoken: what a screen reader hears instead.
+	type FormError = { text: string; spoken?: string; invalid: boolean };
+	let error = $state<FormError | null>(null);
+	// Too long says so while typing, before any save. The other rules wait for the server's answer.
+	const over = $derived(nameLength(name) - MAX_NAME);
 	const shown = $derived(
-		length > MAX_NAME ? { text: strings.nameTooLong, invalid: true } : error
+		over > 0
+			? { text: strings.nameTooLong(over), spoken: strings.nameTooLongSpoken, invalid: true }
+			: error
 	);
+
 	let saving = $state(false);
 	// "Saving…" shows only on a slow answer, so a quick one never flashes it.
 	const SLOW_MS = 300;
@@ -67,7 +71,7 @@
 		if (result === 'ok') {
 			error = null;
 			ondone?.();
-		} else if (typeof result === 'object') {
+		} else if (typeof result === 'object' && 'taken' in result) {
 			error = null;
 			taken = result.taken;
 			reading = true;
@@ -79,12 +83,11 @@
 				await tick();
 				pickButton?.focus();
 			}, READ_MS);
+		} else if (typeof result === 'object') {
+			error = { text: strings.nameRefused(result.invalid.reason, result.invalid.symbol), invalid: true };
 		} else {
 			// A failed join keeps its question, to try again.
-			error =
-				result === 'invalid'
-					? { text: strings.nameInvalid, invalid: true }
-					: { text: strings.saveFailed, invalid: false };
+			error = { text: strings.saveFailed, invalid: false };
 		}
 	}
 
@@ -174,8 +177,13 @@
 			{/if}
 		</div>
 	{:else}
-		{#if shown}
-			<p id="{id}-error" class="text-sm text-ember" role="alert">{shown.text}</p>
+		{#if shown?.spoken}
+			<!-- The count changes on every key, so it stays out of the alert: the alert's words never
+			change while typing, and a screen reader reads it once. -->
+			<p id="{id}-error" class="sr-only" role="alert">{shown.spoken}</p>
+			<p class="text-sm break-words text-ember" aria-hidden="true">{shown.text}</p>
+		{:else if shown}
+			<p id="{id}-error" class="text-sm break-words text-ember" role="alert">{shown.text}</p>
 		{:else if hint}
 			<p id="{id}-hint" class="-mt-2 text-sm text-haze">{hint}</p>
 		{/if}
@@ -183,7 +191,7 @@
 			<!-- A rename's Save stays off until the name changes: a form at rest shows no lit lamp. -->
 			<button
 				type="submit"
-				disabled={saving || trimmed === '' || trimmed === initial || length > MAX_NAME}
+				disabled={saving || trimmed === '' || trimmed === initial || over > 0}
 				class="btn btn-primary flex-1"
 			>
 				{slow ? strings.saving : action}
