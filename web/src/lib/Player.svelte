@@ -1171,11 +1171,9 @@ can't scroll at all. -->
 		subtitle panel is open, never all: in fullscreen the video shrinks first. Absolute inside, so its
 		messages never make the player taller. -->
 		<aside
-			class="relative z-10 border-line landscape:w-72 landscape:shrink-0 landscape:border-l lg:landscape:w-80 portrait:border-t portrait:flex-1 {subtitlesOpen
+			class="relative z-10 border-line landscape:w-72 landscape:shrink-0 landscape:border-l lg:landscape:w-80 portrait:border-t portrait:flex-1 {subtitlesOpen || !full
 				? 'portrait:min-h-56'
-				: full
-					? 'portrait:min-h-0'
-					: 'portrait:min-h-72'}"
+				: 'portrait:min-h-0'}"
 		>
 			<div class="absolute inset-0">
 				{@render side()}
