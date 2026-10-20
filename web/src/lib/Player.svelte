@@ -327,7 +327,13 @@
 		untrack(fit);
 		view.addEventListener('resize', fit);
 		view.addEventListener('scroll', fit);
+		// The wrapper's own size too: turned in fullscreen, an iPad resizes the view before the wrapper, so
+		// the old, taller wrapper looked like a keyboard, and nothing measured again once it caught up. Its
+		// padding can't resize it (fixed to the screen), so this never loops.
+		const resized = new ResizeObserver(fit);
+		resized.observe(wrapper, { box: 'border-box' });
 		return () => {
+			resized.disconnect();
 			view.removeEventListener('resize', fit);
 			view.removeEventListener('scroll', fit);
 			keyboard = { top: 0, bottom: 0 };
