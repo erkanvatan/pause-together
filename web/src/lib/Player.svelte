@@ -80,6 +80,8 @@
 	const skipMs = 10_000;
 	// The controls fade after this long without a touch, mouse move or key, while the video plays.
 	const controlsHideMs = 3000;
+	// How long after a finger that woke the controls lifts they still ignore it.
+	const wakeTapMs = 500;
 
 	let wrapper: HTMLDivElement;
 	let video: HTMLVideoElement;
@@ -187,11 +189,16 @@
 	let keyFocused: Element | null = null;
 	const canFade = $derived(joined && !!playState?.playing && dragMs === null);
 	const faded = $derived(idle && canFade && !overBar);
+	// A finger on faded controls only wakes them. Chrome on Android picks a tap's target when the finger
+	// lifts, when they show again, so without this the tap would also press the one under it: a seek or a
+	// pause for the whole room.
+	let waking = $state(false);
+	let wakingTimer: ReturnType<typeof setTimeout> | undefined;
 	// Hiding waits for the fade to end; showing doesn't, or Tab would find them still hidden and skip them.
 	const fade = $derived(
 		faded
 			? 'invisible opacity-0 transition-[opacity,visibility] duration-300'
-			: 'transition-opacity duration-300'
+			: `transition-opacity duration-300 ${waking ? 'pointer-events-none!' : ''}`
 	);
 
 	// A control a click focused stays focused as it fades: Space would press a button unseen, or do
@@ -512,8 +519,16 @@
 	function pointerDown(e: PointerEvent) {
 		const t = e.target as Element;
 		const bare = box.contains(t) && !bar.contains(t) && !t.closest('button, a, input, select');
+		if (e.pointerType !== 'mouse' && faded) {
+			clearTimeout(wakingTimer);
+			waking = true;
+		}
 		if (e.pointerType !== 'mouse' && bare && !faded) rest();
 		else wake();
+	}
+
+	function pointerUp() {
+		if (waking) wakingTimer = setTimeout(() => (waking = false), wakeTapMs);
 	}
 
 	function skip(ms: number) {
@@ -766,6 +781,8 @@ can't scroll at all. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		onpointerdown={pointerDown}
+		onpointerup={pointerUp}
+		onpointercancel={pointerUp}
 		onpointermove={(e) => e.pointerType === 'mouse' && wake()}
 		onpointerleave={(e) => e.pointerType === 'mouse' && rest()}
 		onfocusin={(e) => {

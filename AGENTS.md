@@ -623,7 +623,9 @@ So each room's video is **prepared once**, then served as a plain file.
 - Controls fade after 3 s with no mouse move, touch or key while the video plays: the round buttons
   and the bar together. An open subtitle panel stays. Never while paused, the seek bar is held, the
   mouse is on the bar, or a key has put the focus on one of them (a click's focus doesn't count). On
-  touch screens, a tap on bare video hides them.
+  touch screens, a tap on bare video hides them, and a tap on faded controls only shows them, never
+  presses the one under the finger (Chrome on Android picks the tap's target as it lifts, when they
+  show again).
 - Over the video's middle: back 10 s, play or pause, forward 10 s. Hidden while "Tap to join", "Waiting
   for …", the end of the video ("Next episode", "The end"), or "Host is offline" hold the middle. Before the room's first
   word on the socket, the middle says "Getting the room ready…" (after a moment, so a quick connect
