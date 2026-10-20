@@ -12,3 +12,11 @@ The project spec and rules are in @AGENTS.md
   `requestAnimationFrame`, and `bind:clientHeight` (ResizeObserver) only updates when a screenshot
   forces a frame, so take one before measuring. Vite reloads the page after each edit, which wipes
   the iframe: build it again.
+- Checking on a real phone with BrowserStack: the BrowserStack MCP refuses `localhost`, so start a Live
+  session on any public URL, then open its dashboard link in Chrome with
+  `url=http%3A%2F%2Flocalhost%3A5173%2F…` and `local=true`, and drive it there. Type `http://`, not
+  https. The user's `BrowserStackLocal` tunnel must run on the account logged in to Chrome. BrowserStack
+  drops some taps and typed keys; typed text that misses a field hits the player's keys (F, M, Space).
+  Tap a bar button within a second of waking the controls: they fade after 3 s, and a tap on faded
+  controls only wakes them. To see what the phone does, a throwaway Vite `configureServer` middleware
+  that logs `/__log` requests, fed by `fetch('/__log?…')` from the page, works.

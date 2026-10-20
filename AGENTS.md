@@ -120,6 +120,10 @@ Dev reads only `MEDIA_ROOT` and `DEV_MEDIA_ROOT` from `.env`. The rest of `.env`
   string). A new Go URL prefix needs its own entry in `web/vite.config.ts`, shaped like the others: a
   regex key (`'^/api(/|$)'`, so `/streams` stays an SPA page) and an object value (why: see
   `changeOrigin` under "Access and networking").
+- For BrowserStack phones, the `/ws` proxy passes a page on `bs-local.com:5173` (what BrowserStack's
+  tunnel serves `localhost` as) to Go as `localhost`, Host and Origin both, or the admin Host check
+  refuses the room socket. Only when both say `bs-local.com`, so another site still fails the Origin
+  check. Dev only: prod has no Vite.
 - The Dockerfile's Go stage copies only `cmd/`, `internal/` and `web/embed.go`. A new top-level Go folder
   must be added there, or the prod build fails while dev still works.
 

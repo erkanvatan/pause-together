@@ -7,6 +7,11 @@ import { defineConfig } from 'vitest/config';
 // Vite turns the string shorthand ('/api': url) into changeOrigin: true.
 const api = { target: process.env.API_URL ?? 'http://localhost:8081', changeOrigin: false };
 
+// BrowserStack's tunnel serves the page as bs-local.com, which Go's admin Host check refuses, so a remote
+// phone's room socket would never open. Only a page on bs-local.com itself passes as localhost: another
+// site opening a socket to bs-local.com (it points at 127.0.0.1) still fails Go's Origin check.
+const bsLocal = 'bs-local.com:5173';
+
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
@@ -16,7 +21,16 @@ export default defineConfig({
 		proxy: {
 			'^/api(/|$)': api,
 			'^/stream(/|$)': api,
-			'^/ws(\\?|$)': { ...api, ws: true }
+			'^/ws(\\?|$)': {
+				...api,
+				ws: true,
+				configure: (proxy) =>
+					proxy.on('proxyReqWs', (proxyReq, req) => {
+						if (req.headers.host !== bsLocal || req.headers.origin !== `http://${bsLocal}`) return;
+						proxyReq.setHeader('host', 'localhost:5173');
+						proxyReq.setHeader('origin', 'http://localhost:5173');
+					})
+			}
 		}
 	},
 	test: {
