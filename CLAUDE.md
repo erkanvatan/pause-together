@@ -15,7 +15,8 @@ The project spec and rules are in @AGENTS.md
 - Checking on a real phone with BrowserStack: the BrowserStack MCP refuses `localhost`, so start a Live
   session on any public URL, then open its dashboard link in Chrome with
   `url=http%3A%2F%2Flocalhost%3A5173%2F…` and `local=true`, and drive it there. Type `http://`, not
-  https. The user's `BrowserStackLocal` tunnel must run on the account logged in to Chrome. BrowserStack
+  https. The phone may open google.com anyway: type the address in its own address bar then. A typed
+  `:` arrives as `;` (on Android at least): tap `!#1`, then the phone keyboard's own `:`. The user's `BrowserStackLocal` tunnel must run on the account logged in to Chrome. BrowserStack
   drops some taps and typed keys; typed text that misses a field hits the player's keys (F, M, Space).
   Tap a bar button within a second of waking the controls: they fade after 3 s, and a tap on faded
   controls only wakes them. To see what the phone does, a throwaway Vite `configureServer` middleware
